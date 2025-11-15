@@ -86,7 +86,10 @@ export const SubscriberDetail = ({
 
   const handleUpdateTransaction = (transactionId: string, updates: any) => {
     updateTransaction(transactionId, updates);
-    window.location.reload();
+    setShowEditTransaction(false);
+    setEditingTransaction(null);
+    // Trigger parent component to reload data
+    onBack();
   };
 
   return (
@@ -167,14 +170,23 @@ export const SubscriberDetail = ({
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-muted-foreground">Current Active Package</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                      Active
-                    </span>
-                    {calculateRemainingDays(subscriber.currentSubscription.endDate) > 0 && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
-                        {calculateRemainingDays(subscriber.currentSubscription.endDate)} days left
-                      </span>
-                    )}
+                    {(() => {
+                      const daysLeft = calculateRemainingDays(subscriber.currentSubscription.endDate);
+                      return daysLeft > 0 ? (
+                        <>
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                            Active
+                          </span>
+                          <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                            {daysLeft} days left
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-red-500/10 text-red-700 dark:text-red-400">
+                          Expired {Math.abs(daysLeft)} days ago
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
                 <h4 className="text-xl font-bold mb-3">{subscriber.currentSubscription.packName}</h4>
