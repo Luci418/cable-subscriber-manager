@@ -130,9 +130,9 @@ const generateSubscriberId = (): string => {
   return `SUB-${counter.toString().padStart(6, '0')}`;
 };
 
-// Format date in IST
+// Format date in IST (returns ISO string for consistent parsing)
 const formatISTDate = (date: Date = new Date()): string => {
-  return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  return date.toISOString();
 };
 
 // Subscribers
@@ -485,6 +485,7 @@ export const addSubscriptionToSubscriber = (
   if (!subscriber) return;
   
   const packPrice = getPackPrice(packName);
+  const totalCost = packPrice * duration;
   const startDate = new Date();
   const endDate = new Date();
   endDate.setMonth(endDate.getMonth() + duration);
@@ -513,6 +514,24 @@ export const addSubscriptionToSubscriber = (
   subscriber.subscriptions.push(newSubscription);
   subscriber.currentSubscription = newSubscription;
   subscriber.pack = packName;
+  
+  // Auto-create transaction for package subscription and update balance
+  const transaction: Transaction = {
+    id: `txn-${Date.now()}`,
+    subscriberId: subscriber.id,
+    subscriberName: subscriber.name,
+    type: 'charge',
+    amount: totalCost,
+    description: `Package subscription: ${packName} (${duration} month${duration > 1 ? 's' : ''})`,
+    date: formatISTDate()
+  };
+  
+  const transactions = getTransactions();
+  transactions.push(transaction);
+  saveTransactions(transactions);
+  
+  // Update balance
+  subscriber.balance = subscriber.balance - totalCost;
   
   saveSubscribers(subscribers);
 };
