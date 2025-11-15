@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getPacks, addSubscriptionToSubscriber, Pack } from '@/lib/storage';
+import { getPacks, addSubscriptionToSubscriber, Pack, getSubscribers, cancelSubscription } from '@/lib/storage';
+import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { toast } from 'sonner';
 import { Calendar, Clock } from 'lucide-react';
 
@@ -25,6 +26,8 @@ export const AddPackageSubscriptionDialog = ({
   const [packs, setPacks] = useState<Pack[]>([]);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
   
   const startDate = new Date();
   const endDate = new Date();
@@ -33,8 +36,11 @@ export const AddPackageSubscriptionDialog = ({
   useEffect(() => {
     if (open) {
       setPacks(getPacks());
+      const subscribers = getSubscribers();
+      const subscriber = subscribers.find(s => s.id === subscriberId);
+      setCurrentSubscriber(subscriber);
     }
-  }, [open]);
+  }, [open, subscriberId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +50,17 @@ export const AddPackageSubscriptionDialog = ({
       return;
     }
 
+    // Check if subscriber has an active subscription
+    if (currentSubscriber?.currentSubscription?.status === 'active') {
+      setShowCancelDialog(true);
+      return;
+    }
+
+    // No active subscription, proceed with adding new one
+    addNewSubscription();
+  };
+
+  const addNewSubscription = () => {
     addSubscriptionToSubscriber(subscriberId, selectedPack, duration);
     toast.success('Package subscription added successfully');
     setSelectedPack('');
@@ -52,11 +69,22 @@ export const AddPackageSubscriptionDialog = ({
     onSuccess();
   };
 
+  const handleCancelAndAdd = (refundAmount: number) => {
+    // Cancel current subscription with refund
+    cancelSubscription(subscriberId, refundAmount);
+    toast.success(`Subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`);
+    
+    // Add new subscription
+    addNewSubscription();
+    setShowCancelDialog(false);
+  };
+
   const selectedPackData = packs.find(p => p.name === selectedPack);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Package Subscription</DialogTitle>
           <p className="text-sm text-muted-foreground">for {subscriberName}</p>
@@ -133,5 +161,15 @@ export const AddPackageSubscriptionDialog = ({
         </form>
       </DialogContent>
     </Dialog>
+
+    {currentSubscriber?.currentSubscription && (
+      <CancelSubscriptionDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        subscription={currentSubscriber.currentSubscription}
+        onConfirm={handleCancelAndAdd}
+      />
+    )}
+    </>
   );
 };

@@ -135,6 +135,49 @@ const formatISTDate = (date: Date = new Date()): string => {
   return date.toISOString();
 };
 
+// Cancel subscription and calculate refund
+export const cancelSubscription = (subscriberId: string, refundAmount: number): void => {
+  const subscribers = getSubscribers();
+  const subscriber = subscribers.find(s => s.id === subscriberId);
+  
+  if (!subscriber || !subscriber.currentSubscription) return;
+  
+  // Mark current subscription as expired with current date
+  subscriber.currentSubscription.status = 'expired';
+  subscriber.currentSubscription.endDate = new Date().toISOString();
+  
+  // Update subscriptions array
+  if (subscriber.subscriptions) {
+    subscriber.subscriptions = subscriber.subscriptions.map(sub => 
+      sub.id === subscriber.currentSubscription?.id 
+        ? { ...sub, status: 'expired' as const, endDate: new Date().toISOString() }
+        : sub
+    );
+  }
+  
+  // Add refund transaction if refund amount > 0
+  if (refundAmount > 0) {
+    const transaction: Transaction = {
+      id: crypto.randomUUID(),
+      subscriberId: subscriber.id,
+      subscriberName: subscriber.name,
+      type: 'payment',
+      amount: refundAmount,
+      description: `Refund for cancelled subscription: ${subscriber.currentSubscription.packName}`,
+      date: formatISTDate()
+    };
+    
+    const transactions = getTransactions();
+    transactions.push(transaction);
+    saveTransactions(transactions);
+    
+    // Update balance (add refund)
+    subscriber.balance = subscriber.balance + refundAmount;
+  }
+  
+  saveSubscribers(subscribers);
+};
+
 // Subscribers
 export const getSubscribers = (): Subscriber[] => {
   const data = localStorage.getItem(SUBSCRIBERS_KEY);
@@ -198,7 +241,7 @@ export const addTransaction = (transaction: Omit<Transaction, 'id' | 'date'>) =>
   transactions.push(newTransaction);
   saveTransactions(transactions);
 
-  // Update subscriber balance
+  // Update subscriber balance (POSITIVE model: payments ADD, charges SUBTRACT)
   const subscribers = getSubscribers();
   const subscriber = subscribers.find(s => s.id === transaction.subscriberId);
   if (subscriber) {
@@ -515,9 +558,9 @@ export const addSubscriptionToSubscriber = (
   subscriber.currentSubscription = newSubscription;
   subscriber.pack = packName;
   
-  // Auto-create transaction for package subscription and update balance
+  // Auto-create transaction for package subscription and update balance (SUBTRACT from positive balance)
   const transaction: Transaction = {
-    id: `txn-${Date.now()}`,
+    id: crypto.randomUUID(),
     subscriberId: subscriber.id,
     subscriberName: subscriber.name,
     type: 'charge',
@@ -530,7 +573,7 @@ export const addSubscriptionToSubscriber = (
   transactions.push(transaction);
   saveTransactions(transactions);
   
-  // Update balance
+  // Update balance (SUBTRACT charge from positive balance)
   subscriber.balance = subscriber.balance - totalCost;
   
   saveSubscribers(subscribers);
