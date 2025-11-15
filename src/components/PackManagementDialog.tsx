@@ -1,0 +1,154 @@
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { getPacks, addPack, updatePack, deletePack, Pack } from '@/lib/storage';
+import { toast } from 'sonner';
+import { Trash2, Plus, Edit2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+
+interface PackManagementDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialogProps) => {
+  const [packs, setPacks] = useState<Pack[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ name: '', price: 0 });
+
+  useEffect(() => {
+    if (open) {
+      loadPacks();
+    }
+  }, [open]);
+
+  const loadPacks = () => {
+    setPacks(getPacks());
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || formData.price <= 0) {
+      toast.error('Please enter valid pack details');
+      return;
+    }
+
+    if (editingId) {
+      updatePack(editingId, formData);
+      toast.success('Pack updated successfully');
+      setEditingId(null);
+    } else {
+      addPack(formData);
+      toast.success('Pack added successfully');
+    }
+    
+    setFormData({ name: '', price: 0 });
+    loadPacks();
+  };
+
+  const handleEdit = (pack: Pack) => {
+    setEditingId(pack.id);
+    setFormData({ name: pack.name, price: pack.price });
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this pack?')) {
+      deletePack(id);
+      toast.success('Pack deleted successfully');
+      loadPacks();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Manage Subscription Packs</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mb-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pack-name">Pack Name</Label>
+              <Input
+                id="pack-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter pack name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pack-price">Price (₹)</Label>
+              <Input
+                id="pack-price"
+                type="number"
+                step="0.01"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                placeholder="Enter price"
+              />
+            </div>
+          </div>
+          <Button type="submit" className="w-full">
+            {editingId ? (
+              <>
+                <Edit2 className="mr-2 h-4 w-4" />
+                Update Pack
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Pack
+              </>
+            )}
+          </Button>
+          {editingId && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditingId(null);
+                setFormData({ name: '', price: 0 });
+              }}
+              className="w-full"
+            >
+              Cancel Edit
+            </Button>
+          )}
+        </form>
+
+        <div className="space-y-2">
+          <h3 className="font-semibold">Existing Packs</h3>
+          {packs.map((pack) => (
+            <Card key={pack.id} className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{pack.name}</p>
+                  <p className="text-sm text-muted-foreground">₹{pack.price.toFixed(2)}/month</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(pack)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(pack.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
