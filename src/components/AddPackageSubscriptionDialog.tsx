@@ -3,10 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getPacks, addSubscriptionToSubscriber, Pack, getSubscribers, cancelSubscription } from '@/lib/storage';
 import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { toast } from 'sonner';
 import { Calendar, Clock } from 'lucide-react';
+import { usePacks } from '@/hooks/usePacks';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddPackageSubscriptionDialogProps {
   open: boolean;
@@ -23,45 +25,94 @@ export const AddPackageSubscriptionDialog = ({
   subscriberName,
   onSuccess
 }: AddPackageSubscriptionDialogProps) => {
-  const [packs, setPacks] = useState<Pack[]>([]);
+  const { user } = useAuth();
+  const { packs } = usePacks(user?.id);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   
   const startDate = new Date();
   const endDate = new Date();
   endDate.setMonth(endDate.getMonth() + duration);
 
   useEffect(() => {
-    if (open) {
-      setPacks(getPacks());
-      const subscribers = getSubscribers();
-      const subscriber = subscribers.find(s => s.id === subscriberId);
-      setCurrentSubscriber(subscriber);
+    if (open && subscriberId) {
+      loadSubscriber();
     }
   }, [open, subscriberId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadSubscriber = async () => {
+    const { data } = await supabase
+      .from('subscribers')
+      .select('*')
+      .eq('id', subscriberId)
+      .single();
+    
+    if (data) {
+      setCurrentSubscriber(data);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedPack) {
-      toast.error('Please select a package');
+    if (!selectedPack || loading) {
+      if (!selectedPack) toast.error('Please select a package');
       return;
     }
 
     // Check if subscriber has an active subscription
-    if (currentSubscriber?.currentSubscription?.status === 'active') {
+    const currentSub = currentSubscriber?.current_subscription as any;
+    if (currentSub?.status === 'active') {
       setShowCancelDialog(true);
       return;
     }
 
     // No active subscription, proceed with adding new one
-    addNewSubscription();
+    await addNewSubscription();
   };
 
-  const addNewSubscription = () => {
-    addSubscriptionToSubscriber(subscriberId, selectedPack, duration);
+  const addNewSubscription = async () => {
+    setLoading(true);
+    const selectedPackData = packs.find(p => p.name === selectedPack);
+    if (!selectedPackData) {
+      toast.error('Package not found');
+      setLoading(false);
+      return;
+    }
+
+    const newSubscription = {
+      id: `sub-${Date.now()}`,
+      packName: selectedPackData.name,
+      packPrice: selectedPackData.price,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      duration,
+      status: 'active',
+      subscribedAt: new Date().toISOString()
+    };
+
+    const subscriptionHistory = currentSubscriber?.subscription_history || [];
+    
+    const { error } = await supabase
+      .from('subscribers')
+      .update({
+        current_pack: selectedPackData.name,
+        current_subscription: newSubscription,
+        subscription_history: [...subscriptionHistory, newSubscription]
+      })
+      .eq('id', subscriberId);
+
+    setLoading(false);
+
+    if (error) {
+      toast.error('Failed to add subscription');
+      console.error(error);
+      return;
+    }
+
     toast.success('Package subscription added successfully');
     setSelectedPack('');
     setDuration(1);
@@ -69,14 +120,34 @@ export const AddPackageSubscriptionDialog = ({
     onSuccess();
   };
 
-  const handleCancelAndAdd = (refundAmount: number) => {
-    // Cancel current subscription with refund
-    cancelSubscription(subscriberId, refundAmount);
+  const handleCancelAndAdd = async (refundAmount: number) => {
+    setLoading(true);
+    
+    // Update subscriber balance with refund (positive value increases balance)
+    const newBalance = (currentSubscriber?.balance || 0) + refundAmount;
+    
+    const { error } = await supabase
+      .from('subscribers')
+      .update({
+        current_subscription: null,
+        balance: newBalance
+      })
+      .eq('id', subscriberId);
+
+    if (error) {
+      toast.error('Failed to cancel subscription');
+      console.error(error);
+      setLoading(false);
+      return;
+    }
+
     toast.success(`Subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`);
     
-    // Add new subscription
-    addNewSubscription();
+    // Reload subscriber and add new subscription
+    await loadSubscriber();
+    await addNewSubscription();
     setShowCancelDialog(false);
+    setLoading(false);
   };
 
   const selectedPackData = packs.find(p => p.name === selectedPack);
@@ -151,11 +222,12 @@ export const AddPackageSubscriptionDialog = ({
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="flex-1"
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
-              Add Subscription
+            <Button type="submit" className="flex-1" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Subscription'}
             </Button>
           </div>
         </form>
