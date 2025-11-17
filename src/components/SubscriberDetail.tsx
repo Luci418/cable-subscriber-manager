@@ -147,7 +147,11 @@ export const SubscriberDetail = ({
             )}
             <div className="md:col-span-2">
               <p className="text-sm text-muted-foreground">Joined</p>
-              <p className="font-medium">{formatDate(subscriber.createdAt)}</p>
+              <p className="font-medium">
+                {(subscriber as any).join_date 
+                  ? formatDate((subscriber as any).join_date) 
+                  : (subscriber.createdAt ? formatDate(subscriber.createdAt) : 'N/A')}
+              </p>
             </div>
           </div>
         </CardContent>

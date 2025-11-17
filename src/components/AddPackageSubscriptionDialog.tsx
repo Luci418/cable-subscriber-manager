@@ -169,11 +169,17 @@ export const AddPackageSubscriptionDialog = ({
                 <SelectValue placeholder="Choose a package" />
               </SelectTrigger>
               <SelectContent>
-                {packs.map((pack) => (
-                  <SelectItem key={pack.id} value={pack.name}>
-                    {pack.name} - ₹{pack.price.toFixed(2)}/month
-                  </SelectItem>
-                ))}
+                {packs && packs.length > 0 ? (
+                  packs.map((pack) => (
+                    <SelectItem key={pack.id} value={pack.name}>
+                      {pack.name} - ₹{pack.price.toFixed(2)}/month
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No packages available. Please create packages first.
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>

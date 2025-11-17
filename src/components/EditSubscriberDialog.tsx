@@ -39,13 +39,11 @@ export const EditSubscriberDialog = ({
     stbNumber: subscriber.stbNumber,
     latitude: subscriber.latitude,
     longitude: subscriber.longitude,
-    pack: subscriber.pack,
     region: subscriber.region,
     billingCycle: subscriber.billingCycle || ('monthly' as const),
     autoChargeEnabled: subscriber.autoChargeEnabled || false,
   });
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [packs, setPacks] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [regions, setRegions] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
@@ -56,12 +54,10 @@ export const EditSubscriberDialog = ({
         stbNumber: subscriber.stbNumber,
         latitude: subscriber.latitude,
         longitude: subscriber.longitude,
-        pack: subscriber.pack,
         region: subscriber.region,
         billingCycle: subscriber.billingCycle || 'monthly',
         autoChargeEnabled: subscriber.autoChargeEnabled || false,
       });
-      setPacks(getPacks());
       setRegions(getRegions());
     }
   }, [open, subscriber]);
@@ -98,7 +94,7 @@ export const EditSubscriberDialog = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.mobile || !formData.stbNumber || !formData.pack || !formData.region) {
+    if (!formData.name || !formData.mobile || !formData.stbNumber || !formData.region) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -187,22 +183,6 @@ export const EditSubscriberDialog = ({
                 📍 {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
               </p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-pack">Subscription Pack *</Label>
-            <Select value={formData.pack} onValueChange={(value) => setFormData({ ...formData, pack: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select pack" />
-              </SelectTrigger>
-              <SelectContent>
-                {packs.map(pack => (
-                  <SelectItem key={pack.id} value={pack.name}>
-                    {pack.name} - ₹{pack.price}/month
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
