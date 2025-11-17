@@ -102,16 +102,19 @@ const Index = () => {
     });
 
     if (success) {
-      // Update subscriber balance
+      // Update subscriber balance (positive = debt, negative = credit)
       const currentBalance = subscriber.balance || 0;
       let newBalance = currentBalance;
       
       if (data.type === 'payment') {
-        newBalance = currentBalance + data.amount;
-      } else if (data.type === 'charge') {
+        // Payment reduces debt
         newBalance = currentBalance - data.amount;
-      } else if (data.type === 'refund') {
+      } else if (data.type === 'charge') {
+        // Charge increases debt
         newBalance = currentBalance + data.amount;
+      } else if (data.type === 'refund') {
+        // Refund reduces debt
+        newBalance = currentBalance - data.amount;
       }
 
       await updateSubscriber(selectedSubscriberId, { balance: newBalance });
