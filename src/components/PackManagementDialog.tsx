@@ -3,10 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getPacks, addPack, updatePack, deletePack, Pack } from '@/lib/storage';
 import { toast } from 'sonner';
 import { Trash2, Plus, Edit2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { usePacks } from '@/hooks/usePacks';
+import { useAuth } from '@/hooks/useAuth';
+import type { Database } from '@/integrations/supabase/types';
+
+type Pack = Database["public"]["Tables"]["packs"]["Row"];
 
 interface PackManagementDialogProps {
   open: boolean;
@@ -14,21 +18,12 @@ interface PackManagementDialogProps {
 }
 
 export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialogProps) => {
-  const [packs, setPacks] = useState<Pack[]>([]);
+  const { user } = useAuth();
+  const { packs, addPack, updatePack, deletePack, reloadPacks } = usePacks(user?.id);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', price: 0 });
+  const [formData, setFormData] = useState({ name: '', price: 0, channels: '' });
 
-  useEffect(() => {
-    if (open) {
-      loadPacks();
-    }
-  }, [open]);
-
-  const loadPacks = () => {
-    setPacks(getPacks());
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || formData.price <= 0) {
       toast.error('Please enter valid pack details');
@@ -36,28 +31,40 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
     }
 
     if (editingId) {
-      updatePack(editingId, formData);
-      toast.success('Pack updated successfully');
-      setEditingId(null);
+      const success = await updatePack(editingId, { 
+        name: formData.name, 
+        price: formData.price,
+        channels: formData.channels 
+      });
+      if (success) {
+        toast.success('Pack updated successfully');
+        setEditingId(null);
+        setFormData({ name: '', price: 0, channels: '' });
+      }
     } else {
-      addPack(formData);
-      toast.success('Pack added successfully');
+      const success = await addPack({ 
+        name: formData.name, 
+        price: formData.price,
+        channels: formData.channels 
+      });
+      if (success) {
+        toast.success('Pack added successfully');
+        setFormData({ name: '', price: 0, channels: '' });
+      }
     }
-    
-    setFormData({ name: '', price: 0 });
-    loadPacks();
   };
 
   const handleEdit = (pack: Pack) => {
     setEditingId(pack.id);
-    setFormData({ name: pack.name, price: pack.price });
+    setFormData({ name: pack.name, price: Number(pack.price), channels: pack.channels });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this pack?')) {
-      deletePack(id);
-      toast.success('Pack deleted successfully');
-      loadPacks();
+      const success = await deletePack(id);
+      if (success) {
+        toast.success('Pack deleted successfully');
+      }
     }
   };
 
@@ -91,6 +98,15 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
               />
             </div>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="pack-channels">Channels</Label>
+            <Input
+              id="pack-channels"
+              value={formData.channels}
+              onChange={(e) => setFormData({ ...formData, channels: e.target.value })}
+              placeholder="Enter channels (e.g., Star, Sony, etc.)"
+            />
+          </div>
           <Button type="submit" className="w-full">
             {editingId ? (
               <>
@@ -110,7 +126,7 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
               variant="outline"
               onClick={() => {
                 setEditingId(null);
-                setFormData({ name: '', price: 0 });
+                setFormData({ name: '', price: 0, channels: '' });
               }}
               className="w-full"
             >
