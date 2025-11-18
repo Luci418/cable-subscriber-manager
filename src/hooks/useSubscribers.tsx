@@ -37,9 +37,11 @@ export const useSubscribers = (userId: string | undefined) => {
   const addSubscriber = async (subscriber: Omit<SubscriberInsert, "user_id">) => {
     if (!userId) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("subscribers")
-      .insert({ ...subscriber, user_id: userId });
+      .insert({ ...subscriber, user_id: userId })
+      .select()
+      .single();
 
     if (error) {
       toast.error("Failed to add subscriber");
@@ -47,15 +49,17 @@ export const useSubscribers = (userId: string | undefined) => {
       return false;
     }
 
-    await loadSubscribers();
+    if (data) setSubscribers((prev) => [data, ...prev]);
     return true;
   };
 
   const updateSubscriber = async (id: string, updates: SubscriberUpdate) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("subscribers")
       .update(updates)
-      .eq("id", id);
+      .eq("id", id)
+      .select()
+      .maybeSingle();
 
     if (error) {
       toast.error("Failed to update subscriber");
@@ -63,7 +67,7 @@ export const useSubscribers = (userId: string | undefined) => {
       return false;
     }
 
-    await loadSubscribers();
+    if (data) setSubscribers((prev) => prev.map((s) => (s.id === id ? { ...s, ...data } : s)));
     return true;
   };
 
@@ -79,7 +83,7 @@ export const useSubscribers = (userId: string | undefined) => {
       return false;
     }
 
-    await loadSubscribers();
+    setSubscribers((prev) => prev.filter((s) => s.id !== id));
     return true;
   };
 

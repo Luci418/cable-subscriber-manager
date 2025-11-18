@@ -10,9 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { MapPin, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPacks, getRegions } from '@/lib/storage';
+import { useAuth } from '@/hooks/useAuth';
+import { useRegions } from '@/hooks/useRegions';
 
 interface AddSubscriberFormProps {
   onSubmit: (data: {
@@ -41,13 +41,8 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
   });
   const [loading, setLoading] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [packs, setPacks] = useState<Array<{ id: string; name: string; price: number }>>([]);
-  const [regions, setRegions] = useState<Array<{ id: string; name: string }>>([]);
-
-  useEffect(() => {
-    setPacks(getPacks());
-    setRegions(getRegions());
-  }, []);
+  const { user } = useAuth();
+  const { regions } = useRegions(user?.id);
 
   const getCoordinates = () => {
     if (!navigator.geolocation) {
