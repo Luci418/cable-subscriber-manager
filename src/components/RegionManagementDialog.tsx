@@ -14,37 +14,30 @@ interface RegionManagementDialogProps {
 }
 
 export const RegionManagementDialog = ({ open, onOpenChange }: RegionManagementDialogProps) => {
-  const [regions, setRegions] = useState<Region[]>([]);
+  const { user } = useAuth();
+  const { regions, addRegion, deleteRegion } = useRegions(user?.id);
   const [regionName, setRegionName] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      loadRegions();
-    }
-  }, [open]);
-
-  const loadRegions = () => {
-    setRegions(getRegions());
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regionName.trim()) {
       toast.error('Please enter a region name');
       return;
     }
 
-    addRegion({ name: regionName });
-    toast.success('Region added successfully');
-    setRegionName('');
-    loadRegions();
+    const success = await addRegion({ name: regionName });
+    if (success) {
+      toast.success('Region added successfully');
+      setRegionName('');
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this region?')) {
-      deleteRegion(id);
-      toast.success('Region deleted successfully');
-      loadRegions();
+      const success = await deleteRegion(id);
+      if (success) {
+        toast.success('Region deleted successfully');
+      }
     }
   };
 

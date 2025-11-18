@@ -17,7 +17,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { getPacks, Subscriber } from '@/lib/storage';
+import { Subscriber } from '@/lib/storage';
+import { useAuth } from '@/hooks/useAuth';
+import { usePacks } from '@/hooks/usePacks';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -37,16 +39,12 @@ export const AddTransactionDialog = ({
     amount: '',
     description: '',
   });
-  const [packs, setPacks] = useState<Array<{ id: string; name: string; price: number }>>([]);
-
-  useEffect(() => {
-    if (open) {
-      setPacks(getPacks());
-    }
-  }, [open]);
+  const { user } = useAuth();
+  const { packs } = usePacks(user?.id);
 
   const handleChargeSubscription = () => {
-    const pack = packs.find(p => p.name === subscriber.pack);
+    const currentPackName = (subscriber as any)?.current_pack || (subscriber as any)?.pack;
+    const pack = packs.find(p => p.name === currentPackName);
     if (pack) {
       setFormData({
         type: 'charge',
