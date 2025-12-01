@@ -356,7 +356,7 @@ export const SubscriberDetail = ({
         onOpenChange={setShowAddPackage}
         subscriberId={subscriber.id}
         subscriberName={subscriber.name}
-        onSuccess={(updates) => { setShowAddPackage(false); onEdit?.(updates as any); }}
+        onSuccess={() => setShowAddPackage(false)}
       />
 
       <EditTransactionDialog

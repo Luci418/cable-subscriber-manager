@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRegions } from '@/hooks/useRegions';
+import { Loader2, MapPin } from 'lucide-react';
 
 interface AddSubscriberFormProps {
   onSubmit: (data: {
