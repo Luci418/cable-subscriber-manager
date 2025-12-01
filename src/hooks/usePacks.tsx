@@ -37,9 +37,11 @@ export const usePacks = (userId: string | undefined) => {
   const addPack = async (pack: Omit<PackInsert, "user_id">) => {
     if (!userId) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("packs")
-      .insert({ ...pack, user_id: userId });
+      .insert({ ...pack, user_id: userId })
+      .select()
+      .single();
 
     if (error) {
       toast.error("Failed to add pack");
@@ -47,7 +49,10 @@ export const usePacks = (userId: string | undefined) => {
       return false;
     }
 
-    await loadPacks();
+    // Optimistic update
+    if (data) {
+      setPacks(prev => [data, ...prev]);
+    }
     return true;
   };
 
@@ -63,7 +68,10 @@ export const usePacks = (userId: string | undefined) => {
       return false;
     }
 
-    await loadPacks();
+    // Optimistic update
+    setPacks(prev => prev.map(pack => 
+      pack.id === id ? { ...pack, ...updates } : pack
+    ));
     return true;
   };
 
@@ -79,7 +87,8 @@ export const usePacks = (userId: string | undefined) => {
       return false;
     }
 
-    await loadPacks();
+    // Optimistic update
+    setPacks(prev => prev.filter(pack => pack.id !== id));
     return true;
   };
 

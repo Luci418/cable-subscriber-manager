@@ -42,9 +42,11 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
   const addTransaction = async (transaction: Omit<TransactionInsert, "user_id">) => {
     if (!userId) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("transactions")
-      .insert({ ...transaction, user_id: userId });
+      .insert({ ...transaction, user_id: userId })
+      .select()
+      .single();
 
     if (error) {
       toast.error("Failed to add transaction");
@@ -52,7 +54,10 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
       return false;
     }
 
-    await loadTransactions();
+    // Optimistic update
+    if (data) {
+      setTransactions(prev => [data, ...prev]);
+    }
     return true;
   };
 
@@ -68,7 +73,10 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
       return false;
     }
 
-    await loadTransactions();
+    // Optimistic update
+    setTransactions(prev => prev.map(txn => 
+      txn.id === id ? { ...txn, ...updates } : txn
+    ));
     return true;
   };
 
@@ -84,7 +92,8 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
       return false;
     }
 
-    await loadTransactions();
+    // Optimistic update
+    setTransactions(prev => prev.filter(txn => txn.id !== id));
     return true;
   };
 
