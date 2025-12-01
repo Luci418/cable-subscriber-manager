@@ -18,8 +18,6 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Subscriber } from '@/lib/storage';
-import { useAuth } from '@/hooks/useAuth';
-import { usePacks } from '@/hooks/usePacks';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -39,24 +37,6 @@ export const AddTransactionDialog = ({
     amount: '',
     description: '',
   });
-  const { user } = useAuth();
-  const { packs } = usePacks(user?.id);
-
-  const handleChargeSubscription = () => {
-    const currentPackName = (subscriber as any)?.current_pack || (subscriber as any)?.pack;
-    const pack = packs.find(p => p.name === currentPackName);
-    if (pack) {
-      setFormData({
-        type: 'charge',
-        amount: pack.price.toString(),
-        description: `Monthly charge for ${pack.name}`,
-      });
-      toast.success('Pack price auto-filled');
-    } else {
-      toast.error('Pack not found');
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -93,17 +73,6 @@ export const AddTransactionDialog = ({
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex gap-2 mb-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleChargeSubscription}
-              className="w-full"
-            >
-              Charge Subscription ({subscriber.pack})
-            </Button>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
             <Select
