@@ -29,6 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
@@ -55,6 +58,7 @@ export const SubscriberDetail = ({
   const [showAddPackage, setShowAddPackage] = useState(false);
   const [showEditTransaction, setShowEditTransaction] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const sortedTransactions = [...transactions].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -92,6 +96,50 @@ export const SubscriberDetail = ({
     setEditingTransaction(null);
     // Trigger parent component to reload data
     onBack();
+  };
+
+  const handleCancelSubscription = async (refundAmount: number) => {
+    const currentSub = (subscriber as any).current_subscription;
+    if (!currentSub) return;
+
+    // Mark current subscription as cancelled in history
+    const history = ((subscriber as any).subscription_history || []).map((sub: any) =>
+      sub.id === currentSub.id ? { ...sub, status: 'cancelled' } : sub
+    );
+
+    // Update subscriber - remove current subscription and add refund to balance
+    const newBalance = subscriber.balance + refundAmount;
+
+    const { error } = await supabase
+      .from('subscribers')
+      .update({
+        current_subscription: null,
+        subscription_history: history,
+        balance: newBalance,
+      })
+      .eq('id', subscriber.id);
+
+    if (error) {
+      toast.error('Failed to cancel subscription');
+      console.error(error);
+      return;
+    }
+
+    // Create refund transaction if amount > 0
+    if (refundAmount > 0) {
+      await supabase.from('transactions').insert({
+        subscriber_id: subscriber.id,
+        user_id: (subscriber as any).user_id,
+        type: 'payment',
+        amount: refundAmount,
+        description: `Refund for cancelled subscription: ${currentSub.packName}`,
+        date: new Date().toISOString(),
+      });
+    }
+
+    toast.success(`Subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`);
+    setShowCancelDialog(false);
+    onReload?.();
   };
 
   return (
@@ -197,7 +245,7 @@ export const SubscriberDetail = ({
                   </div>
                 </div>
                 <h4 className="text-xl font-bold mb-3">{(subscriber as any).current_subscription.packName}</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   <div>
                     <p className="text-muted-foreground">Start Date</p>
                     <p className="font-medium">
@@ -219,6 +267,17 @@ export const SubscriberDetail = ({
                     <p className="font-medium">₹{(subscriber as any).current_subscription.packPrice.toFixed(2)}</p>
                   </div>
                 </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setShowCancelDialog(true);
+                  }}
+                  className="w-full"
+                >
+                  Cancel Subscription
+                </Button>
               </div>
 
               {(subscriber as any).subscription_history && (subscriber as any).subscription_history.length > 0 && (
@@ -371,6 +430,15 @@ export const SubscriberDetail = ({
         transaction={editingTransaction}
         onSubmit={handleUpdateTransaction}
       />
+
+      {(subscriber as any).current_subscription && (
+        <CancelSubscriptionDialog
+          open={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+          subscription={(subscriber as any).current_subscription}
+          onConfirm={handleCancelSubscription}
+        />
+      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
