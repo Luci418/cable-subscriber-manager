@@ -245,6 +245,7 @@ const Index = () => {
                 onAddTransaction={handleAddTransaction}
                 onEdit={handleEditSubscriber}
                 onDelete={handleDeleteSubscriber}
+                onReload={reloadSubscribers}
               />
             )}
 

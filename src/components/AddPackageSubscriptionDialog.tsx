@@ -240,11 +240,11 @@ export const AddPackageSubscriptionDialog = ({
       </DialogContent>
     </Dialog>
 
-    {currentSubscriber?.currentSubscription && (
+    {currentSubscriber?.current_subscription && (
       <CancelSubscriptionDialog
         open={showCancelDialog}
         onOpenChange={setShowCancelDialog}
-        subscription={currentSubscriber.currentSubscription}
+        subscription={currentSubscriber.current_subscription}
         onConfirm={handleCancelAndAdd}
       />
     )}

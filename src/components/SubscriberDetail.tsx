@@ -37,6 +37,7 @@ interface SubscriberDetailProps {
   onAddTransaction: (transaction: { type: 'payment' | 'charge'; amount: number; description: string }) => void;
   onEdit: (updates: Partial<Subscriber>) => void;
   onDelete: () => void;
+  onReload?: () => void;
 }
 
 export const SubscriberDetail = ({
@@ -46,6 +47,7 @@ export const SubscriberDetail = ({
   onAddTransaction,
   onEdit,
   onDelete,
+  onReload,
 }: SubscriberDetailProps) => {
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -168,14 +170,15 @@ export const SubscriberDetail = ({
           </div>
         </CardHeader>
         <CardContent>
-          {subscriber.currentSubscription ? (
+          {(subscriber as any).current_subscription ? (
             <div className="space-y-4">
               <div className="rounded-lg border bg-primary/5 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-muted-foreground">Current Active Package</span>
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const daysLeft = calculateRemainingDays(subscriber.currentSubscription.endDate);
+                      const currentSub = (subscriber as any).current_subscription;
+                      const daysLeft = calculateRemainingDays(currentSub.endDate);
                       return daysLeft > 0 ? (
                         <>
                           <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
@@ -193,32 +196,32 @@ export const SubscriberDetail = ({
                     })()}
                   </div>
                 </div>
-                <h4 className="text-xl font-bold mb-3">{subscriber.currentSubscription.packName}</h4>
+                <h4 className="text-xl font-bold mb-3">{(subscriber as any).current_subscription.packName}</h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">Start Date</p>
                     <p className="font-medium">
-                      {new Date(subscriber.currentSubscription.startDate).toLocaleDateString()}
+                      {new Date((subscriber as any).current_subscription.startDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Expiry Date</p>
                     <p className="font-medium">
-                      {new Date(subscriber.currentSubscription.endDate).toLocaleDateString()}
+                      {new Date((subscriber as any).current_subscription.endDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Duration</p>
-                    <p className="font-medium">{subscriber.currentSubscription.duration} months</p>
+                    <p className="font-medium">{(subscriber as any).current_subscription.duration} months</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Monthly Price</p>
-                    <p className="font-medium">₹{subscriber.currentSubscription.packPrice.toFixed(2)}</p>
+                    <p className="font-medium">₹{(subscriber as any).current_subscription.packPrice.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
 
-              {subscriber.subscriptions && subscriber.subscriptions.filter(s => s.status === 'expired').length > 0 && (
+              {(subscriber as any).subscription_history && (subscriber as any).subscription_history.length > 0 && (
                 <>
                   <Separator />
                   <div>
@@ -227,15 +230,15 @@ export const SubscriberDetail = ({
                       <h4 className="font-semibold">Subscription History</h4>
                     </div>
                     <div className="space-y-2">
-                      {subscriber.subscriptions
-                        .filter(s => s.status === 'expired')
-                        .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                        .map((sub) => (
+                      {(subscriber as any).subscription_history
+                        .filter((s: any) => s.id !== (subscriber as any).current_subscription?.id)
+                        .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                        .map((sub: any) => (
                           <div key={sub.id} className="rounded-lg border p-3 text-sm">
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-medium">{sub.packName}</span>
                               <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                                Expired
+                                {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
                               </span>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
@@ -356,7 +359,10 @@ export const SubscriberDetail = ({
         onOpenChange={setShowAddPackage}
         subscriberId={subscriber.id}
         subscriberName={subscriber.name}
-        onSuccess={() => setShowAddPackage(false)}
+        onSuccess={() => {
+          setShowAddPackage(false);
+          onReload?.();
+        }}
       />
 
       <EditTransactionDialog
