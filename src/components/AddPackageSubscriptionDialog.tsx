@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { toast } from 'sonner';
 import { Calendar, Clock } from 'lucide-react';
 import { usePacks } from '@/hooks/usePacks';
@@ -29,7 +28,6 @@ export const AddPackageSubscriptionDialog = ({
   const { packs } = usePacks(user?.id);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
@@ -65,8 +63,8 @@ export const AddPackageSubscriptionDialog = ({
 
     // Check if subscriber has an active subscription
     const currentSub = currentSubscriber?.current_subscription as any;
-    if (currentSub?.status === 'active') {
-      setShowCancelDialog(true);
+    if (currentSub) {
+      toast.error('Please cancel the current subscription before adding a new one');
       return;
     }
 
@@ -94,60 +92,49 @@ export const AddPackageSubscriptionDialog = ({
       subscribedAt: new Date().toISOString()
     };
 
-    const subscriptionHistory = currentSubscriber?.subscription_history || [];
+    // Update history - mark all old subscriptions as expired
+    const subscriptionHistory = (currentSubscriber?.subscription_history || []).map((sub: any) => ({
+      ...sub,
+      status: 'expired'
+    }));
     
+    // Calculate the charge amount
+    const chargeAmount = selectedPackData.price * duration;
+    const newBalance = (currentSubscriber?.balance || 0) + chargeAmount;
+
     const { error } = await supabase
       .from('subscribers')
       .update({
         current_pack: selectedPackData.name,
         current_subscription: newSubscription,
-        subscription_history: [...subscriptionHistory, newSubscription]
-      })
-      .eq('id', subscriberId);
-
-    setLoading(false);
-
-    if (error) {
-      toast.error('Failed to add subscription');
-      console.error(error);
-      return;
-    }
-
-    toast.success('Package subscription added successfully');
-    setSelectedPack('');
-    setDuration(1);
-    onOpenChange(false);
-    onSuccess();
-  };
-
-  const handleCancelAndAdd = async (refundAmount: number) => {
-    setLoading(true);
-    
-    // Update subscriber balance with refund (positive value increases balance)
-    const newBalance = (currentSubscriber?.balance || 0) + refundAmount;
-    
-    const { error } = await supabase
-      .from('subscribers')
-      .update({
-        current_subscription: null,
+        subscription_history: [...subscriptionHistory, newSubscription],
         balance: newBalance
       })
       .eq('id', subscriberId);
 
     if (error) {
-      toast.error('Failed to cancel subscription');
+      toast.error('Failed to add subscription');
       console.error(error);
       setLoading(false);
       return;
     }
 
-    toast.success(`Subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`);
-    
-    // Reload subscriber and add new subscription
-    await loadSubscriber();
-    await addNewSubscription();
-    setShowCancelDialog(false);
+    // Add charge transaction
+    await supabase.from('transactions').insert({
+      subscriber_id: subscriberId,
+      user_id: currentSubscriber?.user_id,
+      type: 'charge',
+      amount: chargeAmount,
+      description: `Subscription charge: ${selectedPackData.name} (${duration} month${duration > 1 ? 's' : ''})`,
+      date: new Date().toISOString(),
+    });
+
     setLoading(false);
+    toast.success('Package subscription added successfully');
+    setSelectedPack('');
+    setDuration(1);
+    onOpenChange(false);
+    onSuccess();
   };
 
   const selectedPackData = packs.find(p => p.name === selectedPack);
@@ -236,18 +223,17 @@ export const AddPackageSubscriptionDialog = ({
               {loading ? 'Adding...' : 'Add Subscription'}
             </Button>
           </div>
+
+          {currentSubscriber?.current_subscription && (
+            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3 mt-3 text-sm">
+              <p className="text-yellow-700 dark:text-yellow-400">
+                ⚠️ This subscriber has an active subscription. Please cancel it first before adding a new one.
+              </p>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>
-
-    {currentSubscriber?.current_subscription && (
-      <CancelSubscriptionDialog
-        open={showCancelDialog}
-        onOpenChange={setShowCancelDialog}
-        subscription={currentSubscriber.current_subscription}
-        onConfirm={handleCancelAndAdd}
-      />
-    )}
     </>
   );
 };
