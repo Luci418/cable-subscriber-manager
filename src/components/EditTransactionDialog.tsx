@@ -116,8 +116,8 @@ export const EditTransactionDialog = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="payment">Payment (Credit)</SelectItem>
-                  <SelectItem value="charge">Charge (Debit)</SelectItem>
+                  <SelectItem value="payment">Received from Customer</SelectItem>
+                  <SelectItem value="charge">Billed to Customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
