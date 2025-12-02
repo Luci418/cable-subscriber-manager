@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Subscriber, Transaction } from '@/lib/storage';
-import { generateInvoicePDF } from '@/lib/pdf';
+import { generateInvoicePDF, generateThermalReceipt, generateSubscriptionInvoice } from '@/lib/pdf';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText } from 'lucide-react';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
@@ -268,6 +268,58 @@ export const SubscriberDetail = ({
                     <p className="text-muted-foreground">Monthly Price</p>
                     <p className="font-medium">₹{(subscriber as any).current_subscription.packPrice.toFixed(2)}</p>
                   </div>
+                </div>
+                <div className="flex gap-2 mb-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      const sub = (subscriber as any).current_subscription;
+                      generateThermalReceipt({
+                        subscriberName: subscriber.name,
+                        subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                        mobile: subscriber.mobile,
+                        stbNumber: subscriber.stbNumber,
+                        region: subscriber.region,
+                        packName: sub.packName,
+                        packPrice: sub.packPrice,
+                        duration: sub.duration,
+                        startDate: sub.startDate,
+                        endDate: sub.endDate,
+                        totalAmount: sub.packPrice * sub.duration,
+                        balance: subscriber.balance,
+                      });
+                    }}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Thermal
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      const sub = (subscriber as any).current_subscription;
+                      generateSubscriptionInvoice({
+                        subscriberName: subscriber.name,
+                        subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                        mobile: subscriber.mobile,
+                        stbNumber: subscriber.stbNumber,
+                        region: subscriber.region,
+                        packName: sub.packName,
+                        packPrice: sub.packPrice,
+                        duration: sub.duration,
+                        startDate: sub.startDate,
+                        endDate: sub.endDate,
+                        totalAmount: sub.packPrice * sub.duration,
+                        balance: subscriber.balance,
+                      });
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    A4 Invoice
+                  </Button>
                 </div>
                 <Button 
                   variant="destructive" 
