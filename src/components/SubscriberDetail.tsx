@@ -107,8 +107,8 @@ export const SubscriberDetail = ({
       sub.id === currentSub.id ? { ...sub, status: 'cancelled' } : sub
     );
 
-    // Update subscriber - remove current subscription and add refund to balance
-    const newBalance = subscriber.balance + refundAmount;
+    // Only update balance if refund amount is greater than 0
+    const newBalance = refundAmount > 0 ? subscriber.balance + refundAmount : subscriber.balance;
 
     const { error } = await supabase
       .from('subscribers')
@@ -125,7 +125,7 @@ export const SubscriberDetail = ({
       return;
     }
 
-    // Create refund transaction if amount > 0
+    // Create refund transaction only if amount > 0
     if (refundAmount > 0) {
       await supabase.from('transactions').insert({
         subscriber_id: subscriber.id,
@@ -137,7 +137,9 @@ export const SubscriberDetail = ({
       });
     }
 
-    toast.success(`Subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`);
+    toast.success(refundAmount > 0 
+      ? `Subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}` 
+      : 'Subscription cancelled.');
     setShowCancelDialog(false);
     onReload?.();
   };

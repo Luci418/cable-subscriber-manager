@@ -126,20 +126,22 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Button variant="ghost" onClick={onBack} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Subscribers
-          </Button>
-          <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Comprehensive insights into your cable TV business</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant={timeRange === '7d' ? 'default' : 'outline'} onClick={() => setTimeRange('7d')}>7 Days</Button>
-          <Button variant={timeRange === '30d' ? 'default' : 'outline'} onClick={() => setTimeRange('30d')}>30 Days</Button>
-          <Button variant={timeRange === '90d' ? 'default' : 'outline'} onClick={() => setTimeRange('90d')}>90 Days</Button>
-          <Button variant={timeRange === 'all' ? 'default' : 'outline'} onClick={() => setTimeRange('all')}>All Time</Button>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <Button variant="ghost" onClick={onBack} className="mb-2">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Analytics</h1>
+            <p className="text-sm text-muted-foreground">Business insights</p>
+          </div>
+          <div className="flex flex-wrap gap-1 sm:gap-2">
+            <Button size="sm" variant={timeRange === '7d' ? 'default' : 'outline'} onClick={() => setTimeRange('7d')}>7D</Button>
+            <Button size="sm" variant={timeRange === '30d' ? 'default' : 'outline'} onClick={() => setTimeRange('30d')}>30D</Button>
+            <Button size="sm" variant={timeRange === '90d' ? 'default' : 'outline'} onClick={() => setTimeRange('90d')}>90D</Button>
+            <Button size="sm" variant={timeRange === 'all' ? 'default' : 'outline'} onClick={() => setTimeRange('all')}>All</Button>
+          </div>
         </div>
       </div>
 
