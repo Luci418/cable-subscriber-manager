@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, TrendingUp, Users, DollarSign, Package, MapPin, Calendar } from 'lucide-react';
-import { getSubscribers, getTransactions, getPacks, Transaction, Subscriber } from '@/lib/storage';
+import { ArrowLeft, TrendingUp, Users, DollarSign, Calendar } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAuth } from '@/hooks/useAuth';
+import { useSubscribers } from '@/hooks/useSubscribers';
+import { useTransactions } from '@/hooks/useTransactions';
+import type { Database } from '@/integrations/supabase/types';
+
+type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
+type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 
 interface AnalyticsProps {
   onBack: () => void;
@@ -14,14 +20,12 @@ interface AnalyticsProps {
 }
 
 export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalance }: AnalyticsProps) => {
-  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { user } = useAuth();
+  const { subscribers, loading: subscribersLoading } = useSubscribers(user?.id);
+  const { transactions, loading: transactionsLoading } = useTransactions(user?.id);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
 
-  useEffect(() => {
-    setSubscribers(getSubscribers());
-    setTransactions(getTransactions());
-  }, []);
+  const loading = subscribersLoading || transactionsLoading;
 
   // Calculate key metrics
   const totalSubscribers = subscribers.length;
@@ -77,7 +81,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     const monthlyData: { [key: string]: number } = {};
     
     subscribers.forEach(s => {
-      const monthKey = new Date(s.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+      const monthKey = new Date(s.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
       monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
     });
 
@@ -93,7 +97,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   const getPackDistribution = () => {
     const packCounts: { [key: string]: number } = {};
     subscribers.forEach(s => {
-      packCounts[s.pack] = (packCounts[s.pack] || 0) + 1;
+      const packName = s.current_pack || 'No Pack';
+      packCounts[packName] = (packCounts[packName] || 0) + 1;
     });
 
     return Object.entries(packCounts).map(([name, value]) => ({ name, value }));
@@ -103,7 +108,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   const getRegionDistribution = () => {
     const regionCounts: { [key: string]: number } = {};
     subscribers.forEach(s => {
-      regionCounts[s.region] = (regionCounts[s.region] || 0) + 1;
+      const regionName = s.region || 'Unknown';
+      regionCounts[regionName] = (regionCounts[regionName] || 0) + 1;
     });
 
     return Object.entries(regionCounts).map(([name, value]) => ({ name, value }));
@@ -116,13 +122,21 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     const zero = subscribers.filter(s => s.balance === 0).length;
 
     return [
-      { name: 'Credit Balance', value: positive },
-      { name: 'Debit Balance', value: negative },
+      { name: 'Debt (Due)', value: positive },
+      { name: 'Credit (Advance)', value: negative },
       { name: 'Zero Balance', value: zero },
     ].filter(item => item.value > 0);
   };
 
   const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--secondary))', 'hsl(var(--warning))', 'hsl(var(--success))'];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Loading analytics...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -182,14 +196,16 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-              ₹{totalBalance.toLocaleString()}
+            <div className={`text-2xl font-bold ${totalBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+              ₹{Math.abs(totalBalance).toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Outstanding balance</p>
+            <p className="text-xs text-muted-foreground">
+              {totalBalance > 0 ? 'Due from subscribers' : 'Credit with subscribers'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -267,7 +283,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
                       fill="#8884d8"
                       dataKey="value"
                       onClick={(data) => {
-                        if (onFilterPack) {
+                        if (onFilterPack && data.name !== 'No Pack') {
                           onFilterPack(data.name);
                           onBack();
                         }
@@ -302,7 +318,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
                       fill="#8884d8"
                       dataKey="value"
                       onClick={(data) => {
-                        if (onFilterRegion) {
+                        if (onFilterRegion && data.name !== 'Unknown') {
                           onFilterRegion(data.name);
                           onBack();
                         }
@@ -339,8 +355,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
                       onClick={(data) => {
                         if (onFilterBalance) {
                           const statusMap: { [key: string]: string } = {
-                            'Credit Balance': 'positive',
-                            'Debit Balance': 'negative',
+                            'Debt (Due)': 'positive',
+                            'Credit (Advance)': 'negative',
                             'Zero Balance': 'zero'
                           };
                           onFilterBalance(statusMap[data.name]);

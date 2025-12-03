@@ -104,11 +104,12 @@ export const SubscriberDetail = ({
 
     // Mark current subscription as cancelled in history
     const history = ((subscriber as any).subscription_history || []).map((sub: any) =>
-      sub.id === currentSub.id ? { ...sub, status: 'cancelled' } : sub
+      sub.id === currentSub.id ? { ...sub, status: 'cancelled', endDate: new Date().toISOString() } : sub
     );
 
-    // Only update balance if refund amount is greater than 0
-    const newBalance = refundAmount > 0 ? subscriber.balance + refundAmount : subscriber.balance;
+    // Refund reduces debt (balance model: positive = debt, negative = credit)
+    // A refund is like a payment - it reduces the balance
+    const newBalance = refundAmount > 0 ? subscriber.balance - refundAmount : subscriber.balance;
 
     const { error } = await supabase
       .from('subscribers')

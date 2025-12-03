@@ -17,7 +17,8 @@ const calculateRemainingDays = (endDate: string): number => {
   const end = new Date(endDate);
   const now = new Date();
   const diffTime = end.getTime() - now.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Use floor to avoid overestimating days
+  return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
 };
 
 export const CancelSubscriptionDialog = ({
@@ -27,9 +28,11 @@ export const CancelSubscriptionDialog = ({
   onConfirm
 }: CancelSubscriptionDialogProps) => {
   const daysRemaining = calculateRemainingDays(subscription.endDate);
-  const totalDays = subscription.duration * 30; // Approximate days in subscription
-  const pricePerDay = subscription.packPrice / 30;
-  const autoCalculatedRefund = Math.max(0, daysRemaining * pricePerDay);
+  const totalDays = subscription.duration * 30; // Total days in subscription
+  const totalCharged = subscription.packPrice * subscription.duration;
+  // Calculate daily rate based on total charge and total days
+  const pricePerDay = totalCharged / totalDays;
+  const autoCalculatedRefund = Math.floor(daysRemaining * pricePerDay);
   
   const [refundAmount, setRefundAmount] = useState(autoCalculatedRefund);
 
@@ -55,7 +58,7 @@ export const CancelSubscriptionDialog = ({
         <div className="space-y-4">
           <div className="rounded-lg border border-warning/20 bg-warning/10 p-4">
             <p className="text-sm text-foreground">
-              You need to cancel the current active subscription before adding a new one.
+              Cancelling will end the current subscription and optionally issue a refund based on remaining days.
             </p>
           </div>
 
@@ -65,12 +68,20 @@ export const CancelSubscriptionDialog = ({
               <span className="font-medium">{subscription.packName}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Days Remaining:</span>
-              <span className="font-medium">{daysRemaining > 0 ? daysRemaining : 0} days</span>
+              <span className="text-muted-foreground">Duration:</span>
+              <span className="font-medium">{subscription.duration} month(s)</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Original Price:</span>
-              <span className="font-medium">₹{subscription.packPrice.toFixed(2)}/month</span>
+              <span className="text-muted-foreground">Total Charged:</span>
+              <span className="font-medium">₹{totalCharged.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Days Remaining:</span>
+              <span className="font-medium">{daysRemaining} days</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Daily Rate:</span>
+              <span className="font-medium">₹{pricePerDay.toFixed(2)}/day</span>
             </div>
           </div>
 
@@ -80,13 +91,14 @@ export const CancelSubscriptionDialog = ({
               id="refund"
               type="number"
               min="0"
-              step="0.01"
+              max={totalCharged}
+              step="1"
               value={refundAmount}
-              onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
+              onChange={(e) => setRefundAmount(Math.max(0, parseInt(e.target.value) || 0))}
+              placeholder="0"
             />
             <p className="text-xs text-muted-foreground">
-              Auto-calculated: ₹{autoCalculatedRefund.toFixed(2)} (based on remaining days)
+              Auto-calculated: ₹{autoCalculatedRefund} ({daysRemaining} days × ₹{pricePerDay.toFixed(2)})
             </p>
           </div>
         </div>
