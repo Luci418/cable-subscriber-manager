@@ -3,11 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { isSubscriptionActive } from '@/lib/subscriptionUtils';
 
 interface AddPackageSubscriptionDialogProps {
   open: boolean;
@@ -24,24 +26,29 @@ export const AddPackageSubscriptionDialog = ({
   subscriberName,
   onSuccess
 }: AddPackageSubscriptionDialogProps) => {
-  const { user } = useAuth();
-  const { packs } = usePacks(user?.id);
+  const { user, loading: authLoading } = useAuth();
+  const { packs, loading: packsLoading, reloadPacks } = usePacks(user?.id);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
   const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [subscriberLoading, setSubscriberLoading] = useState(false);
   
   const startDate = new Date();
   const endDate = new Date();
   endDate.setMonth(endDate.getMonth() + duration);
 
+  // Reload packs when dialog opens
   useEffect(() => {
-    if (open && subscriberId) {
+    if (open && user?.id) {
+      reloadPacks();
       loadSubscriber();
     }
-  }, [open, subscriberId]);
+  }, [open, user?.id]);
 
   const loadSubscriber = async () => {
+    if (!subscriberId) return;
+    setSubscriberLoading(true);
     const { data } = await supabase
       .from('subscribers')
       .select('*')
@@ -51,7 +58,13 @@ export const AddPackageSubscriptionDialog = ({
     if (data) {
       setCurrentSubscriber(data);
     }
+    setSubscriberLoading(false);
   };
+
+  // Check if current subscription is actually active (not just exists)
+  const hasActiveSubscription = currentSubscriber?.current_subscription 
+    ? isSubscriptionActive(currentSubscriber.current_subscription)
+    : false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +74,8 @@ export const AddPackageSubscriptionDialog = ({
       return;
     }
 
-    // Check if subscriber has an active subscription
-    const currentSub = currentSubscriber?.current_subscription as any;
-    if (currentSub) {
+    // Check if subscriber has an ACTIVE subscription (not just any subscription)
+    if (hasActiveSubscription) {
       toast.error('Please cancel the current subscription before adding a new one');
       return;
     }
@@ -139,6 +151,8 @@ export const AddPackageSubscriptionDialog = ({
 
   const selectedPackData = packs.find(p => p.name === selectedPack);
 
+  const isLoading = authLoading || packsLoading || subscriberLoading;
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -148,6 +162,13 @@ export const AddPackageSubscriptionDialog = ({
           <p className="text-sm text-muted-foreground">for {subscriberName}</p>
         </DialogHeader>
 
+        {isLoading ? (
+          <div className="space-y-4 py-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="package">Select Package</Label>
@@ -155,7 +176,7 @@ export const AddPackageSubscriptionDialog = ({
               <SelectTrigger id="package">
                 <SelectValue placeholder="Choose a package" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover">
                 {packs && packs.length > 0 ? (
                   packs.map((pack) => (
                     <SelectItem key={pack.id} value={pack.name}>
@@ -163,8 +184,9 @@ export const AddPackageSubscriptionDialog = ({
                     </SelectItem>
                   ))
                 ) : (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                    No packages available. Please create packages first.
+                  <div className="px-2 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    No packages available. Please create packages in Settings first.
                   </div>
                 )}
               </SelectContent>
@@ -224,7 +246,7 @@ export const AddPackageSubscriptionDialog = ({
             </Button>
           </div>
 
-          {currentSubscriber?.current_subscription && (
+          {hasActiveSubscription && (
             <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3 mt-3 text-sm">
               <p className="text-yellow-700 dark:text-yellow-400">
                 ⚠️ This subscriber has an active subscription. Please cancel it first before adding a new one.
@@ -232,6 +254,7 @@ export const AddPackageSubscriptionDialog = ({
             </div>
           )}
         </form>
+        )}
       </DialogContent>
     </Dialog>
     </>
