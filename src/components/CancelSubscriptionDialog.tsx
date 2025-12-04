@@ -28,10 +28,10 @@ export const CancelSubscriptionDialog = ({
   onConfirm
 }: CancelSubscriptionDialogProps) => {
   const daysRemaining = calculateRemainingDays(subscription.endDate);
-  const totalDays = subscription.duration * 30; // Total days in subscription
-  const totalCharged = subscription.packPrice * subscription.duration;
+  const totalDays = (subscription.duration || 1) * 30; // Total days in subscription
+  const totalCharged = (subscription.packPrice || 0) * (subscription.duration || 1);
   // Calculate daily rate based on total charge and total days
-  const pricePerDay = totalCharged / totalDays;
+  const pricePerDay = totalDays > 0 ? totalCharged / totalDays : 0;
   const autoCalculatedRefund = Math.floor(daysRemaining * pricePerDay);
   
   const [refundAmount, setRefundAmount] = useState(autoCalculatedRefund);
