@@ -34,5 +34,5 @@ export const useAuth = () => {
     navigate("/auth");
   };
 
-  return { user, session, loading, signOut };
+  return { user, session, loading, signOut, isAuthenticated: !!user };
 };

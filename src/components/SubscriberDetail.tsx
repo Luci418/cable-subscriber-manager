@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Subscriber, Transaction } from '@/lib/storage';
 import { generateInvoicePDF, generateThermalReceipt, generateSubscriptionInvoice } from '@/lib/pdf';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw } from 'lucide-react';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
@@ -32,6 +32,13 @@ import {
 import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { 
+  isSubscriptionActive, 
+  calculateRemainingDays, 
+  processSubscriberData,
+  getSubscriptionStatus,
+  SubscriptionEntry 
+} from '@/lib/subscriptionUtils';
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
@@ -60,6 +67,30 @@ export const SubscriberDetail = ({
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
+  // Auto-cleanup expired subscriptions on mount
+  useEffect(() => {
+    const cleanupExpiredSubscription = async () => {
+      const { needsUpdate, updates } = processSubscriberData(subscriber);
+      
+      if (needsUpdate) {
+        const { error } = await supabase
+          .from('subscribers')
+          .update({
+            current_subscription: updates.current_subscription as any,
+            subscription_history: updates.subscription_history as any,
+            current_pack: updates.current_subscription?.packName || null
+          })
+          .eq('id', subscriber.id);
+        
+        if (!error) {
+          onReload?.();
+        }
+      }
+    };
+    
+    cleanupExpiredSubscription();
+  }, [subscriber.id]);
+
   const sortedTransactions = [...transactions].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
@@ -77,13 +108,9 @@ export const SubscriberDetail = ({
     });
   };
 
-  const calculateRemainingDays = (endDate: string) => {
-    const end = new Date(endDate);
-    const now = new Date();
-    const diffTime = end.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+  // Get current subscription status
+  const currentSub = (subscriber as any).current_subscription as SubscriptionEntry | null;
+  const subscriptionStatus = getSubscriptionStatus(currentSub);
 
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -221,53 +248,45 @@ export const SubscriberDetail = ({
           </div>
         </CardHeader>
         <CardContent>
-          {(subscriber as any).current_subscription ? (
+          {currentSub && subscriptionStatus.isActive ? (
             <div className="space-y-4">
               <div className="rounded-lg border bg-primary/5 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-muted-foreground">Current Active Package</span>
                   <div className="flex items-center gap-2">
-                    {(() => {
-                      const currentSub = (subscriber as any).current_subscription;
-                      const daysLeft = calculateRemainingDays(currentSub.endDate);
-                      return daysLeft > 0 ? (
-                        <>
-                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                            Active
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
-                            {daysLeft} days left
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-xs px-2 py-1 rounded-full bg-red-500/10 text-red-700 dark:text-red-400">
-                          Expired {Math.abs(daysLeft)} days ago
-                        </span>
-                      );
-                    })()}
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                      Active
+                    </span>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      subscriptionStatus.statusColor === 'yellow' 
+                        ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                        : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                    }`}>
+                      {subscriptionStatus.statusText}
+                    </span>
                   </div>
                 </div>
-                <h4 className="text-xl font-bold mb-3">{(subscriber as any).current_subscription.packName}</h4>
+                <h4 className="text-xl font-bold mb-3">{currentSub.packName}</h4>
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   <div>
                     <p className="text-muted-foreground">Start Date</p>
                     <p className="font-medium">
-                      {new Date((subscriber as any).current_subscription.startDate).toLocaleDateString()}
+                      {new Date(currentSub.startDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Expiry Date</p>
                     <p className="font-medium">
-                      {new Date((subscriber as any).current_subscription.endDate).toLocaleDateString()}
+                      {new Date(currentSub.endDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Duration</p>
-                    <p className="font-medium">{(subscriber as any).current_subscription.duration} months</p>
+                    <p className="font-medium">{currentSub.duration || 1} months</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Monthly Price</p>
-                    <p className="font-medium">₹{((subscriber as any).current_subscription.packPrice || 0).toFixed(2)}</p>
+                    <p className="font-medium">₹{(currentSub.packPrice || 0).toFixed(2)}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 mb-2">
@@ -276,19 +295,18 @@ export const SubscriberDetail = ({
                     size="sm"
                     className="flex-1"
                     onClick={() => {
-                      const sub = (subscriber as any).current_subscription;
                       generateThermalReceipt({
                         subscriberName: subscriber.name,
                         subscriberId: (subscriber as any).subscriber_id || subscriber.id,
                         mobile: subscriber.mobile,
                         stbNumber: subscriber.stbNumber,
                         region: subscriber.region,
-                        packName: sub.packName,
-                        packPrice: sub.packPrice || 0,
-                        duration: sub.duration || 1,
-                        startDate: sub.startDate,
-                        endDate: sub.endDate,
-                        totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                        packName: currentSub.packName,
+                        packPrice: currentSub.packPrice || 0,
+                        duration: currentSub.duration || 1,
+                        startDate: currentSub.startDate,
+                        endDate: currentSub.endDate,
+                        totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
                         balance: subscriber.balance || 0,
                       });
                     }}
@@ -301,19 +319,18 @@ export const SubscriberDetail = ({
                     size="sm"
                     className="flex-1"
                     onClick={() => {
-                      const sub = (subscriber as any).current_subscription;
                       generateSubscriptionInvoice({
                         subscriberName: subscriber.name,
                         subscriberId: (subscriber as any).subscriber_id || subscriber.id,
                         mobile: subscriber.mobile,
                         stbNumber: subscriber.stbNumber,
                         region: subscriber.region,
-                        packName: sub.packName,
-                        packPrice: sub.packPrice || 0,
-                        duration: sub.duration || 1,
-                        startDate: sub.startDate,
-                        endDate: sub.endDate,
-                        totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                        packName: currentSub.packName,
+                        packPrice: currentSub.packPrice || 0,
+                        duration: currentSub.duration || 1,
+                        startDate: currentSub.startDate,
+                        endDate: currentSub.endDate,
+                        totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
                         balance: subscriber.balance || 0,
                       });
                     }}
