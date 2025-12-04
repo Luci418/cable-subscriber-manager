@@ -186,16 +186,16 @@ export const SubscriberDetail = ({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Current Balance</p>
-              <p className={`text-2xl font-bold ${getBalanceColor(subscriber.balance)}`}>
-                ₹{subscriber.balance.toFixed(2)}
+              <p className={`text-2xl font-bold ${getBalanceColor(subscriber.balance || 0)}`}>
+                ₹{(subscriber.balance || 0).toFixed(2)}
               </p>
             </div>
             {subscriber.latitude && subscriber.longitude && (
               <div className="md:col-span-2">
                 <p className="text-sm text-muted-foreground">Location Coordinates</p>
-                <p className="font-medium">
-                  📍 Lat: {subscriber.latitude.toFixed(6)}, Long: {subscriber.longitude.toFixed(6)}
-                </p>
+              <p className="font-medium">
+                📍 Lat: {(subscriber.latitude || 0).toFixed(6)}, Long: {(subscriber.longitude || 0).toFixed(6)}
+              </p>
               </div>
             )}
             <div className="md:col-span-2">
@@ -267,7 +267,7 @@ export const SubscriberDetail = ({
                   </div>
                   <div>
                     <p className="text-muted-foreground">Monthly Price</p>
-                    <p className="font-medium">₹{(subscriber as any).current_subscription.packPrice.toFixed(2)}</p>
+                    <p className="font-medium">₹{((subscriber as any).current_subscription.packPrice || 0).toFixed(2)}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 mb-2">
@@ -284,12 +284,12 @@ export const SubscriberDetail = ({
                         stbNumber: subscriber.stbNumber,
                         region: subscriber.region,
                         packName: sub.packName,
-                        packPrice: sub.packPrice,
-                        duration: sub.duration,
+                        packPrice: sub.packPrice || 0,
+                        duration: sub.duration || 1,
                         startDate: sub.startDate,
                         endDate: sub.endDate,
-                        totalAmount: sub.packPrice * sub.duration,
-                        balance: subscriber.balance,
+                        totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                        balance: subscriber.balance || 0,
                       });
                     }}
                   >
@@ -309,12 +309,12 @@ export const SubscriberDetail = ({
                         stbNumber: subscriber.stbNumber,
                         region: subscriber.region,
                         packName: sub.packName,
-                        packPrice: sub.packPrice,
-                        duration: sub.duration,
+                        packPrice: sub.packPrice || 0,
+                        duration: sub.duration || 1,
                         startDate: sub.startDate,
                         endDate: sub.endDate,
-                        totalAmount: sub.packPrice * sub.duration,
-                        balance: subscriber.balance,
+                        totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                        balance: subscriber.balance || 0,
                       });
                     }}
                   >
