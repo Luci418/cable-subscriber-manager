@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Trash2, Plus, Edit2 } from 'lucide-react';
+import { Trash2, Plus, Edit2, Archive, RotateCcw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import type { Database } from '@/integrations/supabase/types';
@@ -19,7 +20,7 @@ interface PackManagementDialogProps {
 
 export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialogProps) => {
   const { user } = useAuth();
-  const { packs, addPack, updatePack, deletePack, reloadPacks } = usePacks(user?.id);
+  const { packs, addPack, updatePack, deletePack, retirePack, reactivatePack } = usePacks(user?.id);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', price: 0, channels: '' });
 
@@ -60,13 +61,32 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this pack?')) {
+    if (confirm('Are you sure you want to delete this pack? This will only work if no customers are assigned to it.')) {
       const success = await deletePack(id);
       if (success) {
         toast.success('Pack deleted successfully');
       }
     }
   };
+
+  const handleRetire = async (id: string) => {
+    if (confirm('Retire this pack? It will be hidden from new subscriptions but existing customers will keep it.')) {
+      const success = await retirePack(id);
+      if (success) {
+        toast.success('Pack retired successfully');
+      }
+    }
+  };
+
+  const handleReactivate = async (id: string) => {
+    const success = await reactivatePack(id);
+    if (success) {
+      toast.success('Pack reactivated successfully');
+    }
+  };
+
+  const activePacks = packs.filter(p => p.is_active !== false);
+  const retiredPacks = packs.filter(p => p.is_active === false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,34 +155,86 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
           )}
         </form>
 
-        <div className="space-y-2">
-          <h3 className="font-semibold">Existing Packs</h3>
-          {packs.map((pack) => (
-            <Card key={pack.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{pack.name}</p>
-                  <p className="text-sm text-muted-foreground">₹{pack.price.toFixed(2)}/month</p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h3 className="font-semibold">Active Packs</h3>
+            {activePacks.length === 0 && (
+              <p className="text-sm text-muted-foreground">No active packs</p>
+            )}
+            {activePacks.map((pack) => (
+              <Card key={pack.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{pack.name}</p>
+                    <p className="text-sm text-muted-foreground">₹{Number(pack.price).toFixed(2)}/month</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(pack)}
+                      title="Edit"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRetire(pack.id)}
+                      title="Retire (soft delete)"
+                    >
+                      <Archive className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(pack.id)}
+                      title="Delete (only if unused)"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(pack)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDelete(pack.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
+
+          {retiredPacks.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-muted-foreground">Retired Packs</h3>
+              {retiredPacks.map((pack) => (
+                <Card key={pack.id} className="p-4 opacity-60">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{pack.name}</p>
+                        <Badge variant="secondary">Retired</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">₹{Number(pack.price).toFixed(2)}/month</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReactivate(pack.id)}
+                        title="Reactivate"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(pack.id)}
+                        title="Delete (only if unused)"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

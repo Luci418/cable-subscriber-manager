@@ -102,6 +102,7 @@ export type Database = {
           channels: string
           created_at: string
           id: string
+          is_active: boolean
           name: string
           price: number
           user_id: string
@@ -110,6 +111,7 @@ export type Database = {
           channels: string
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
           price: number
           user_id: string
@@ -118,6 +120,7 @@ export type Database = {
           channels?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
           price?: number
           user_id?: string
@@ -181,6 +184,47 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stb_inventory: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          serial_number: string
+          status: Database["public"]["Enums"]["stb_status"]
+          subscriber_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          serial_number: string
+          status?: Database["public"]["Enums"]["stb_status"]
+          subscriber_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          serial_number?: string
+          status?: Database["public"]["Enums"]["stb_status"]
+          subscriber_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stb_inventory_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
             referencedColumns: ["id"]
           },
         ]
@@ -303,10 +347,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_pack_in_use: {
+        Args: { owner_id: string; pack_name: string }
+        Returns: boolean
+      }
+      is_region_in_use: {
+        Args: { owner_id: string; region_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      stb_status: "available" | "assigned" | "faulty" | "decommissioned"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -433,6 +484,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      stb_status: ["available", "assigned", "faulty", "decommissioned"],
+    },
   },
 } as const

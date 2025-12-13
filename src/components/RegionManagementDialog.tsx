@@ -16,7 +16,7 @@ interface RegionManagementDialogProps {
 
 export const RegionManagementDialog = ({ open, onOpenChange }: RegionManagementDialogProps) => {
   const { user } = useAuth();
-  const { regions, addRegion, deleteRegion } = useRegions(user?.id);
+  const { regions, addRegion, deleteRegion, checkRegionInUse } = useRegions(user?.id);
   const [regionName, setRegionName] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +33,14 @@ export const RegionManagementDialog = ({ open, onOpenChange }: RegionManagementD
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, regionName: string) => {
+    // Check if region is in use before confirming
+    const inUse = await checkRegionInUse(regionName);
+    if (inUse) {
+      toast.error('Cannot delete region - customers are still assigned to it');
+      return;
+    }
+
     if (confirm('Are you sure you want to delete this region?')) {
       const success = await deleteRegion(id);
       if (success) {
@@ -74,7 +81,7 @@ export const RegionManagementDialog = ({ open, onOpenChange }: RegionManagementD
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => handleDelete(region.id)}
+                  onClick={() => handleDelete(region.id, region.name)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

@@ -27,7 +27,7 @@ export const AddPackageSubscriptionDialog = ({
   onSuccess
 }: AddPackageSubscriptionDialogProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { packs, loading: packsLoading, reloadPacks } = usePacks(user?.id);
+  const { packs, loading: packsLoading, reloadPacks, getActivePacks } = usePacks(user?.id);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
   const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
@@ -86,7 +86,8 @@ export const AddPackageSubscriptionDialog = ({
 
   const addNewSubscription = async () => {
     setLoading(true);
-    const selectedPackData = packs.find(p => p.name === selectedPack);
+    const activePacks = getActivePacks();
+    const selectedPackData = activePacks.find(p => p.name === selectedPack);
     if (!selectedPackData) {
       toast.error('Package not found');
       setLoading(false);
@@ -149,7 +150,8 @@ export const AddPackageSubscriptionDialog = ({
     onSuccess();
   };
 
-  const selectedPackData = packs.find(p => p.name === selectedPack);
+  const activePacks = getActivePacks();
+  const selectedPackData = activePacks.find(p => p.name === selectedPack);
 
   const isLoading = authLoading || packsLoading || subscriberLoading;
 
@@ -177,16 +179,16 @@ export const AddPackageSubscriptionDialog = ({
                 <SelectValue placeholder="Choose a package" />
               </SelectTrigger>
               <SelectContent className="bg-popover">
-                {packs && packs.length > 0 ? (
-                  packs.map((pack) => (
+                {activePacks && activePacks.length > 0 ? (
+                  activePacks.map((pack) => (
                     <SelectItem key={pack.id} value={pack.name}>
-                      {pack.name} - ₹{pack.price.toFixed(2)}/month
+                      {pack.name} - ₹{Number(pack.price).toFixed(2)}/month
                     </SelectItem>
                   ))
                 ) : (
                   <div className="px-2 py-3 text-sm text-muted-foreground flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
-                    No packages available. Please create packages in Settings first.
+                    No active packages available. Please create packages first.
                   </div>
                 )}
               </SelectContent>

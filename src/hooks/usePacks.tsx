@@ -34,12 +34,15 @@ export const usePacks = (userId: string | undefined) => {
     loadPacks();
   }, [userId]);
 
+  // Get only active packs for dropdowns
+  const getActivePacks = () => packs.filter(p => p.is_active !== false);
+
   const addPack = async (pack: Omit<PackInsert, "user_id">) => {
-    if (!userId) return;
+    if (!userId) return false;
 
     const { data, error } = await supabase
       .from("packs")
-      .insert({ ...pack, user_id: userId })
+      .insert({ ...pack, user_id: userId, is_active: true })
       .select()
       .single();
 
@@ -49,7 +52,6 @@ export const usePacks = (userId: string | undefined) => {
       return false;
     }
 
-    // Optimistic update
     if (data) {
       setPacks(prev => [data, ...prev]);
     }
@@ -57,10 +59,12 @@ export const usePacks = (userId: string | undefined) => {
   };
 
   const updatePack = async (id: string, updates: PackUpdate) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("packs")
       .update(updates)
-      .eq("id", id);
+      .eq("id", id)
+      .select()
+      .single();
 
     if (error) {
       toast.error("Failed to update pack");
@@ -68,14 +72,39 @@ export const usePacks = (userId: string | undefined) => {
       return false;
     }
 
-    // Optimistic update
-    setPacks(prev => prev.map(pack => 
-      pack.id === id ? { ...pack, ...updates } : pack
-    ));
+    if (data) {
+      setPacks(prev => prev.map(pack => 
+        pack.id === id ? data : pack
+      ));
+    }
     return true;
   };
 
+  const checkPackInUse = async (packName: string): Promise<boolean> => {
+    if (!userId) return false;
+    
+    const { data, error } = await supabase
+      .rpc('is_pack_in_use', { pack_name: packName, owner_id: userId });
+    
+    if (error) {
+      console.error('Error checking pack usage:', error);
+      return true; // Assume in use on error to be safe
+    }
+    
+    return data as boolean;
+  };
+
   const deletePack = async (id: string) => {
+    const pack = packs.find(p => p.id === id);
+    if (!pack) return false;
+
+    // Check if pack is in use
+    const inUse = await checkPackInUse(pack.name);
+    if (inUse) {
+      toast.error("Cannot delete pack - customers are still assigned to it. Use 'Retire' to phase it out.");
+      return false;
+    }
+
     const { error } = await supabase
       .from("packs")
       .delete()
@@ -87,9 +116,16 @@ export const usePacks = (userId: string | undefined) => {
       return false;
     }
 
-    // Optimistic update
     setPacks(prev => prev.filter(pack => pack.id !== id));
     return true;
+  };
+
+  const retirePack = async (id: string) => {
+    return await updatePack(id, { is_active: false });
+  };
+
+  const reactivatePack = async (id: string) => {
+    return await updatePack(id, { is_active: true });
   };
 
   return {
@@ -98,6 +134,10 @@ export const usePacks = (userId: string | undefined) => {
     addPack,
     updatePack,
     deletePack,
+    retirePack,
+    reactivatePack,
+    getActivePacks,
+    checkPackInUse,
     reloadPacks: loadPacks,
   };
 };
