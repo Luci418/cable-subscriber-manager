@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRegions } from '@/hooks/useRegions';
+import { useStbInventory } from '@/hooks/useStbInventory';
 import { Loader2, MapPin } from 'lucide-react';
 
 interface AddSubscriberFormProps {
@@ -44,6 +45,9 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
   const [gettingLocation, setGettingLocation] = useState(false);
   const { user } = useAuth();
   const { regions } = useRegions(user?.id);
+  const { stbs } = useStbInventory(user?.id);
+
+  const availableStbs = stbs.filter(stb => stb.status === 'available');
 
   const getCoordinates = () => {
     if (!navigator.geolocation) {
@@ -137,13 +141,23 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
 
           <div className="space-y-2">
             <Label htmlFor="stb">STB Number *</Label>
-            <Input
-              id="stb"
-              value={formData.stbNumber}
-              onChange={(e) => setFormData({ ...formData, stbNumber: e.target.value })}
-              placeholder="Enter STB number"
-              required
-            />
+            <Select value={formData.stbNumber} onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select available STB" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableStbs.length === 0 ? (
+                  <SelectItem value="" disabled>No available STBs in inventory</SelectItem>
+                ) : (
+                  availableStbs.map(stb => (
+                    <SelectItem key={stb.id} value={stb.serial_number}>{stb.serial_number}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {availableStbs.length === 0 && (
+              <p className="text-sm text-destructive">Add STBs to inventory first</p>
+            )}
           </div>
 
           <div className="space-y-2">
