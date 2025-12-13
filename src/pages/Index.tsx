@@ -31,7 +31,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { subscribers, loading: subsLoading, addSubscriber, updateSubscriber, deleteSubscriber, reloadSubscribers } = useSubscribers(user?.id);
-  const { transactions, addTransaction: createTransaction } = useTransactions(user?.id);
+  const { transactions, addTransaction: createTransaction, reloadTransactions } = useTransactions(user?.id);
   
   const [view, setView] = useState<View>('list');
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);
@@ -152,6 +152,11 @@ const Index = () => {
     reloadSubscribers();
   };
 
+  const handleSubscriberReload = () => {
+    reloadSubscribers();
+    reloadTransactions();
+  };
+
   const selectedSubscriber = selectedSubscriberId 
     ? subscribers.find(s => s.id === selectedSubscriberId)
     : null;
@@ -248,7 +253,7 @@ const Index = () => {
                 onAddTransaction={handleAddTransaction}
                 onEdit={handleEditSubscriber}
                 onDelete={handleDeleteSubscriber}
-                onReload={reloadSubscribers}
+                onReload={handleSubscriberReload}
               />
             )}
 

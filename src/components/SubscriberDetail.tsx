@@ -205,11 +205,11 @@ export const SubscriberDetail = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">STB Number</p>
-              <p className="font-medium">{subscriber.stbNumber}</p>
+              <p className="font-medium">{(subscriber as any).stb_number || subscriber.stbNumber || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Region/Cluster</p>
-              <p className="font-medium">{subscriber.region}</p>
+              <p className="font-medium">{subscriber.region || 'N/A'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Current Balance</p>

@@ -52,19 +52,22 @@ export const SubscriberList = ({
   const [regionFilter, setRegionFilter] = useState<string>(initialRegionFilter || 'all');
   const [balanceFilter, setBalanceFilter] = useState<string>(initialBalanceFilter || 'all');
 
-  const packs = Array.from(new Set(subscribers.map(s => s.pack)));
-  const regions = Array.from(new Set(subscribers.map(s => s.region)));
+  // Use database field names: current_pack and stb_number
+  const packs = Array.from(new Set(subscribers.map(s => (s as any).current_pack || s.pack).filter(Boolean)));
+  const regions = Array.from(new Set(subscribers.map(s => s.region).filter(Boolean)));
 
   const filteredSubscribers = subscribers.filter(s => {
     const searchLower = search.toLowerCase().trim();
+    const stbNum = (s as any).stb_number || s.stbNumber || '';
+    const pack = (s as any).current_pack || s.pack || '';
     
     const matchesSearch = !searchLower || 
       s.name.toLowerCase().includes(searchLower) ||
       s.mobile.toLowerCase().includes(searchLower) ||
-      s.stbNumber.toLowerCase().includes(searchLower) ||
+      stbNum.toLowerCase().includes(searchLower) ||
       s.id.toLowerCase().includes(searchLower);
     
-    const matchesPack = packFilter === 'all' || s.pack === packFilter;
+    const matchesPack = packFilter === 'all' || pack === packFilter;
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
     
     let matchesBalance = true;
@@ -181,39 +184,43 @@ export const SubscriberList = ({
             </CardContent>
           </Card>
         ) : (
-          filteredSubscribers.map(subscriber => (
-            <Card 
-              key={subscriber.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => onSelectSubscriber(subscriber.id)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{subscriber.name}</CardTitle>
-                     <p className="text-sm text-muted-foreground mt-1">
-                       {subscriber.mobile} • STB: {subscriber.stbNumber} • {subscriber.region}
-                     </p>
+          filteredSubscribers.map(subscriber => {
+            const stbNum = (subscriber as any).stb_number || subscriber.stbNumber || 'N/A';
+            const pack = (subscriber as any).current_pack || subscriber.pack || 'No Pack';
+            return (
+              <Card 
+                key={subscriber.id}
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => onSelectSubscriber(subscriber.id)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{subscriber.name}</CardTitle>
+                       <p className="text-sm text-muted-foreground mt-1">
+                         {subscriber.mobile} • STB: {stbNum} • {subscriber.region || 'No Region'}
+                       </p>
+                    </div>
+                    <Badge variant="secondary">{pack}</Badge>
                   </div>
-                  <Badge variant="secondary">{subscriber.pack}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-muted-foreground">
-                    {subscriber.latitude && subscriber.longitude ? (
-                      <span>📍 {subscriber.latitude.toFixed(4)}, {subscriber.longitude.toFixed(4)}</span>
-                    ) : (
-                      <span>No coordinates</span>
-                    )}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      {subscriber.latitude && subscriber.longitude ? (
+                        <span>📍 {subscriber.latitude.toFixed(4)}, {subscriber.longitude.toFixed(4)}</span>
+                      ) : (
+                        <span>No coordinates</span>
+                      )}
+                    </div>
+                    <div className={`font-semibold ${getBalanceColor(subscriber.balance || 0)}`}>
+                      ₹{(subscriber.balance || 0).toFixed(2)}
+                    </div>
                   </div>
-                  <div className={`font-semibold ${getBalanceColor(subscriber.balance)}`}>
-                    ₹{subscriber.balance.toFixed(2)}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>
