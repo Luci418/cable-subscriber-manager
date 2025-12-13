@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, MoreHorizontal, Upload, Download } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Upload, Download, HardDrive } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
 interface SubscriberListProps {
@@ -27,6 +28,7 @@ interface SubscriberListProps {
   onImport: () => void;
   onManagePacks: () => void;
   onManageRegions: () => void;
+  onManageStbs: () => void;
   initialPackFilter?: string;
   initialRegionFilter?: string;
   initialBalanceFilter?: string;
@@ -40,6 +42,7 @@ export const SubscriberList = ({
   onImport,
   onManagePacks,
   onManageRegions,
+  onManageStbs,
   initialPackFilter,
   initialRegionFilter,
   initialBalanceFilter,
@@ -100,8 +103,8 @@ export const SubscriberList = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Packs</SelectItem>
-              {packs.map(pack => (
-                <SelectItem key={pack} value={pack}>{pack}</SelectItem>
+              {packs.filter(Boolean).map((pack, idx) => (
+                <SelectItem key={`pack-${pack}-${idx}`} value={pack}>{pack}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -112,8 +115,8 @@ export const SubscriberList = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Regions</SelectItem>
-              {regions.map(region => (
-                <SelectItem key={region} value={region}>{region}</SelectItem>
+              {regions.filter(Boolean).map((region, idx) => (
+                <SelectItem key={`region-${region}-${idx}`} value={region}>{region}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -143,6 +146,11 @@ export const SubscriberList = ({
               <DropdownMenuItem onClick={onManageRegions}>
                 Manage Regions
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onManageStbs}>
+                <HardDrive className="h-4 w-4 mr-2" />
+                STB Inventory
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onImport}>
                 <Upload className="h-4 w-4 mr-2" />
                 Import

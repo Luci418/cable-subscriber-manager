@@ -10,6 +10,7 @@ import { Billing } from '@/pages/Billing';
 import { ImportDialog } from '@/components/ImportDialog';
 import { PackManagementDialog } from '@/components/PackManagementDialog';
 import { RegionManagementDialog } from '@/components/RegionManagementDialog';
+import { StbInventoryDialog } from '@/components/StbInventoryDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -37,6 +38,7 @@ const Index = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showPackManagement, setShowPackManagement] = useState(false);
   const [showRegionManagement, setShowRegionManagement] = useState(false);
+  const [showStbInventory, setShowStbInventory] = useState(false);
   const [packFilter, setPackFilter] = useState<string | undefined>();
   const [regionFilter, setRegionFilter] = useState<string | undefined>();
   const [balanceFilter, setBalanceFilter] = useState<string | undefined>();
@@ -224,6 +226,7 @@ const Index = () => {
                 onImport={() => setShowImportDialog(true)}
                 onManagePacks={() => setShowPackManagement(true)}
                 onManageRegions={() => setShowRegionManagement(true)}
+                onManageStbs={() => setShowStbInventory(true)}
                 initialPackFilter={packFilter}
                 initialRegionFilter={regionFilter}
                 initialBalanceFilter={balanceFilter}
@@ -287,6 +290,11 @@ const Index = () => {
       <RegionManagementDialog
         open={showRegionManagement}
         onOpenChange={setShowRegionManagement}
+      />
+
+      <StbInventoryDialog
+        open={showStbInventory}
+        onOpenChange={setShowStbInventory}
       />
     </div>
   );
