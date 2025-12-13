@@ -19,6 +19,8 @@ import { Switch } from '@/components/ui/switch';
 import { MapPin, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Subscriber, getPacks, getRegions, calculateNextBillingDate } from '@/lib/storage';
+import { useAuth } from '@/hooks/useAuth';
+import { useStbInventory } from '@/hooks/useStbInventory';
 
 interface EditSubscriberDialogProps {
   open: boolean;
@@ -45,6 +47,13 @@ export const EditSubscriberDialog = ({
   });
   const [gettingLocation, setGettingLocation] = useState(false);
   const [regions, setRegions] = useState<Array<{ id: string; name: string }>>([]);
+  const { user } = useAuth();
+  const { stbs } = useStbInventory(user?.id);
+
+  // Available STBs include: those with 'available' status OR the currently assigned one
+  const availableStbs = stbs.filter(stb => 
+    stb.status === 'available' || stb.serial_number === subscriber.stbNumber
+  );
 
   useEffect(() => {
     if (open) {
@@ -146,13 +155,18 @@ export const EditSubscriberDialog = ({
 
           <div className="space-y-2">
             <Label htmlFor="edit-stb">STB Number *</Label>
-            <Input
-              id="edit-stb"
-              value={formData.stbNumber}
-              onChange={(e) => setFormData({ ...formData, stbNumber: e.target.value })}
-              placeholder="Enter STB number"
-              required
-            />
+            <Select value={formData.stbNumber} onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select STB" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableStbs.map(stb => (
+                  <SelectItem key={stb.id} value={stb.serial_number}>
+                    {stb.serial_number} {stb.serial_number === subscriber.stbNumber ? '(current)' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
