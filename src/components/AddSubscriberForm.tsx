@@ -147,7 +147,9 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
               </SelectTrigger>
               <SelectContent>
                 {availableStbs.length === 0 ? (
-                  <SelectItem value="" disabled>No available STBs in inventory</SelectItem>
+                  <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                    No available STBs in inventory
+                  </div>
                 ) : (
                   availableStbs.map(stb => (
                     <SelectItem key={stb.id} value={stb.serial_number}>{stb.serial_number}</SelectItem>
