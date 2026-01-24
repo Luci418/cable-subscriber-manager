@@ -196,9 +196,25 @@ export const SubscriberDetail = ({
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-2xl">{subscriber.name}</CardTitle>
+              <p className="text-muted-foreground mt-1">
+                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded">
+                  ID: {(subscriber as any).subscriber_id || 'N/A'}
+                </span>
+              </p>
               <p className="text-muted-foreground mt-2">{subscriber.mobile}</p>
             </div>
-            <Badge variant="secondary" className="text-base px-4 py-2">{subscriber.pack}</Badge>
+            <div className="text-right space-y-2">
+              <Badge variant="secondary" className="text-base px-4 py-2">{subscriber.pack}</Badge>
+              {currentSub && subscriptionStatus.isActive && (
+                <div className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                  subscriptionStatus.daysRemaining <= 7 
+                    ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' 
+                    : 'bg-green-500/20 text-green-700 dark:text-green-400'
+                }`}>
+                  {subscriptionStatus.daysRemaining} days left
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
