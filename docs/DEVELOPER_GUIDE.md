@@ -1496,6 +1496,247 @@ doc.text(data.name ?? 'N/A', 10, 10);  // Handle null/undefined
 
 ---
 
+## 🆔 Subscriber ID Generation
+
+### Pattern: REGION-NNN
+
+Subscriber IDs follow a region-based pattern for easy identification and organization:
+
+```
+NORTH-001   → First subscriber in "North Zone"
+NORTH-002   → Second subscriber in "North Zone"
+DOWNTOWN-001 → First subscriber in "Downtown"
+EAST-015     → 15th subscriber in "East Zone"
+```
+
+### Implementation
+
+```typescript
+// src/lib/subscriberIdGenerator.ts
+
+/**
+ * Generates a subscriber ID in the format: REGION-001
+ * Each region maintains its own sequential counter.
+ */
+export async function generateSubscriberId(
+  regionName: string, 
+  userId: string
+): Promise<string> {
+  const prefix = createRegionPrefix(regionName);
+  const nextNumber = await getNextSequenceNumber(prefix, userId);
+  return `${prefix}-${nextNumber.toString().padStart(3, '0')}`;
+}
+
+/**
+ * Creates prefix from region name:
+ * - Takes first word
+ * - Removes special characters
+ * - Uppercase, max 10 chars
+ * 
+ * Examples:
+ * "North Zone" → "NORTH"
+ * "Downtown Area" → "DOWNTOWN"
+ */
+export function createRegionPrefix(regionName: string): string {
+  const firstWord = regionName.split(/[\s-_]+/)[0];
+  return firstWord.replace(/[^a-zA-Z0-9]/g, '')
+                  .toUpperCase()
+                  .slice(0, 10) || 'DEFAULT';
+}
+```
+
+### Database Query for Next Sequence
+
+```typescript
+async function getNextSequenceNumber(prefix: string, userId: string): Promise<number> {
+  const { data } = await supabase
+    .from('subscribers')
+    .select('subscriber_id')
+    .eq('user_id', userId)
+    .like('subscriber_id', `${prefix}-%`);
+  
+  // Find highest existing number
+  let maxNumber = 0;
+  for (const row of data || []) {
+    const match = row.subscriber_id?.match(/^${prefix}-(\d+)$/);
+    if (match) {
+      maxNumber = Math.max(maxNumber, parseInt(match[1], 10));
+    }
+  }
+  
+  return maxNumber + 1;
+}
+```
+
+### Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Visual Organization** | Quickly identify subscriber's region |
+| **Collision-Free** | Scoped per region, per user |
+| **Scalable** | Supports 999+ subscribers per region |
+| **Searchable** | Filter by prefix in database queries |
+
+---
+
+## 🚀 Deployment Guide
+
+### Option 1: Deploy to Vercel + Self-Hosted Supabase
+
+This guide walks you through deploying the frontend to Vercel and using your own Supabase project.
+
+#### Prerequisites
+
+- GitHub account
+- Vercel account (free tier works)
+- Supabase account (free tier works)
+- Node.js 18+ installed locally
+
+#### Step 1: Export Your Code
+
+1. Connect your Lovable project to GitHub (Settings → GitHub)
+2. Push your code to the repository
+3. Clone the repository locally:
+
+```bash
+git clone https://github.com/yourusername/your-repo.git
+cd your-repo
+```
+
+#### Step 2: Create Your Own Supabase Project
+
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Note your project credentials:
+   - **Project URL**: `https://xxxxxxxx.supabase.co`
+   - **Anon Key**: Found in Settings → API
+   - **Service Role Key**: For server-side operations
+
+#### Step 3: Migrate Database Schema
+
+Export the schema from your current database and run migrations:
+
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Link to your new project
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+
+# Push migrations from supabase/migrations/ folder
+supabase db push
+```
+
+Or manually run the SQL from each migration file in your Supabase SQL Editor.
+
+#### Step 4: Configure Environment Variables
+
+Create a `.env.local` file for local development:
+
+```env
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key_here
+VITE_SUPABASE_PROJECT_ID=your_project_id
+```
+
+#### Step 5: Update Supabase Client
+
+The client is auto-generated, but if you need to modify it:
+
+```typescript
+// src/integrations/supabase/client.ts
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+```
+
+#### Step 6: Deploy to Vercel
+
+1. Go to [vercel.com](https://vercel.com) and import your GitHub repository
+2. Configure environment variables in Vercel dashboard:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - `VITE_SUPABASE_PROJECT_ID`
+3. Deploy!
+
+```bash
+# Or deploy via CLI
+npm install -g vercel
+vercel
+```
+
+#### Step 7: Configure Authentication URLs
+
+In your Supabase dashboard (Authentication → URL Configuration):
+
+```
+Site URL: https://your-app.vercel.app
+Redirect URLs: 
+  - https://your-app.vercel.app/*
+  - http://localhost:5173/* (for local dev)
+```
+
+### Deployment Checklist
+
+| Step | Action | Status |
+|------|--------|--------|
+| 1 | Export code to GitHub | ⬜ |
+| 2 | Create new Supabase project | ⬜ |
+| 3 | Run database migrations | ⬜ |
+| 4 | Configure RLS policies | ⬜ |
+| 5 | Set environment variables | ⬜ |
+| 6 | Deploy to Vercel | ⬜ |
+| 7 | Update auth redirect URLs | ⬜ |
+| 8 | Test authentication flow | ⬜ |
+| 9 | Test CRUD operations | ⬜ |
+| 10 | Configure custom domain (optional) | ⬜ |
+
+### Data Migration
+
+If you have existing data in Lovable Cloud:
+
+```sql
+-- Export data from Lovable Cloud (run in Cloud SQL editor)
+-- Then import to your Supabase project
+
+-- Option 1: Export as CSV from Cloud UI
+-- Option 2: Use pg_dump for large datasets
+-- Option 3: Write a migration script
+
+-- Example: Copy subscribers
+INSERT INTO subscribers (id, name, mobile, ...)
+SELECT id, name, mobile, ...
+FROM source_table;
+```
+
+### Edge Functions
+
+If you have edge functions, deploy them to your Supabase:
+
+```bash
+# Deploy all functions
+supabase functions deploy
+
+# Deploy specific function
+supabase functions deploy function-name
+```
+
+### Custom Domain (Optional)
+
+**Vercel:**
+1. Go to your Vercel project → Settings → Domains
+2. Add your custom domain
+3. Configure DNS records
+
+**Supabase:**
+1. Upgrade to Pro plan for custom domains
+2. Or keep using the default `*.supabase.co` domain
+
+---
+
 ## 📚 Further Reading
 
 - [React Documentation](https://react.dev)
@@ -1504,6 +1745,8 @@ doc.text(data.name ?? 'N/A', 10, 10);  // Handle null/undefined
 - [shadcn/ui Components](https://ui.shadcn.com)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [jsPDF Documentation](https://rawgit.com/MrRio/jsPDF/master/docs/)
+- [Vercel Documentation](https://vercel.com/docs)
+- [Supabase CLI Reference](https://supabase.com/docs/reference/cli)
 
 ---
 
