@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
 import { exportToCSV } from '@/lib/csv';
+import { generateSubscriberId } from '@/lib/subscriberIdGenerator';
 import { toast } from 'sonner';
 import { Tv, BarChart3, MessageSquare, Settings as SettingsIcon, MoreVertical, Calendar, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,7 +63,10 @@ const Index = () => {
   }
 
   const handleAddSubscriber = async (data: any) => {
-    const subscriberId = `SUB${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    // Generate region-based subscriber ID (e.g., NORTH-001, DOWNTOWN-002)
+    const regionName = data.region || 'DEFAULT';
+    const subscriberId = await generateSubscriberId(regionName, user.id);
+    
     const success = await addSubscriber({
       subscriber_id: subscriberId,
       name: data.name,
@@ -79,7 +83,7 @@ const Index = () => {
     });
 
     if (success) {
-      toast.success('Subscriber added successfully!');
+      toast.success(`Subscriber ${subscriberId} added successfully!`);
       setView('list');
     }
   };
