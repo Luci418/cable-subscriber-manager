@@ -17,14 +17,9 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { exportToCSV } from '@/lib/csv';
 import { generateSubscriberId } from '@/lib/subscriberIdGenerator';
 import { toast } from 'sonner';
-import { Tv, BarChart3, MessageSquare, Settings as SettingsIcon, MoreVertical, Calendar, LogOut, Loader2 } from 'lucide-react';
+import { Tv, BarChart3, MessageSquare, Settings as SettingsIcon, Calendar, LogOut, Loader2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
 type View = 'list' | 'add' | 'detail' | 'analytics' | 'complaints' | 'settings' | 'billing';
 
