@@ -347,6 +347,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_lapsed_subscriptions: { Args: never; Returns: number }
       is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
       is_region_in_use: { Args: { region_name: string }; Returns: boolean }
     }
