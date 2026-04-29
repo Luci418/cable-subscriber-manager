@@ -67,29 +67,10 @@ export const SubscriberDetail = ({
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  // Auto-cleanup expired subscriptions on mount
-  useEffect(() => {
-    const cleanupExpiredSubscription = async () => {
-      const { needsUpdate, updates } = processSubscriberData(subscriber);
-      
-      if (needsUpdate) {
-        const { error } = await supabase
-          .from('subscribers')
-          .update({
-            current_subscription: updates.current_subscription as any,
-            subscription_history: updates.subscription_history as any,
-            current_pack: updates.current_subscription?.packName || null
-          })
-          .eq('id', subscriber.id);
-        
-        if (!error) {
-          onReload?.();
-        }
-      }
-    };
-    
-    cleanupExpiredSubscription();
-  }, [subscriber.id]);
+  // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
+  // RPC before every fetch, and an hourly pg_cron job runs the same function.
+  // No client-side lazy cleanup is needed here — the data we receive is already
+  // authoritative. Kept this comment so future contributors don't re-introduce it.
 
   const sortedTransactions = [...transactions].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
