@@ -228,9 +228,11 @@ export const SubscriberDetail = ({
               <p className="font-medium">{subscriber.region || 'N/A'}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Current Balance</p>
+              <p className="text-sm text-muted-foreground">
+                {(subscriber.balance || 0) > 0 ? 'Dues' : (subscriber.balance || 0) < 0 ? 'Advance' : 'Dues'}
+              </p>
               <p className={`text-2xl font-bold ${getBalanceColor(subscriber.balance || 0)}`}>
-                ₹{(subscriber.balance || 0).toFixed(2)}
+                ₹{Math.abs(subscriber.balance || 0).toFixed(2)}
               </p>
             </div>
             {subscriber.latitude && subscriber.longitude && (
@@ -268,7 +270,7 @@ export const SubscriberDetail = ({
             <div className="space-y-4">
               <div className="rounded-lg border bg-primary/5 p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-muted-foreground">Current Active Package</span>
+                  <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
                       Active
@@ -452,7 +454,7 @@ export const SubscriberDetail = ({
                     <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
                     <TableCell>
                       <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
-                        {transaction.type}
+                        {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
                       </Badge>
                     </TableCell>
                     <TableCell>{transaction.description}</TableCell>
