@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Subscriber, Transaction } from '@/lib/storage';
 import { generateInvoicePDF, generateThermalReceipt, generateSubscriptionInvoice } from '@/lib/pdf';
 import { Button } from '@/components/ui/button';
@@ -33,9 +33,6 @@ import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
-  isSubscriptionActive, 
-  calculateRemainingDays, 
-  processSubscriberData,
   getSubscriptionStatus,
   SubscriptionEntry 
 } from '@/lib/subscriptionUtils';
