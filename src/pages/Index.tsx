@@ -164,55 +164,83 @@ const Index = () => {
     ? transactions.filter(t => t.subscriber_id === selectedSubscriberId)
     : [];
 
+  // Top-level navigation items shown in the desktop header tab strip
+  // and in the mobile bottom-nav bar. Adding entries here is the only
+  // place to register a new top-level page (keeps nav DRY across breakpoints).
+  const navItems: { id: View; label: string; icon: typeof Users }[] = [
+    { id: 'list', label: 'Subscribers', icon: Users },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'billing', label: 'Billing', icon: Calendar },
+    { id: 'complaints', label: 'Complaints', icon: MessageSquare },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  ];
+
+  // Detail/add are sub-views of "list" — highlight the Subscribers tab for them.
+  const activeNav: View = view === 'detail' || view === 'add' ? 'list' : view;
+
+  const handleNavClick = (id: View) => {
+    setView(id);
+    setSelectedSubscriberId(null);
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
-                <Tv className="h-6 w-6 text-primary-foreground" />
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <header className="border-b bg-card sticky top-0 z-30">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                <Tv className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Cable TV Manager</h1>
-                <p className="text-sm text-muted-foreground">Subscriber & Billing Management</p>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">Cable TV Manager</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Subscriber & Billing Management</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {view === 'list' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setView('analytics')}>
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Analytics
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView('billing')}>
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Billing
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView('complaints')}>
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Complaints
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setView('settings')}>
-                      <SettingsIcon className="mr-2 h-4 w-4" />
-                      Settings
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <Button variant="outline" size="icon" onClick={signOut} title="Sign Out">
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button variant="outline" size="icon" onClick={signOut} title="Sign Out" className="shrink-0">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
+
+          {/* Desktop tab strip */}
+          <nav className="hidden md:flex items-center gap-1 mt-3 -mb-3 overflow-x-auto scrollbar-hide">
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => handleNavClick(id)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                  activeNav === id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
+
+      {/* Mobile bottom nav — keeps every feature one tap away on phones */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-card border-t">
+        <div className="grid grid-cols-5">
+          {navItems.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => handleNavClick(id)}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
+                activeNav === id ? 'text-primary' : 'text-muted-foreground'
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="leading-none">{label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       <main className="container mx-auto px-4 py-4 sm:py-6">
         {subsLoading ? (
