@@ -84,7 +84,7 @@ export const usePacks = (userId: string | undefined) => {
     if (!userId) return false;
     
     const { data, error } = await supabase
-      .rpc('is_pack_in_use', { pack_name: packName, owner_id: userId });
+      .rpc('is_pack_in_use', { pack_name: packName });
     
     if (error) {
       console.error('Error checking pack usage:', error);

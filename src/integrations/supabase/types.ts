@@ -347,14 +347,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_pack_in_use: {
-        Args: { owner_id: string; pack_name: string }
-        Returns: boolean
-      }
-      is_region_in_use: {
-        Args: { owner_id: string; region_name: string }
-        Returns: boolean
-      }
+      is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
+      is_region_in_use: { Args: { region_name: string }; Returns: boolean }
     }
     Enums: {
       stb_status: "available" | "assigned" | "faulty" | "decommissioned"
