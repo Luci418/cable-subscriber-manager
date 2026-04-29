@@ -134,7 +134,18 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     ].filter(item => item.value > 0);
   };
 
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--secondary))', 'hsl(var(--warning))', 'hsl(var(--success))'];
+  // Vivid, high-contrast palette for pie charts (the previous mix included
+  // muted/gray-ish tokens that disappeared on light backgrounds).
+  const COLORS = [
+    'hsl(217 91% 60%)',  // blue
+    'hsl(142 71% 45%)',  // green
+    'hsl(38 92% 50%)',   // amber
+    'hsl(0 84% 60%)',    // red
+    'hsl(280 70% 55%)',  // purple
+    'hsl(190 85% 45%)',  // teal
+    'hsl(330 75% 55%)',  // pink
+    'hsl(20 90% 55%)',   // orange
+  ];
 
   if (loading) {
     return (

@@ -15,6 +15,15 @@ export const useSubscribers = (userId: string | undefined) => {
     if (!userId) return;
     
     setLoading(true);
+    // Eagerly expire any lapsed subscriptions server-side BEFORE fetching,
+    // so the UI always reflects authoritative server state (no client-side lazy cleanup).
+    // Safe to ignore errors: cron also runs hourly, and stale rows just look like the prior render.
+    try {
+      await supabase.rpc("expire_lapsed_subscriptions");
+    } catch (e) {
+      console.warn("expire_lapsed_subscriptions RPC failed (non-fatal):", e);
+    }
+
     const { data, error } = await supabase
       .from("subscribers")
       .select("*")
