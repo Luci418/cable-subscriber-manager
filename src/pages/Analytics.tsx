@@ -49,47 +49,53 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     return transactions.filter(t => new Date(t.date) >= cutoffDate);
   };
 
-  // Revenue trend data (daily for last period)
+  // Revenue trend data (daily for last period) — sorted chronologically using ISO keys
   const getRevenueTrendData = () => {
     const filtered = getFilteredTransactions();
-    const dailyData: { [key: string]: { payments: number; charges: number } } = {};
+    const dailyData: { [isoKey: string]: { payments: number; charges: number } } = {};
 
     filtered.forEach(t => {
-      const dateKey = new Date(t.date).toLocaleDateString('en-IN');
-      if (!dailyData[dateKey]) {
-        dailyData[dateKey] = { payments: 0, charges: 0 };
+      const d = new Date(t.date);
+      // ISO YYYY-MM-DD ensures correct lexicographic + chronological sort
+      const isoKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (!dailyData[isoKey]) {
+        dailyData[isoKey] = { payments: 0, charges: 0 };
       }
       if (t.type === 'payment') {
-        dailyData[dateKey].payments += t.amount;
+        dailyData[isoKey].payments += t.amount;
       } else {
-        dailyData[dateKey].charges += t.amount;
+        dailyData[isoKey].charges += t.amount;
       }
     });
 
     return Object.entries(dailyData)
-      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-      .map(([date, data]) => ({
-        date,
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([isoKey, data]) => ({
+        date: new Date(isoKey).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
         payments: data.payments,
         charges: data.charges,
         net: data.payments - data.charges,
       }));
   };
 
-  // Subscriber growth data
+  // Subscriber growth data — sort by ISO YYYY-MM so 2025 < 2026 chronologically
   const getSubscriberGrowthData = () => {
-    const monthlyData: { [key: string]: number } = {};
-    
+    const monthlyData: { [isoMonth: string]: number } = {};
+
     subscribers.forEach(s => {
-      const monthKey = new Date(s.created_at).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-      monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+      const d = new Date(s.created_at);
+      const isoMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyData[isoMonth] = (monthlyData[isoMonth] || 0) + 1;
     });
 
     let cumulative = 0;
     return Object.entries(monthlyData)
-      .map(([month, count]) => {
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([isoMonth, count]) => {
         cumulative += count;
-        return { month, new: count, total: cumulative };
+        const [y, m] = isoMonth.split('-').map(Number);
+        const label = new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+        return { month: label, new: count, total: cumulative };
       });
   };
 
