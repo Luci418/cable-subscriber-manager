@@ -58,7 +58,7 @@ export const useRegions = (userId: string | undefined) => {
     if (!userId) return false;
     
     const { data, error } = await supabase
-      .rpc('is_region_in_use', { region_name: regionName, owner_id: userId });
+      .rpc('is_region_in_use', { region_name: regionName });
     
     if (error) {
       console.error('Error checking region usage:', error);
