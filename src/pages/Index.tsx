@@ -104,7 +104,7 @@ const Index = () => {
 
     if (success) {
       // Update subscriber balance (positive = debt, negative = credit)
-      const currentBalance = subscriber.balance || 0;
+      const currentBalance = subscriber.cable_balance || 0;
       let newBalance = currentBalance;
       
       if (data.type === 'payment') {

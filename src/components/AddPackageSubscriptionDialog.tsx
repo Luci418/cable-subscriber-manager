@@ -113,7 +113,7 @@ export const AddPackageSubscriptionDialog = ({
     
     // Calculate the charge amount
     const chargeAmount = selectedPackData.price * duration;
-    const newBalance = (currentSubscriber?.balance || 0) + chargeAmount;
+    const newBalance = (currentSubscriber?.cable_balance || 0) + chargeAmount;
 
     const { error } = await supabase
       .from('subscribers')

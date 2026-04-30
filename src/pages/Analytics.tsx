@@ -36,7 +36,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     .filter(t => t.type === 'charge')
     .reduce((sum, t) => sum + t.amount, 0);
   const netRevenue = totalRevenue - totalCharges;
-  const totalBalance = subscribers.reduce((sum, s) => sum + s.balance, 0);
+  const totalBalance = subscribers.reduce((sum, s) => sum + s.cable_balance, 0);
 
   // Filter transactions by time range
   const getFilteredTransactions = () => {
@@ -123,9 +123,9 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
 
   // Balance distribution
   const getBalanceDistribution = () => {
-    const positive = subscribers.filter(s => s.balance > 0).length;
-    const negative = subscribers.filter(s => s.balance < 0).length;
-    const zero = subscribers.filter(s => s.balance === 0).length;
+    const positive = subscribers.filter(s => s.cable_balance > 0).length;
+    const negative = subscribers.filter(s => s.cable_balance < 0).length;
+    const zero = subscribers.filter(s => s.cable_balance === 0).length;
 
     return [
       { name: 'Debt (Due)', value: positive },

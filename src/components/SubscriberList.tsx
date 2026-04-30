@@ -71,9 +71,9 @@ export const SubscriberList = ({
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
     
     let matchesBalance = true;
-    if (balanceFilter === 'positive') matchesBalance = s.balance > 0;
-    else if (balanceFilter === 'negative') matchesBalance = s.balance < 0;
-    else if (balanceFilter === 'zero') matchesBalance = s.balance === 0;
+    if (balanceFilter === 'positive') matchesBalance = s.cable_balance > 0;
+    else if (balanceFilter === 'negative') matchesBalance = s.cable_balance < 0;
+    else if (balanceFilter === 'zero') matchesBalance = s.cable_balance === 0;
     
     return matchesSearch && matchesPack && matchesRegion && matchesBalance;
   });
@@ -213,8 +213,8 @@ export const SubscriberList = ({
                         <span>No coordinates</span>
                       )}
                     </div>
-                    <div className={`font-semibold ${getBalanceColor(subscriber.balance || 0)}`}>
-                      ₹{(subscriber.balance || 0).toFixed(2)}
+                    <div className={`font-semibold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
+                      ₹{(subscriber.cable_balance || 0).toFixed(2)}
                     </div>
                   </div>
                 </CardContent>

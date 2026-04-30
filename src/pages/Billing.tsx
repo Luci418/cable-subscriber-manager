@@ -165,8 +165,8 @@ export const Billing = ({ onBack }: BillingProps) => {
           <CardContent>
             <div className="text-2xl font-bold">
               ₹{subscribers
-                .filter(s => s.balance > 0)
-                .reduce((sum, s) => sum + s.balance, 0)
+                .filter(s => s.cable_balance > 0)
+                .reduce((sum, s) => sum + s.cable_balance, 0)
                 .toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -236,8 +236,8 @@ export const Billing = ({ onBack }: BillingProps) => {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={subscriber.balance > 0 ? 'text-destructive' : 'text-success'}>
-                              ₹{subscriber.balance.toFixed(2)}
+                            <span className={subscriber.cable_balance > 0 ? 'text-destructive' : 'text-success'}>
+                              ₹{subscriber.cable_balance.toFixed(2)}
                             </span>
                           </TableCell>
                         </TableRow>
@@ -297,8 +297,8 @@ export const Billing = ({ onBack }: BillingProps) => {
                             <Badge variant="outline">{currentSub?.duration || 1} month(s)</Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={subscriber.balance > 0 ? 'text-destructive' : 'text-success'}>
-                              ₹{subscriber.balance.toFixed(2)}
+                            <span className={subscriber.cable_balance > 0 ? 'text-destructive' : 'text-success'}>
+                              ₹{subscriber.cable_balance.toFixed(2)}
                             </span>
                           </TableCell>
                         </TableRow>
@@ -342,8 +342,8 @@ export const Billing = ({ onBack }: BillingProps) => {
                         <TableCell>{subscriber.current_pack || 'None'}</TableCell>
                         <TableCell>{subscriber.region || 'N/A'}</TableCell>
                         <TableCell className="text-right">
-                          <span className={subscriber.balance > 0 ? 'text-destructive' : 'text-success'}>
-                            ₹{subscriber.balance.toFixed(2)}
+                          <span className={subscriber.cable_balance > 0 ? 'text-destructive' : 'text-success'}>
+                            ₹{subscriber.cable_balance.toFixed(2)}
                           </span>
                         </TableCell>
                       </TableRow>
