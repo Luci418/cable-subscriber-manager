@@ -67,12 +67,16 @@ export interface Complaint {
   resolvedAt?: string;
 }
 
+export type ServiceType = 'cable' | 'internet';
+
 export interface CompanySettings {
   name: string;
   address: string;
   phone: string;
   email: string;
   logo?: string;
+  /** Which service modules are enabled in the UI. Defaults to ['cable']. */
+  enabledServices?: ServiceType[];
 }
 
 export interface BillingHistory {
