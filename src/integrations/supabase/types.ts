@@ -105,6 +105,7 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          service_type: string
           user_id: string
         }
         Insert: {
@@ -114,6 +115,7 @@ export type Database = {
           is_active?: boolean
           name: string
           price: number
+          service_type?: string
           user_id: string
         }
         Update: {
@@ -123,6 +125,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          service_type?: string
           user_id?: string
         }
         Relationships: [
@@ -191,9 +194,11 @@ export type Database = {
       stb_inventory: {
         Row: {
           created_at: string
+          device_type: string
           id: string
           notes: string | null
           serial_number: string
+          service_type: string
           status: Database["public"]["Enums"]["stb_status"]
           subscriber_id: string | null
           updated_at: string
@@ -201,9 +206,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          device_type?: string
           id?: string
           notes?: string | null
           serial_number: string
+          service_type?: string
           status?: Database["public"]["Enums"]["stb_status"]
           subscriber_id?: string | null
           updated_at?: string
@@ -211,9 +218,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          device_type?: string
           id?: string
           notes?: string | null
           serial_number?: string
+          service_type?: string
           status?: Database["public"]["Enums"]["stb_status"]
           subscriber_id?: string | null
           updated_at?: string
@@ -231,17 +240,22 @@ export type Database = {
       }
       subscribers: {
         Row: {
-          balance: number
+          cable_balance: number
           created_at: string
+          current_internet_pack: string | null
           current_pack: string | null
           current_subscription: Json | null
           id: string
+          internet_balance: number
+          internet_subscription: Json | null
+          internet_subscription_history: Json[] | null
           join_date: string
           latitude: number | null
           longitude: number | null
           mobile: string
           name: string
           region: string | null
+          services: string[]
           stb_number: string | null
           subscriber_id: string
           subscription_history: Json[] | null
@@ -249,17 +263,22 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          balance?: number
+          cable_balance?: number
           created_at?: string
+          current_internet_pack?: string | null
           current_pack?: string | null
           current_subscription?: Json | null
           id?: string
+          internet_balance?: number
+          internet_subscription?: Json | null
+          internet_subscription_history?: Json[] | null
           join_date?: string
           latitude?: number | null
           longitude?: number | null
           mobile: string
           name: string
           region?: string | null
+          services?: string[]
           stb_number?: string | null
           subscriber_id: string
           subscription_history?: Json[] | null
@@ -267,17 +286,22 @@ export type Database = {
           user_id: string
         }
         Update: {
-          balance?: number
+          cable_balance?: number
           created_at?: string
+          current_internet_pack?: string | null
           current_pack?: string | null
           current_subscription?: Json | null
           id?: string
+          internet_balance?: number
+          internet_subscription?: Json | null
+          internet_subscription_history?: Json[] | null
           join_date?: string
           latitude?: number | null
           longitude?: number | null
           mobile?: string
           name?: string
           region?: string | null
+          services?: string[]
           stb_number?: string | null
           subscriber_id?: string
           subscription_history?: Json[] | null
@@ -301,6 +325,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          service_type: string
           subscriber_id: string
           type: string
           user_id: string
@@ -311,6 +336,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          service_type?: string
           subscriber_id: string
           type: string
           user_id: string
@@ -321,6 +347,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          service_type?: string
           subscriber_id?: string
           type?: string
           user_id?: string

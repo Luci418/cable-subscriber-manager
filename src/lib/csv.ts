@@ -12,7 +12,7 @@ export const exportToCSV = (subscribers: Subscriber[], transactions: Transaction
     s.longitude || '',
     s.pack,
     s.region,
-    s.balance,
+    s.cable_balance,
     s.createdAt,
   ]);
 
@@ -120,7 +120,7 @@ export const importFromCSV = async (subscriberFile: File, transactionFile: File)
         longitude: values[5] && values[5] !== '' ? parseFloat(values[5]) : undefined,
         pack: clean(values[6]) || 'Basic SD',
         region: clean(values[7]) || 'North Zone',
-        balance: values[8] && values[8] !== '' ? parseFloat(values[8]) : 0,
+        cable_balance: values[8] && values[8] !== '' ? parseFloat(values[8]) : 0,
         createdAt: clean(values[9]) || new Date().toISOString(),
       };
     });

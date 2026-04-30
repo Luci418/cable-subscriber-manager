@@ -18,7 +18,11 @@ export interface Subscriber {
   longitude?: number;
   pack: string;
   region: string;
-  balance: number;
+  /** @deprecated use cable_balance */
+  balance?: number;
+  cable_balance: number;
+  internet_balance?: number;
+  services?: string[];
   createdAt: string;
   billingCycle?: 'monthly' | 'quarterly' | 'semi-annually' | 'yearly';
   nextBillingDate?: string;
@@ -172,7 +176,7 @@ export const cancelSubscription = (subscriberId: string, refundAmount: number): 
     saveTransactions(transactions);
     
     // Update balance (add refund)
-    subscriber.balance = subscriber.balance + refundAmount;
+    subscriber.cable_balance = subscriber.cable_balance + refundAmount;
   }
   
   saveSubscribers(subscribers);
@@ -246,7 +250,7 @@ export const addTransaction = (transaction: Omit<Transaction, 'id' | 'date'>) =>
   const subscriber = subscribers.find(s => s.id === transaction.subscriberId);
   if (subscriber) {
     const amount = transaction.type === 'payment' ? transaction.amount : -transaction.amount;
-    updateSubscriber(subscriber.id, { balance: subscriber.balance + amount });
+    updateSubscriber(subscriber.id, { cable_balance: subscriber.cable_balance + amount });
   }
 
   return newTransaction;
@@ -269,7 +273,7 @@ export const updateTransaction = (transactionId: string, updates: Partial<Transa
     if (subscriber) {
       const oldAmount = oldTransaction.type === 'payment' ? -oldTransaction.amount : oldTransaction.amount;
       const newAmount = newTransaction.type === 'payment' ? newTransaction.amount : -newTransaction.amount;
-      updateSubscriber(subscriber.id, { balance: subscriber.balance + oldAmount + newAmount });
+      updateSubscriber(subscriber.id, { cable_balance: subscriber.cable_balance + oldAmount + newAmount });
     }
     
     transactions[index] = newTransaction;
@@ -574,7 +578,7 @@ export const addSubscriptionToSubscriber = (
   saveTransactions(transactions);
   
   // Update balance (SUBTRACT charge from positive balance)
-  subscriber.balance = subscriber.balance - totalCost;
+  subscriber.cable_balance = subscriber.cable_balance - totalCost;
   
   saveSubscribers(subscribers);
 };

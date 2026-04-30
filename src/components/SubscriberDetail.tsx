@@ -114,14 +114,14 @@ export const SubscriberDetail = ({
 
     // Refund reduces debt (balance model: positive = debt, negative = credit)
     // A refund is like a payment - it reduces the balance
-    const newBalance = refundAmount > 0 ? subscriber.balance - refundAmount : subscriber.balance;
+    const newBalance = refundAmount > 0 ? subscriber.cable_balance - refundAmount : subscriber.cable_balance;
 
     const { error } = await supabase
       .from('subscribers')
       .update({
         current_subscription: null,
         subscription_history: history,
-        balance: newBalance,
+        cable_balance: newBalance,
       })
       .eq('id', subscriber.id);
 
@@ -207,10 +207,10 @@ export const SubscriberDetail = ({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">
-                {(subscriber.balance || 0) > 0 ? 'Dues' : (subscriber.balance || 0) < 0 ? 'Advance' : 'Dues'}
+                {(subscriber.cable_balance || 0) > 0 ? 'Dues' : (subscriber.cable_balance || 0) < 0 ? 'Advance' : 'Dues'}
               </p>
-              <p className={`text-2xl font-bold ${getBalanceColor(subscriber.balance || 0)}`}>
-                ₹{Math.abs(subscriber.balance || 0).toFixed(2)}
+              <p className={`text-2xl font-bold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
+                ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}
               </p>
             </div>
             {subscriber.latitude && subscriber.longitude && (
@@ -303,7 +303,7 @@ export const SubscriberDetail = ({
                         startDate: currentSub.startDate,
                         endDate: currentSub.endDate,
                         totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                        balance: subscriber.balance || 0,
+                        balance: subscriber.cable_balance || 0,
                       });
                     }}
                   >
@@ -327,7 +327,7 @@ export const SubscriberDetail = ({
                         startDate: currentSub.startDate,
                         endDate: currentSub.endDate,
                         totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                        balance: subscriber.balance || 0,
+                        balance: subscriber.cable_balance || 0,
                       });
                     }}
                   >
