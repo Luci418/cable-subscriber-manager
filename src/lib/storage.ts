@@ -18,7 +18,11 @@ export interface Subscriber {
   longitude?: number;
   pack: string;
   region: string;
-  balance: number;
+  /** @deprecated use cable_balance */
+  balance?: number;
+  cable_balance: number;
+  internet_balance?: number;
+  services?: string[];
   createdAt: string;
   billingCycle?: 'monthly' | 'quarterly' | 'semi-annually' | 'yearly';
   nextBillingDate?: string;
