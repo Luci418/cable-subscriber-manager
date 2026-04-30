@@ -120,6 +120,56 @@ export const Settings = ({ onBack }: SettingsProps) => {
           </CardContent>
         </Card>
 
+        {/* Service Modules — toggle Cable / Internet at any time. Disabling does NOT delete data. */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wifi className="h-5 w-5" />
+              Service Modules
+            </CardTitle>
+            <CardDescription>
+              Enable the services you offer. You can run Cable, Internet, or both.
+              Turning a service off hides its UI but keeps all underlying data safe.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(['cable', 'internet'] as ServiceType[]).map((svc) => {
+              const enabled = (settings.enabledServices ?? ['cable']).includes(svc);
+              const Icon = svc === 'cable' ? Tv : Wifi;
+              const label = svc === 'cable' ? 'Cable TV' : 'Internet (ISP)';
+              const desc = svc === 'cable'
+                ? 'Set-top boxes, channel packs, monthly cable subscriptions.'
+                : 'ONU/Router devices, internet plans, separate internet balance.';
+              return (
+                <div key={svc} className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{label}</p>
+                      <p className="text-sm text-muted-foreground">{desc}</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={enabled}
+                    onCheckedChange={(checked) => {
+                      const current = new Set(settings.enabledServices ?? ['cable']);
+                      if (checked) current.add(svc); else current.delete(svc);
+                      if (current.size === 0) {
+                        toast.error('At least one service must be enabled.');
+                        return;
+                      }
+                      const next = { ...settings, enabledServices: Array.from(current) as ServiceType[] };
+                      setSettings(next);
+                      saveCompanySettings(next);
+                      toast.success(`${label} ${checked ? 'enabled' : 'disabled'}`);
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
         {/* Backup & Restore */}
         <Card>
           <CardHeader>
