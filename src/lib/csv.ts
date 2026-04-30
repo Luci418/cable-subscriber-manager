@@ -12,7 +12,7 @@ export const exportToCSV = (subscribers: Subscriber[], transactions: Transaction
     s.longitude || '',
     s.pack,
     s.region,
-    s.balance,
+    s.cable_balance,
     s.createdAt,
   ]);
 
