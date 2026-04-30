@@ -67,12 +67,16 @@ export interface Complaint {
   resolvedAt?: string;
 }
 
+export type ServiceType = 'cable' | 'internet';
+
 export interface CompanySettings {
   name: string;
   address: string;
   phone: string;
   email: string;
   logo?: string;
+  /** Which service modules are enabled in the UI. Defaults to ['cable']. */
+  enabledServices?: ServiceType[];
 }
 
 export interface BillingHistory {
@@ -390,12 +394,17 @@ export const deleteComplaint = (id: string) => {
 // Company Settings
 export const getCompanySettings = (): CompanySettings => {
   const data = localStorage.getItem(COMPANY_SETTINGS_KEY);
-  return data ? JSON.parse(data) : {
+  const parsed: CompanySettings = data ? JSON.parse(data) : {
     name: 'Cable TV Company',
     address: 'Your Address Here',
     phone: '+91 XXXXXXXXXX',
     email: 'info@cabletv.com',
   };
+  // Backfill enabledServices for older saves so the toggle UI has a defined state.
+  if (!parsed.enabledServices || parsed.enabledServices.length === 0) {
+    parsed.enabledServices = ['cable'];
+  }
+  return parsed;
 };
 
 export const saveCompanySettings = (settings: CompanySettings) => {

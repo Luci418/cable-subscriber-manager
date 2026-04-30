@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Download, Upload, Building2 } from 'lucide-react';
-import { getCompanySettings, saveCompanySettings, createBackup, restoreBackup, CompanySettings } from '@/lib/storage';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, Save, Download, Upload, Building2, Tv, Wifi } from 'lucide-react';
+import { getCompanySettings, saveCompanySettings, createBackup, restoreBackup, CompanySettings, ServiceType } from '@/lib/storage';
 import { toast } from 'sonner';
 
 interface SettingsProps {
@@ -116,6 +117,56 @@ export const Settings = ({ onBack }: SettingsProps) => {
                 Save Settings
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Service Modules — toggle Cable / Internet at any time. Disabling does NOT delete data. */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wifi className="h-5 w-5" />
+              Service Modules
+            </CardTitle>
+            <CardDescription>
+              Enable the services you offer. You can run Cable, Internet, or both.
+              Turning a service off hides its UI but keeps all underlying data safe.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(['cable', 'internet'] as ServiceType[]).map((svc) => {
+              const enabled = (settings.enabledServices ?? ['cable']).includes(svc);
+              const Icon = svc === 'cable' ? Tv : Wifi;
+              const label = svc === 'cable' ? 'Cable TV' : 'Internet (ISP)';
+              const desc = svc === 'cable'
+                ? 'Set-top boxes, channel packs, monthly cable subscriptions.'
+                : 'ONU/Router devices, internet plans, separate internet balance.';
+              return (
+                <div key={svc} className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{label}</p>
+                      <p className="text-sm text-muted-foreground">{desc}</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={enabled}
+                    onCheckedChange={(checked) => {
+                      const current = new Set(settings.enabledServices ?? ['cable']);
+                      if (checked) current.add(svc); else current.delete(svc);
+                      if (current.size === 0) {
+                        toast.error('At least one service must be enabled.');
+                        return;
+                      }
+                      const next = { ...settings, enabledServices: Array.from(current) as ServiceType[] };
+                      setSettings(next);
+                      saveCompanySettings(next);
+                      toast.success(`${label} ${checked ? 'enabled' : 'disabled'}`);
+                    }}
+                  />
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
