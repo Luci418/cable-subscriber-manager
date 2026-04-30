@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Download, Upload, Building2 } from 'lucide-react';
-import { getCompanySettings, saveCompanySettings, createBackup, restoreBackup, CompanySettings } from '@/lib/storage';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, Save, Download, Upload, Building2, Tv, Wifi } from 'lucide-react';
+import { getCompanySettings, saveCompanySettings, createBackup, restoreBackup, CompanySettings, ServiceType } from '@/lib/storage';
 import { toast } from 'sonner';
 
 interface SettingsProps {
