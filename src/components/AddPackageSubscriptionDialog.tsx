@@ -121,7 +121,7 @@ export const AddPackageSubscriptionDialog = ({
         current_pack: selectedPackData.name,
         current_subscription: newSubscription,
         subscription_history: [...subscriptionHistory, newSubscription],
-        balance: newBalance
+        cable_balance: newBalance
       })
       .eq('id', subscriberId);
 

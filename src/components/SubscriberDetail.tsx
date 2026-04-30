@@ -121,7 +121,7 @@ export const SubscriberDetail = ({
       .update({
         current_subscription: null,
         subscription_history: history,
-        balance: newBalance,
+        cable_balance: newBalance,
       })
       .eq('id', subscriber.id);
 

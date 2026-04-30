@@ -71,7 +71,7 @@ const Index = () => {
       region: data.region || null,
       latitude: data.latitude || null,
       longitude: data.longitude || null,
-      balance: 0,
+      cable_balance: 0,
       join_date: new Date().toISOString(),
       current_subscription: null,
       subscription_history: [],
@@ -118,7 +118,7 @@ const Index = () => {
         newBalance = currentBalance - data.amount;
       }
 
-      await updateSubscriber(selectedSubscriberId, { balance: newBalance });
+      await updateSubscriber(selectedSubscriberId, { cable_balance: newBalance });
       toast.success('Transaction added successfully!');
     }
   };
