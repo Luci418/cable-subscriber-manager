@@ -141,22 +141,35 @@ export const SubscriberList = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Manage</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Catalog</DropdownMenuLabel>
               <DropdownMenuItem onClick={onManagePacks}>
-                Manage Packs
+                <Package className="h-4 w-4 mr-2" />
+                Packs {bothEnabled && <span className="ml-auto text-xs text-muted-foreground">Cable + Internet</span>}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onManageRegions}>
-                Manage Regions
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onManageStbs}>
-                <HardDrive className="h-4 w-4 mr-2" />
-                STB Inventory
+                <MapPin className="h-4 w-4 mr-2" />
+                Regions
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuLabel>Inventory</DropdownMenuLabel>
+              {/* Inventory label adapts: cable-only → "STBs", internet-only → "ONU / Routers", both → unified label */}
+              <DropdownMenuItem onClick={onManageStbs}>
+                {internetEnabled && !cableEnabled ? (
+                  <><Wifi className="h-4 w-4 mr-2" /> ONU / Router Inventory</>
+                ) : bothEnabled ? (
+                  <><HardDrive className="h-4 w-4 mr-2" /> Device Inventory</>
+                ) : (
+                  <><Tv className="h-4 w-4 mr-2" /> STB Inventory</>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Data</DropdownMenuLabel>
               <DropdownMenuItem onClick={onImport}>
                 <Upload className="h-4 w-4 mr-2" />
                 Import
