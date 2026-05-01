@@ -73,10 +73,11 @@ export const SubscriberList = ({
     const matchesPack = packFilter === 'all' || pack === packFilter;
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
     
+    const totalBalance = (s.cable_balance || 0) + ((s as any).internet_balance || 0);
     let matchesBalance = true;
-    if (balanceFilter === 'positive') matchesBalance = s.cable_balance > 0;
-    else if (balanceFilter === 'negative') matchesBalance = s.cable_balance < 0;
-    else if (balanceFilter === 'zero') matchesBalance = s.cable_balance === 0;
+    if (balanceFilter === 'positive') matchesBalance = totalBalance > 0;
+    else if (balanceFilter === 'negative') matchesBalance = totalBalance < 0;
+    else if (balanceFilter === 'zero') matchesBalance = totalBalance === 0;
     
     return matchesSearch && matchesPack && matchesRegion && matchesBalance;
   });
@@ -201,38 +202,108 @@ export const SubscriberList = ({
           </Card>
         ) : (
           filteredSubscribers.map(subscriber => {
-            const stbNum = (subscriber as any).stb_number || subscriber.stbNumber || 'N/A';
-            const pack = (subscriber as any).current_pack || subscriber.pack || 'No Pack';
+            const sAny = subscriber as any;
+            const stbNum = sAny.stb_number || subscriber.stbNumber || '';
+            const cablePack = sAny.current_pack || subscriber.pack || '';
+            const internetPack = sAny.current_internet_pack || '';
+            const cableSub = sAny.current_subscription;
+            const internetSub = sAny.internet_subscription;
+            const services: string[] = sAny.services || ['cable'];
+            const hasCable = cableEnabled && services.includes('cable');
+            const hasInternet = internetEnabled && services.includes('internet');
+
+            const formatExpiry = (sub: any) => {
+              if (!sub?.endDate) return null;
+              const d = new Date(sub.endDate);
+              const days = Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+              if (days < 0) return { text: `Expired ${dateStr}`, tone: 'text-destructive' };
+              if (days <= 5) return { text: `${dateStr} • ${days}d left`, tone: 'text-warning' };
+              return { text: `${dateStr} • ${days}d left`, tone: 'text-muted-foreground' };
+            };
+
+            const ServiceStrip = ({
+              icon: Icon,
+              label,
+              pack,
+              expiry,
+              balance,
+            }: {
+              icon: typeof Tv;
+              label: string;
+              pack: string;
+              expiry: ReturnType<typeof formatExpiry>;
+              balance: number;
+            }) => (
+              <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/40">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">{label}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{pack || 'No pack'}</div>
+                    {expiry && <div className={`text-xs ${expiry.tone}`}>{expiry.text}</div>}
+                  </div>
+                </div>
+                <div className={`text-sm font-semibold whitespace-nowrap ${getBalanceColor(balance)}`}>
+                  ₹{balance.toFixed(0)}
+                </div>
+              </div>
+            );
+
             return (
-              <Card 
+              <Card
                 key={subscriber.id}
                 className="cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => onSelectSubscriber(subscriber.id)}
               >
                 <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{subscriber.name}</CardTitle>
-                       <p className="text-sm text-muted-foreground mt-1">
-                         {subscriber.mobile} • STB: {stbNum} • {subscriber.region || 'No Region'}
-                       </p>
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="min-w-0">
+                      <CardTitle className="text-lg truncate">{subscriber.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1 truncate">
+                        {subscriber.mobile}
+                        {subscriber.region && <> • {subscriber.region}</>}
+                        {stbNum && <> • {stbNum}</>}
+                      </p>
                     </div>
-                    <Badge variant="secondary">{pack}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    <div className="text-sm text-muted-foreground">
-                      {subscriber.latitude && subscriber.longitude ? (
-                        <span>📍 {subscriber.latitude.toFixed(4)}, {subscriber.longitude.toFixed(4)}</span>
-                      ) : (
-                        <span>No coordinates</span>
+                    <div className="flex gap-1 shrink-0">
+                      {hasCable && (
+                        <Badge variant="secondary" className="gap-1">
+                          <Tv className="h-3 w-3" /> Cable
+                        </Badge>
+                      )}
+                      {hasInternet && (
+                        <Badge variant="secondary" className="gap-1">
+                          <Wifi className="h-3 w-3" /> Net
+                        </Badge>
                       )}
                     </div>
-                    <div className={`font-semibold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
-                      ₹{(subscriber.cable_balance || 0).toFixed(2)}
-                    </div>
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {hasCable && (
+                    <ServiceStrip
+                      icon={Tv}
+                      label="Cable"
+                      pack={cablePack}
+                      expiry={formatExpiry(cableSub)}
+                      balance={subscriber.cable_balance || 0}
+                    />
+                  )}
+                  {hasInternet && (
+                    <ServiceStrip
+                      icon={Wifi}
+                      label="Internet"
+                      pack={internetPack}
+                      expiry={formatExpiry(internetSub)}
+                      balance={(subscriber as any).internet_balance || 0}
+                    />
+                  )}
+                  {!hasCable && !hasInternet && (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      No active services
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
