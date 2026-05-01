@@ -27,6 +27,7 @@ type View = 'list' | 'add' | 'detail' | 'analytics' | 'complaints' | 'settings' 
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const { subscribers, loading: subsLoading, addSubscriber, updateSubscriber, deleteSubscriber, reloadSubscribers } = useSubscribers(user?.id);
   const { transactions, addTransaction: createTransaction, reloadTransactions } = useTransactions(user?.id);
   
