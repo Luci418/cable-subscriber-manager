@@ -17,9 +17,10 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { exportToCSV } from '@/lib/csv';
 import { generateSubscriberId } from '@/lib/subscriberIdGenerator';
 import { toast } from 'sonner';
-import { Tv, BarChart3, MessageSquare, Settings as SettingsIcon, Calendar, LogOut, Loader2, Users } from 'lucide-react';
+import { Tv, BarChart3, MessageSquare, Settings as SettingsIcon, Calendar, LogOut, Loader2, Users, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
 
 type View = 'list' | 'add' | 'detail' | 'analytics' | 'complaints' | 'settings' | 'billing';
 
