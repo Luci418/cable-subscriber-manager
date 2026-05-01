@@ -185,6 +185,15 @@ const Index = () => {
     setSelectedSubscriberId(null);
   };
 
+  // Dynamic header — reflects which service modules the operator runs.
+  // Avoids the "Cable TV Manager" label feeling wrong for an internet-only or dual-service operator.
+  const appTitle = bothEnabled
+    ? 'Cable & Internet Manager'
+    : internetEnabled && !cableEnabled
+      ? 'Internet Manager'
+      : 'Cable TV Manager';
+  const HeaderIcon = internetEnabled && !cableEnabled ? Wifi : Tv;
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <header className="border-b bg-card sticky top-0 z-30">
@@ -192,10 +201,10 @@ const Index = () => {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                <Tv className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+                <HeaderIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">Cable TV Manager</h1>
+                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{appTitle}</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Subscriber & Billing Management</p>
               </div>
             </div>
