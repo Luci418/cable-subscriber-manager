@@ -48,6 +48,7 @@ export const SubscriberList = ({
   initialRegionFilter,
   initialBalanceFilter,
 }: SubscriberListProps) => {
+  const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const [search, setSearch] = useState('');
   const [packFilter, setPackFilter] = useState<string>(initialPackFilter || 'all');
   const [regionFilter, setRegionFilter] = useState<string>(initialRegionFilter || 'all');
