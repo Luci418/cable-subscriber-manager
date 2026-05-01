@@ -162,7 +162,8 @@ export const Settings = ({ onBack }: SettingsProps) => {
                       }
                       const next = { ...settings, enabledServices: Array.from(current) as ServiceType[] };
                       setSettings(next);
-                      saveCompanySettings(next);
+                      // Use the hook so the rest of the app re-renders immediately
+                      setEnabledServices(next.enabledServices!);
                       toast.success(`${label} ${checked ? 'enabled' : 'disabled'}`);
                     }}
                   />
