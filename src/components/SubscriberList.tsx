@@ -73,10 +73,11 @@ export const SubscriberList = ({
     const matchesPack = packFilter === 'all' || pack === packFilter;
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
     
+    const totalBalance = (s.cable_balance || 0) + ((s as any).internet_balance || 0);
     let matchesBalance = true;
-    if (balanceFilter === 'positive') matchesBalance = s.cable_balance > 0;
-    else if (balanceFilter === 'negative') matchesBalance = s.cable_balance < 0;
-    else if (balanceFilter === 'zero') matchesBalance = s.cable_balance === 0;
+    if (balanceFilter === 'positive') matchesBalance = totalBalance > 0;
+    else if (balanceFilter === 'negative') matchesBalance = totalBalance < 0;
+    else if (balanceFilter === 'zero') matchesBalance = totalBalance === 0;
     
     return matchesSearch && matchesPack && matchesRegion && matchesBalance;
   });
