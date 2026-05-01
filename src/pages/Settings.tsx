@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Save, Download, Upload, Building2, Tv, Wifi } from 'lucide-react';
 import { getCompanySettings, saveCompanySettings, createBackup, restoreBackup, CompanySettings, ServiceType } from '@/lib/storage';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { toast } from 'sonner';
 
 interface SettingsProps {
@@ -15,6 +16,7 @@ interface SettingsProps {
 
 export const Settings = ({ onBack }: SettingsProps) => {
   const [settings, setSettings] = useState<CompanySettings>(getCompanySettings());
+  const { setEnabledServices } = useEnabledServices();
 
   const handleSaveSettings = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
