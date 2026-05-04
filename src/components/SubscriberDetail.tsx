@@ -62,18 +62,38 @@ export const SubscriberDetail = ({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddPackage, setShowAddPackage] = useState(false);
+  const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
   const [showEditTransaction, setShowEditTransaction] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
+  const [internetDevice, setInternetDevice] = useState<any>(null);
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
-  // A subscriber's individual services opt-in. If unset (legacy data), assume cable.
   const subscriberServices = subscriber.services && subscriber.services.length > 0
     ? subscriber.services
     : ['cable'];
   const showCableTab = cableEnabled && subscriberServices.includes('cable');
   const showInternetTab = internetEnabled && subscriberServices.includes('internet');
   const [activeTab, setActiveTab] = useState<string>('overview');
+
+  // Load the assigned internet device (ONU/router) for this subscriber.
+  // We query stb_inventory filtered by device_type so cable STBs and internet
+  // devices stay in their own lanes.
+  useEffect(() => {
+    if (!showInternetTab) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('stb_inventory')
+        .select('*')
+        .eq('subscriber_id', subscriber.id)
+        .in('device_type', ['onu', 'router'])
+        .maybeSingle();
+      if (!cancelled) setInternetDevice(data);
+    })();
+    return () => { cancelled = true; };
+  }, [subscriber.id, showInternetTab]);
 
   // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
   // RPC before every fetch, and an hourly pg_cron job runs the same function.
