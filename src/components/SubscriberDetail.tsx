@@ -332,7 +332,7 @@ export const SubscriberDetail = ({
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Package Subscriptions</CardTitle>
-                  <Button onClick={() => setShowAddPackage(true)} size="sm">
+                  <Button onClick={() => { setAddPackageService('cable'); setShowAddPackage(true); }} size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Package
                   </Button>
