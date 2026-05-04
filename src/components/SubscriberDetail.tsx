@@ -66,6 +66,15 @@ export const SubscriberDetail = ({
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
+  const { cableEnabled, internetEnabled } = useEnabledServices();
+  // A subscriber's individual services opt-in. If unset (legacy data), assume cable.
+  const subscriberServices = subscriber.services && subscriber.services.length > 0
+    ? subscriber.services
+    : ['cable'];
+  const showCableTab = cableEnabled && subscriberServices.includes('cable');
+  const showInternetTab = internetEnabled && subscriberServices.includes('internet');
+  const [activeTab, setActiveTab] = useState<string>('overview');
+
   // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
   // RPC before every fetch, and an hourly pg_cron job runs the same function.
   // No client-side lazy cleanup is needed here — the data we receive is already
