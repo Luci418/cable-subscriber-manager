@@ -123,8 +123,8 @@ export const AddPackageSubscriptionDialog = ({
       [historyCol]: [...subscriptionHistory, newSubscription],
       [balanceCol]: newBalance,
     };
-    const { error } = await supabase
-      .from('subscribers')
+    const { error } = await (supabase
+      .from('subscribers') as any)
       .update(updates)
       .eq('id', subscriberId);
 
