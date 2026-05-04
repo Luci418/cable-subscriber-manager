@@ -795,6 +795,7 @@ export const SubscriberDetail = ({
         onOpenChange={setShowAddPackage}
         subscriberId={subscriber.id}
         subscriberName={subscriber.name}
+        serviceType={addPackageService}
         onSuccess={() => {
           setShowAddPackage(false);
           onReload?.();
@@ -808,14 +809,19 @@ export const SubscriberDetail = ({
         onSubmit={handleUpdateTransaction}
       />
 
-      {(subscriber as any).current_subscription && (
-        <CancelSubscriptionDialog
-          open={showCancelDialog}
-          onOpenChange={setShowCancelDialog}
-          subscription={(subscriber as any).current_subscription}
-          onConfirm={handleCancelSubscription}
-        />
-      )}
+      {(() => {
+        const subForCancel = cancelService === 'internet'
+          ? (subscriber as any).internet_subscription
+          : (subscriber as any).current_subscription;
+        return subForCancel ? (
+          <CancelSubscriptionDialog
+            open={showCancelDialog}
+            onOpenChange={setShowCancelDialog}
+            subscription={subForCancel}
+            onConfirm={handleCancelSubscription}
+          />
+        ) : null;
+      })()}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
