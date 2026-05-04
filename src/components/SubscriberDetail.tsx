@@ -132,6 +132,21 @@ export const SubscriberDetail = ({
     (t: any) => t.service_type === 'internet'
   );
 
+  // Transactions tab service filter. Defaults sensibly based on which services
+  // are enabled, and auto-pivots when the user navigates from Cable/Internet tab.
+  const [txFilter, setTxFilter] = useState<'all' | 'cable' | 'internet'>(
+    showCableTab && !showInternetTab ? 'cable' : showInternetTab && !showCableTab ? 'internet' : 'all'
+  );
+  useEffect(() => {
+    if (activeTab === 'cable' && showCableTab) setTxFilter('cable');
+    else if (activeTab === 'internet' && showInternetTab) setTxFilter('internet');
+  }, [activeTab, showCableTab, showInternetTab]);
+
+  const visibleTransactions =
+    txFilter === 'cable' ? cableTransactions :
+    txFilter === 'internet' ? internetTransactions :
+    sortedTransactions;
+
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setShowEditTransaction(true);
