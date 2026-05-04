@@ -117,14 +117,15 @@ export const AddPackageSubscriptionDialog = ({
     const chargeAmount = Number(selectedPackData.price) * duration;
     const newBalance = Number(currentSubscriber?.[balanceCol] || 0) + chargeAmount;
 
+    const updates: Record<string, any> = {
+      [packCol]: selectedPackData.name,
+      [subscriptionCol]: newSubscription,
+      [historyCol]: [...subscriptionHistory, newSubscription],
+      [balanceCol]: newBalance,
+    };
     const { error } = await supabase
       .from('subscribers')
-      .update({
-        [packCol]: selectedPackData.name,
-        [subscriptionCol]: newSubscription,
-        [historyCol]: [...subscriptionHistory, newSubscription],
-        [balanceCol]: newBalance,
-      })
+      .update(updates)
       .eq('id', subscriberId);
 
     if (error) {
