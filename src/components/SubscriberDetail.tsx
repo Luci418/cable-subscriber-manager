@@ -180,6 +180,15 @@ export const SubscriberDetail = ({
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${2 + (showCableTab ? 1 : 0) + (showInternetTab ? 1 : 0)}, minmax(0, 1fr))` }}>
+          <TabsTrigger value="overview"><User className="h-4 w-4 mr-1.5" />Overview</TabsTrigger>
+          {showCableTab && <TabsTrigger value="cable"><Tv className="h-4 w-4 mr-1.5" />Cable</TabsTrigger>}
+          {showInternetTab && <TabsTrigger value="internet"><Wifi className="h-4 w-4 mr-1.5" />Internet</TabsTrigger>}
+          <TabsTrigger value="transactions"><Receipt className="h-4 w-4 mr-1.5" />Transactions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
