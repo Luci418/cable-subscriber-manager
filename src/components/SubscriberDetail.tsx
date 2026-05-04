@@ -117,9 +117,20 @@ export const SubscriberDetail = ({
     });
   };
 
-  // Get current subscription status
+  // Active subscription accessors per service.
   const currentSub = (subscriber as any).current_subscription as SubscriptionEntry | null;
   const subscriptionStatus = getSubscriptionStatus(currentSub);
+  const internetSub = (subscriber as any).internet_subscription as SubscriptionEntry | null;
+  const internetStatus = getSubscriptionStatus(internetSub);
+
+  // Per-tab transaction filtering. Legacy rows without service_type are
+  // assumed to be cable so we don't lose history when the column was added.
+  const cableTransactions = sortedTransactions.filter(
+    (t: any) => (t.service_type || 'cable') === 'cable'
+  );
+  const internetTransactions = sortedTransactions.filter(
+    (t: any) => t.service_type === 'internet'
+  );
 
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction);
