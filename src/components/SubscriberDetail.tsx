@@ -13,7 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
@@ -63,6 +65,15 @@ export const SubscriberDetail = ({
   const [showEditTransaction, setShowEditTransaction] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  const { cableEnabled, internetEnabled } = useEnabledServices();
+  // A subscriber's individual services opt-in. If unset (legacy data), assume cable.
+  const subscriberServices = subscriber.services && subscriber.services.length > 0
+    ? subscriber.services
+    : ['cable'];
+  const showCableTab = cableEnabled && subscriberServices.includes('cable');
+  const showInternetTab = internetEnabled && subscriberServices.includes('internet');
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
   // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
   // RPC before every fetch, and an hourly pg_cron job runs the same function.
@@ -169,303 +180,359 @@ export const SubscriberDetail = ({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-2xl">{subscriber.name}</CardTitle>
-              <p className="text-muted-foreground mt-1">
-                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded">
-                  ID: {(subscriber as any).subscriber_id || 'N/A'}
-                </span>
-              </p>
-              <p className="text-muted-foreground mt-2">{subscriber.mobile}</p>
-            </div>
-            <div className="text-right space-y-2">
-              <Badge variant="secondary" className="text-base px-4 py-2">{subscriber.pack}</Badge>
-              {currentSub && subscriptionStatus.isActive && (
-                <div className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                  subscriptionStatus.daysRemaining <= 7 
-                    ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' 
-                    : 'bg-green-500/20 text-green-700 dark:text-green-400'
-                }`}>
-                  {subscriptionStatus.daysRemaining} days left
-                </div>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">STB Number</p>
-              <p className="font-medium">{(subscriber as any).stb_number || subscriber.stbNumber || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Region/Cluster</p>
-              <p className="font-medium">{subscriber.region || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {(subscriber.cable_balance || 0) > 0 ? 'Dues' : (subscriber.cable_balance || 0) < 0 ? 'Advance' : 'Dues'}
-              </p>
-              <p className={`text-2xl font-bold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
-                ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}
-              </p>
-            </div>
-            {subscriber.latitude && subscriber.longitude && (
-              <div className="md:col-span-2">
-                <p className="text-sm text-muted-foreground">Location Coordinates</p>
-              <p className="font-medium">
-                📍 Lat: {(subscriber.latitude || 0).toFixed(6)}, Long: {(subscriber.longitude || 0).toFixed(6)}
-              </p>
-              </div>
-            )}
-            <div className="md:col-span-2">
-              <p className="text-sm text-muted-foreground">Joined</p>
-              <p className="font-medium">
-                {(subscriber as any).join_date 
-                  ? formatDate((subscriber as any).join_date) 
-                  : (subscriber.createdAt ? formatDate(subscriber.createdAt) : 'N/A')}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${2 + (showCableTab ? 1 : 0) + (showInternetTab ? 1 : 0)}, minmax(0, 1fr))` }}>
+          <TabsTrigger value="overview"><User className="h-4 w-4 mr-1.5" />Overview</TabsTrigger>
+          {showCableTab && <TabsTrigger value="cable"><Tv className="h-4 w-4 mr-1.5" />Cable</TabsTrigger>}
+          {showInternetTab && <TabsTrigger value="internet"><Wifi className="h-4 w-4 mr-1.5" />Internet</TabsTrigger>}
+          <TabsTrigger value="transactions"><Receipt className="h-4 w-4 mr-1.5" />Transactions</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Package Subscriptions</CardTitle>
-            <Button onClick={() => setShowAddPackage(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Package
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {currentSub && subscriptionStatus.isActive ? (
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-primary/5 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                      Active
+        {/* OVERVIEW TAB — subscriber profile + per-service balance summary */}
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-2xl">{subscriber.name}</CardTitle>
+                  <p className="text-muted-foreground mt-1">
+                    <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded">
+                      ID: {(subscriber as any).subscriber_id || 'N/A'}
                     </span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      subscriptionStatus.statusColor === 'yellow' 
-                        ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                        : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                    }`}>
-                      {subscriptionStatus.statusText}
-                    </span>
-                  </div>
+                  </p>
+                  <p className="text-muted-foreground mt-2">{subscriber.mobile}</p>
                 </div>
-                <h4 className="text-xl font-bold mb-3">{currentSub.packName}</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                  <div>
-                    <p className="text-muted-foreground">Start Date</p>
+                <div className="flex flex-wrap gap-1.5 justify-end">
+                  {subscriberServices.includes('cable') && (
+                    <Badge variant="secondary" className="gap-1"><Tv className="h-3 w-3" />Cable</Badge>
+                  )}
+                  {subscriberServices.includes('internet') && (
+                    <Badge variant="secondary" className="gap-1"><Wifi className="h-3 w-3" />Internet</Badge>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Region/Cluster</p>
+                  <p className="font-medium">{subscriber.region || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Joined</p>
+                  <p className="font-medium">
+                    {(subscriber as any).join_date
+                      ? formatDate((subscriber as any).join_date)
+                      : (subscriber.createdAt ? formatDate(subscriber.createdAt) : 'N/A')}
+                  </p>
+                </div>
+                {subscriber.latitude && subscriber.longitude && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm text-muted-foreground">Location Coordinates</p>
                     <p className="font-medium">
-                      {new Date(currentSub.startDate).toLocaleDateString()}
+                      📍 Lat: {(subscriber.latitude || 0).toFixed(6)}, Long: {(subscriber.longitude || 0).toFixed(6)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Expiry Date</p>
-                    <p className="font-medium">
-                      {new Date(currentSub.endDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Duration</p>
-                    <p className="font-medium">{currentSub.duration || 1} months</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Monthly Price</p>
-                    <p className="font-medium">₹{(currentSub.packPrice || 0).toFixed(2)}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2 mb-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      generateThermalReceipt({
-                        subscriberName: subscriber.name,
-                        subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                        mobile: subscriber.mobile,
-                        stbNumber: subscriber.stbNumber,
-                        region: subscriber.region,
-                        packName: currentSub.packName,
-                        packPrice: currentSub.packPrice || 0,
-                        duration: currentSub.duration || 1,
-                        startDate: currentSub.startDate,
-                        endDate: currentSub.endDate,
-                        totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                        balance: subscriber.cable_balance || 0,
-                      });
-                    }}
-                  >
-                    <Printer className="h-4 w-4 mr-1" />
-                    Thermal
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      generateSubscriptionInvoice({
-                        subscriberName: subscriber.name,
-                        subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                        mobile: subscriber.mobile,
-                        stbNumber: subscriber.stbNumber,
-                        region: subscriber.region,
-                        packName: currentSub.packName,
-                        packPrice: currentSub.packPrice || 0,
-                        duration: currentSub.duration || 1,
-                        startDate: currentSub.startDate,
-                        endDate: currentSub.endDate,
-                        totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                        balance: subscriber.cable_balance || 0,
-                      });
-                    }}
-                  >
-                    <FileText className="h-4 w-4 mr-1" />
-                    A4 Invoice
-                  </Button>
-                </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => {
-                    setEditingTransaction(null);
-                    setShowCancelDialog(true);
-                  }}
-                  className="w-full"
-                >
-                  Cancel Subscription
-                </Button>
+                )}
               </div>
 
-              {(subscriber as any).subscription_history && (subscriber as any).subscription_history.length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <History className="h-4 w-4" />
-                      <h4 className="font-semibold">Subscription History</h4>
-                    </div>
-                    <div className="space-y-2">
-                      {(subscriber as any).subscription_history
-                        .filter((s: any) => s.id !== (subscriber as any).current_subscription?.id)
-                        .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                        .map((sub: any) => (
-                          <div key={sub.id} className="rounded-lg border p-3 text-sm">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium">{sub.packName}</span>
-                              <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                                {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                              <div>
-                                <span className="block">Duration</span>
-                                <span className="font-medium text-foreground">{sub.duration}m</span>
-                              </div>
-                              <div>
-                                <span className="block">Started</span>
-                                <span className="font-medium text-foreground">
-                                  {new Date(sub.startDate).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="block">Ended</span>
-                                <span className="font-medium text-foreground">
-                                  {new Date(sub.endDate).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No active package subscription</p>
-              <p className="text-sm mt-1">Click "Add Package" to subscribe</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <Separator />
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Transaction History</CardTitle>
-            <Button onClick={() => setShowAddTransaction(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {sortedTransactions.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No transactions yet</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedTransactions.map(transaction => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
-                    <TableCell>
-                      <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
-                        {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{transaction.description}</TableCell>
-                    <TableCell className={`text-right font-semibold ${
-                      transaction.type === 'payment' ? 'text-success' : 'text-destructive'
-                    }`}>
-                      {transaction.type === 'payment' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
+              {/* Per-service balance summary */}
+              <div className={`grid gap-4 ${showCableTab && showInternetTab ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
+                {showCableTab && (
+                  <div className="rounded-lg border p-4">
+                    <div className="flex items-center gap-2 mb-1 text-sm text-muted-foreground">
+                      <Tv className="h-4 w-4" />
+                      <span>Cable {(subscriber.cable_balance || 0) >= 0 ? 'Dues' : 'Advance'}</span>
+                    </div>
+                    <p className={`text-2xl font-bold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
+                      ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+                {showInternetTab && (
+                  <div className="rounded-lg border p-4">
+                    <div className="flex items-center gap-2 mb-1 text-sm text-muted-foreground">
+                      <Wifi className="h-4 w-4" />
+                      <span>Internet {(subscriber.internet_balance || 0) >= 0 ? 'Dues' : 'Advance'}</span>
+                    </div>
+                    <p className={`text-2xl font-bold ${getBalanceColor(subscriber.internet_balance || 0)}`}>
+                      ₹{Math.abs(subscriber.internet_balance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* CABLE TAB — STB info + package subscription + history */}
+        {showCableTab && (
+          <TabsContent value="cable" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Tv className="h-5 w-5" />Cable Service</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">STB Number</p>
+                    <p className="font-medium">{(subscriber as any).stb_number || subscriber.stbNumber || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Current Pack</p>
+                    <p className="font-medium">{subscriber.pack || 'None'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Package Subscriptions</CardTitle>
+                  <Button onClick={() => setShowAddPackage(true)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Package
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {currentSub && subscriptionStatus.isActive ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border bg-primary/5 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                            Active
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            subscriptionStatus.statusColor === 'yellow'
+                              ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                          }`}>
+                            {subscriptionStatus.statusText}
+                          </span>
+                        </div>
+                      </div>
+                      <h4 className="text-xl font-bold mb-3">{currentSub.packName}</h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                        <div>
+                          <p className="text-muted-foreground">Start Date</p>
+                          <p className="font-medium">{new Date(currentSub.startDate).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Expiry Date</p>
+                          <p className="font-medium">{new Date(currentSub.endDate).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Duration</p>
+                          <p className="font-medium">{currentSub.duration || 1} months</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Monthly Price</p>
+                          <p className="font-medium">₹{(currentSub.packPrice || 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mb-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleEditTransaction(transaction)}
+                          className="flex-1"
+                          onClick={() => {
+                            generateThermalReceipt({
+                              subscriberName: subscriber.name,
+                              subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                              mobile: subscriber.mobile,
+                              stbNumber: subscriber.stbNumber,
+                              region: subscriber.region,
+                              packName: currentSub.packName,
+                              packPrice: currentSub.packPrice || 0,
+                              duration: currentSub.duration || 1,
+                              startDate: currentSub.startDate,
+                              endDate: currentSub.endDate,
+                              totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
+                              balance: subscriber.cable_balance || 0,
+                            });
+                          }}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Printer className="h-4 w-4 mr-1" />
+                          Thermal
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => generateInvoicePDF(transaction, subscriber)}
+                          className="flex-1"
+                          onClick={() => {
+                            generateSubscriptionInvoice({
+                              subscriberName: subscriber.name,
+                              subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                              mobile: subscriber.mobile,
+                              stbNumber: subscriber.stbNumber,
+                              region: subscriber.region,
+                              packName: currentSub.packName,
+                              packPrice: currentSub.packPrice || 0,
+                              duration: currentSub.duration || 1,
+                              startDate: currentSub.startDate,
+                              endDate: currentSub.endDate,
+                              totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
+                              balance: subscriber.cable_balance || 0,
+                            });
+                          }}
                         >
-                          <Download className="h-4 w-4" />
+                          <FileText className="h-4 w-4 mr-1" />
+                          A4 Invoice
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setEditingTransaction(null);
+                          setShowCancelDialog(true);
+                        }}
+                        className="w-full"
+                      >
+                        Cancel Subscription
+                      </Button>
+                    </div>
+
+                    {(subscriber as any).subscription_history && (subscriber as any).subscription_history.length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <History className="h-4 w-4" />
+                            <h4 className="font-semibold">Subscription History</h4>
+                          </div>
+                          <div className="space-y-2">
+                            {(subscriber as any).subscription_history
+                              .filter((s: any) => s.id !== (subscriber as any).current_subscription?.id)
+                              .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                              .map((sub: any) => (
+                                <div key={sub.id} className="rounded-lg border p-3 text-sm">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-medium">{sub.packName}</span>
+                                    <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                                      {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                                    <div>
+                                      <span className="block">Duration</span>
+                                      <span className="font-medium text-foreground">{sub.duration}m</span>
+                                    </div>
+                                    <div>
+                                      <span className="block">Started</span>
+                                      <span className="font-medium text-foreground">
+                                        {new Date(sub.startDate).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="block">Ended</span>
+                                      <span className="font-medium text-foreground">
+                                        {new Date(sub.endDate).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No active package subscription</p>
+                    <p className="text-sm mt-1">Click "Add Package" to subscribe</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* INTERNET TAB — placeholder until internet plans/devices are wired */}
+        {showInternetTab && (
+          <TabsContent value="internet" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5" />Internet Service</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground space-y-2">
+                  <Wifi className="h-10 w-10 mx-auto opacity-40" />
+                  <p>Internet plan & device management coming soon.</p>
+                  <p className="text-sm">ONU/Router details and plan subscriptions will appear here.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* TRANSACTIONS TAB */}
+        <TabsContent value="transactions" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Transaction History</CardTitle>
+                <Button onClick={() => setShowAddTransaction(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Transaction
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {sortedTransactions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No transactions yet</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedTransactions.map(transaction => (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
+                        <TableCell>
+                          <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
+                            {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{transaction.description}</TableCell>
+                        <TableCell className={`text-right font-semibold ${
+                          transaction.type === 'payment' ? 'text-success' : 'text-destructive'
+                        }`}>
+                          {transaction.type === 'payment' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <AddTransactionDialog
         open={showAddTransaction}
