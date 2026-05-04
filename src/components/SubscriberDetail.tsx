@@ -431,6 +431,7 @@ export const SubscriberDetail = ({
                         size="sm"
                         onClick={() => {
                           setEditingTransaction(null);
+                          setCancelService('cable');
                           setShowCancelDialog(true);
                         }}
                         className="w-full"
