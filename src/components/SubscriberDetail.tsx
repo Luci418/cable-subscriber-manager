@@ -13,7 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
