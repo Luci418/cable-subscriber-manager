@@ -514,26 +514,64 @@ export const SubscriberDetail = ({
           </TabsContent>
         )}
 
-        {/* TRANSACTIONS TAB */}
+        {/* TRANSACTIONS TAB — service filter pivots between Cable / Internet / All */}
         <TabsContent value="transactions" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-wrap justify-between items-center gap-3">
                 <CardTitle>Transaction History</CardTitle>
-                <Button onClick={() => setShowAddTransaction(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Transaction
-                </Button>
+                <div className="flex items-center gap-2">
+                  {(showCableTab || showInternetTab) && (
+                    <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
+                      <Button
+                        type="button"
+                        variant={txFilter === 'all' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="h-7 px-3"
+                        onClick={() => setTxFilter('all')}
+                      >
+                        All
+                      </Button>
+                      {showCableTab && (
+                        <Button
+                          type="button"
+                          variant={txFilter === 'cable' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="h-7 px-3"
+                          onClick={() => setTxFilter('cable')}
+                        >
+                          <Tv className="h-3.5 w-3.5 mr-1" />Cable
+                        </Button>
+                      )}
+                      {showInternetTab && (
+                        <Button
+                          type="button"
+                          variant={txFilter === 'internet' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="h-7 px-3"
+                          onClick={() => setTxFilter('internet')}
+                        >
+                          <Wifi className="h-3.5 w-3.5 mr-1" />Internet
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  <Button onClick={() => setShowAddTransaction(true)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Transaction
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              {sortedTransactions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No transactions yet</p>
+              {visibleTransactions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No transactions to show</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Service</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
@@ -541,32 +579,41 @@ export const SubscriberDetail = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedTransactions.map(transaction => (
-                      <TableRow key={transaction.id}>
-                        <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
-                        <TableCell>
-                          <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
-                            {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{transaction.description}</TableCell>
-                        <TableCell className={`text-right font-semibold ${
-                          transaction.type === 'payment' ? 'text-success' : 'text-destructive'
-                        }`}>
-                          {transaction.type === 'payment' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-1 justify-end">
-                            <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)}>
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {visibleTransactions.map(transaction => {
+                      const svc = ((transaction as any).service_type || 'cable') as 'cable' | 'internet';
+                      return (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="gap-1">
+                              {svc === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
+                              {svc === 'internet' ? 'Internet' : 'Cable'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
+                              {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell className={`text-right font-semibold ${
+                            transaction.type === 'payment' ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {transaction.type === 'payment' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)}>
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
