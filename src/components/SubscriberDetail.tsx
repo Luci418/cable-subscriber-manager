@@ -511,19 +511,158 @@ export const SubscriberDetail = ({
           </TabsContent>
         )}
 
-        {/* INTERNET TAB — placeholder until internet plans/devices are wired */}
+        {/* INTERNET TAB — ONU/router device, current pack, history */}
         {showInternetTab && (
           <TabsContent value="internet" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5" />Internet Service</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5" />Internet Device</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground space-y-2">
-                  <Wifi className="h-10 w-10 mx-auto opacity-40" />
-                  <p>Internet plan & device management coming soon.</p>
-                  <p className="text-sm">ONU/Router details and plan subscriptions will appear here.</p>
+                {internetDevice ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Device Type</p>
+                      <p className="font-medium capitalize">{internetDevice.device_type || 'Router'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Serial Number</p>
+                      <p className="font-mono text-sm">{internetDevice.serial_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <Badge variant="secondary" className="capitalize">{internetDevice.status}</Badge>
+                    </div>
+                    {internetDevice.notes && (
+                      <div className="md:col-span-2">
+                        <p className="text-sm text-muted-foreground">Notes</p>
+                        <p className="text-sm">{internetDevice.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Wifi className="h-8 w-8 mx-auto opacity-40 mb-2" />
+                    <p>No ONU/Router assigned to this subscriber.</p>
+                    <p className="text-sm mt-1">Assign one from the Inventory screen.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Internet Plan</CardTitle>
+                  <Button onClick={() => { setAddPackageService('internet'); setShowAddPackage(true); }} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Plan
+                  </Button>
                 </div>
+              </CardHeader>
+              <CardContent>
+                {internetSub && internetStatus.isActive ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border bg-primary/5 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-muted-foreground">Active Plan</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                            Active
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            internetStatus.statusColor === 'yellow'
+                              ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                          }`}>
+                            {internetStatus.statusText}
+                          </span>
+                        </div>
+                      </div>
+                      <h4 className="text-xl font-bold mb-3">{internetSub.packName}</h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                        <div>
+                          <p className="text-muted-foreground">Start Date</p>
+                          <p className="font-medium">{new Date(internetSub.startDate).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Expiry Date</p>
+                          <p className="font-medium">{new Date(internetSub.endDate).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Duration</p>
+                          <p className="font-medium">{internetSub.duration || 1} months</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Monthly Price</p>
+                          <p className="font-medium">₹{(internetSub.packPrice || 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setEditingTransaction(null);
+                          setCancelService('internet');
+                          setShowCancelDialog(true);
+                        }}
+                        className="w-full"
+                      >
+                        Cancel Plan
+                      </Button>
+                    </div>
+
+                    {(subscriber as any).internet_subscription_history && (subscriber as any).internet_subscription_history.length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <History className="h-4 w-4" />
+                            <h4 className="font-semibold">Plan History</h4>
+                          </div>
+                          <div className="space-y-2">
+                            {(subscriber as any).internet_subscription_history
+                              .filter((s: any) => s.id !== internetSub?.id)
+                              .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                              .map((sub: any) => (
+                                <div key={sub.id} className="rounded-lg border p-3 text-sm">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-medium">{sub.packName}</span>
+                                    <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                                      {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                                    <div>
+                                      <span className="block">Duration</span>
+                                      <span className="font-medium text-foreground">{sub.duration}m</span>
+                                    </div>
+                                    <div>
+                                      <span className="block">Started</span>
+                                      <span className="font-medium text-foreground">
+                                        {new Date(sub.startDate).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="block">Ended</span>
+                                      <span className="font-medium text-foreground">
+                                        {new Date(sub.endDate).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No active internet plan</p>
+                    <p className="text-sm mt-1">Click "Add Plan" to subscribe</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
