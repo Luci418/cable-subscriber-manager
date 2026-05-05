@@ -164,8 +164,7 @@ export const AddPackageSubscriptionDialog = ({
     onSuccess();
   };
 
-  const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
-  const selectedPackData = activePacks.find(p => p.name === selectedPack);
+  // (activePacks/selectedPackData declared near the top of the component)
   const isLoading = authLoading || packsLoading || subscriberLoading;
 
   return (
