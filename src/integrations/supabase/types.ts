@@ -99,6 +99,7 @@ export type Database = {
       }
       packs: {
         Row: {
+          billing_type: string
           channels: string
           created_at: string
           id: string
@@ -107,8 +108,10 @@ export type Database = {
           price: number
           service_type: string
           user_id: string
+          validity_days: number | null
         }
         Insert: {
+          billing_type?: string
           channels: string
           created_at?: string
           id?: string
@@ -117,8 +120,10 @@ export type Database = {
           price: number
           service_type?: string
           user_id: string
+          validity_days?: number | null
         }
         Update: {
+          billing_type?: string
           channels?: string
           created_at?: string
           id?: string
@@ -127,6 +132,7 @@ export type Database = {
           price?: number
           service_type?: string
           user_id?: string
+          validity_days?: number | null
         }
         Relationships: [
           {
