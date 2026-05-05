@@ -149,7 +149,7 @@ export const AddPackageSubscriptionDialog = ({
       type: 'charge',
       amount: chargeAmount,
       service_type: serviceType,
-      description: `${serviceLabel} subscription charge: ${selectedPackData.name} (${duration} month${duration > 1 ? 's' : ''})`,
+      description: `${serviceLabel} ${isPrepaid ? 'recharge' : 'subscription charge'}: ${selectedPackData.name} (${duration} ${isPrepaid ? `× ${validityDays}d` : `month${duration > 1 ? 's' : ''}`})`,
       date: new Date().toISOString(),
     });
 
