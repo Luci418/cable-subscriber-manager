@@ -46,9 +46,20 @@ export const AddPackageSubscriptionDialog = ({
   const balanceCol = serviceType === 'internet' ? 'internet_balance' : 'cable_balance';
   const serviceLabel = serviceType === 'internet' ? 'Internet' : 'Cable';
 
+  // Pull the live pack metadata to determine billing model + validity.
+  const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
+  const selectedPackData: any = activePacks.find(p => p.name === selectedPack);
+  const isPrepaid = selectedPackData?.billing_type === 'prepaid';
+  const validityDays = Number(selectedPackData?.validity_days) || 30;
+
   const startDate = new Date();
   const endDate = new Date();
-  endDate.setMonth(endDate.getMonth() + duration);
+  if (isPrepaid) {
+    // Prepaid: validity in days × number of recharges
+    endDate.setDate(endDate.getDate() + validityDays * duration);
+  } else {
+    endDate.setMonth(endDate.getMonth() + duration);
+  }
 
   useEffect(() => {
     if (open && user?.id) {
