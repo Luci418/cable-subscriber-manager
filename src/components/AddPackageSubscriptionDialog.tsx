@@ -46,9 +46,20 @@ export const AddPackageSubscriptionDialog = ({
   const balanceCol = serviceType === 'internet' ? 'internet_balance' : 'cable_balance';
   const serviceLabel = serviceType === 'internet' ? 'Internet' : 'Cable';
 
+  // Pull the live pack metadata to determine billing model + validity.
+  const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
+  const selectedPackData: any = activePacks.find(p => p.name === selectedPack);
+  const isPrepaid = selectedPackData?.billing_type === 'prepaid';
+  const validityDays = Number(selectedPackData?.validity_days) || 30;
+
   const startDate = new Date();
   const endDate = new Date();
-  endDate.setMonth(endDate.getMonth() + duration);
+  if (isPrepaid) {
+    // Prepaid: validity in days × number of recharges
+    endDate.setDate(endDate.getDate() + validityDays * duration);
+  } else {
+    endDate.setMonth(endDate.getMonth() + duration);
+  }
 
   useEffect(() => {
     if (open && user?.id) {
@@ -89,9 +100,6 @@ export const AddPackageSubscriptionDialog = ({
 
   const addNewSubscription = async () => {
     setLoading(true);
-    // Only show packs of the matching service type.
-    const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
-    const selectedPackData = activePacks.find(p => p.name === selectedPack);
     if (!selectedPackData) {
       toast.error('Package not found');
       setLoading(false);
@@ -141,7 +149,7 @@ export const AddPackageSubscriptionDialog = ({
       type: 'charge',
       amount: chargeAmount,
       service_type: serviceType,
-      description: `${serviceLabel} subscription charge: ${selectedPackData.name} (${duration} month${duration > 1 ? 's' : ''})`,
+      description: `${serviceLabel} ${isPrepaid ? 'recharge' : 'subscription charge'}: ${selectedPackData.name} (${duration} ${isPrepaid ? `× ${validityDays}d` : `month${duration > 1 ? 's' : ''}`})`,
       date: new Date().toISOString(),
     });
 
@@ -153,8 +161,7 @@ export const AddPackageSubscriptionDialog = ({
     onSuccess();
   };
 
-  const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
-  const selectedPackData = activePacks.find(p => p.name === selectedPack);
+  // (activePacks/selectedPackData declared near the top of the component)
   const isLoading = authLoading || packsLoading || subscriberLoading;
 
   return (
@@ -181,9 +188,13 @@ export const AddPackageSubscriptionDialog = ({
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   {activePacks.length > 0 ? (
-                    activePacks.map((pack) => (
+                    activePacks.map((pack: any) => (
                       <SelectItem key={pack.id} value={pack.name}>
-                        {pack.name} - ₹{Number(pack.price).toFixed(2)}/month
+                        {pack.name} — ₹{Number(pack.price).toFixed(2)}
+                        {pack.billing_type === 'prepaid'
+                          ? ` / ${pack.validity_days || 30}d`
+                          : ' / month'}
+                        {' '}({pack.billing_type === 'prepaid' ? 'Prepaid' : 'Postpaid'})
                       </SelectItem>
                     ))
                   ) : (
@@ -197,16 +208,29 @@ export const AddPackageSubscriptionDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration">Duration (months)</Label>
+              <Label htmlFor="duration">
+                {isPrepaid ? `Recharges (× ${validityDays} days each)` : 'Duration (months)'}
+              </Label>
               <Select value={duration.toString()} onValueChange={(val) => setDuration(parseInt(val))}>
                 <SelectTrigger id="duration">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 Month</SelectItem>
-                  <SelectItem value="3">3 Months</SelectItem>
-                  <SelectItem value="6">6 Months</SelectItem>
-                  <SelectItem value="12">12 Months</SelectItem>
+                  {isPrepaid ? (
+                    <>
+                      <SelectItem value="1">1 × {validityDays} days</SelectItem>
+                      <SelectItem value="2">2 × {validityDays} days</SelectItem>
+                      <SelectItem value="3">3 × {validityDays} days</SelectItem>
+                      <SelectItem value="6">6 × {validityDays} days</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="1">1 Month</SelectItem>
+                      <SelectItem value="3">3 Months</SelectItem>
+                      <SelectItem value="6">6 Months</SelectItem>
+                      <SelectItem value="12">12 Months</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

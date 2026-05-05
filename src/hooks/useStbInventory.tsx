@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export type StbStatus = 'available' | 'assigned' | 'faulty' | 'decommissioned';
+export type DeviceType = 'stb' | 'onu' | 'router';
+export type DeviceServiceType = 'cable' | 'internet';
 
 export interface StbInventoryItem {
   id: string;
@@ -11,6 +13,8 @@ export interface StbInventoryItem {
   subscriber_id: string | null;
   user_id: string;
   notes: string | null;
+  device_type: DeviceType;
+  service_type: DeviceServiceType;
   created_at: string;
   updated_at: string;
 }
@@ -20,6 +24,8 @@ export interface StbInsert {
   status?: StbStatus;
   subscriber_id?: string | null;
   notes?: string | null;
+  device_type?: DeviceType;
+  service_type?: DeviceServiceType;
 }
 
 export interface StbUpdate {
@@ -27,6 +33,8 @@ export interface StbUpdate {
   status?: StbStatus;
   subscriber_id?: string | null;
   notes?: string | null;
+  device_type?: DeviceType;
+  service_type?: DeviceServiceType;
 }
 
 export const useStbInventory = (userId: string | undefined) => {
