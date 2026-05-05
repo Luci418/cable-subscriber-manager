@@ -100,9 +100,6 @@ export const AddPackageSubscriptionDialog = ({
 
   const addNewSubscription = async () => {
     setLoading(true);
-    // Only show packs of the matching service type.
-    const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
-    const selectedPackData = activePacks.find(p => p.name === selectedPack);
     if (!selectedPackData) {
       toast.error('Package not found');
       setLoading(false);
