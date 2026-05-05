@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -14,13 +15,16 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRegions } from '@/hooks/useRegions';
 import { useStbInventory } from '@/hooks/useStbInventory';
-import { Loader2, MapPin } from 'lucide-react';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { Loader2, MapPin, Tv, Wifi } from 'lucide-react';
 
 interface AddSubscriberFormProps {
   onSubmit: (data: {
     name: string;
     mobile: string;
+    services: ('cable' | 'internet')[];
     stbNumber: string;
+    internetDeviceId?: string;
     latitude?: number;
     longitude?: number;
     region: string;
@@ -31,10 +35,20 @@ interface AddSubscriberFormProps {
 }
 
 export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps) => {
+  const { user } = useAuth();
+  const { cableEnabled, internetEnabled } = useEnabledServices();
+  const { regions } = useRegions(user?.id);
+  const { stbs } = useStbInventory(user?.id);
+
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
+    services: [
+      ...(cableEnabled ? ['cable' as const] : []),
+      ...(internetEnabled && !cableEnabled ? ['internet' as const] : []),
+    ] as ('cable' | 'internet')[],
     stbNumber: '',
+    internetDeviceId: '',
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
     region: '',
@@ -43,38 +57,52 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
   });
   const [loading, setLoading] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const { user } = useAuth();
-  const { regions } = useRegions(user?.id);
-  const { stbs } = useStbInventory(user?.id);
 
-  const availableStbs = stbs.filter(stb => stb.status === 'available');
+  const wantsCable = formData.services.includes('cable');
+  const wantsInternet = formData.services.includes('internet');
+
+  // Available devices, segmented by service. Fall back to legacy rows
+  // (no service_type/device_type) on the cable side.
+  const availableStbs = stbs.filter(
+    (s: any) => s.status === 'available' && (s.service_type || 'cable') === 'cable'
+  );
+  const availableInternetDevices = stbs.filter(
+    (s: any) => s.status === 'available' && s.service_type === 'internet'
+  );
+
+  const toggleService = (svc: 'cable' | 'internet', checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      services: checked
+        ? [...prev.services, svc]
+        : prev.services.filter(s => s !== svc),
+      // Clear the corresponding device selection when toggling off
+      ...(svc === 'cable' && !checked ? { stbNumber: '' } : {}),
+      ...(svc === 'internet' && !checked ? { internetDeviceId: '' } : {}),
+    }));
+  };
 
   const getCoordinates = () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
+      toast.error('Geolocation not supported');
       return;
     }
-
     setGettingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setFormData({
-          ...formData,
+        setFormData(prev => ({
+          ...prev,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
-        toast.success('Location captured successfully!');
+        }));
+        toast.success('Location captured!');
         setGettingLocation(false);
       },
       (error) => {
-        toast.error('Failed to get location: ' + error.message);
+        toast.error('Failed: ' + error.message);
         setGettingLocation(false);
       },
-      {
-        enableHighAccuracy: false, // Faster, less accurate
-        timeout: 5000, // 5 second timeout
-        maximumAge: 0
-      }
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
     );
   };
 
@@ -83,8 +111,8 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, housePicture: reader.result as string });
-        toast.success('House picture captured!');
+        setFormData(prev => ({ ...prev, housePicture: reader.result as string }));
+        toast.success('House picture captured');
       };
       reader.readAsDataURL(file);
     }
@@ -92,17 +120,20 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name || !formData.mobile || !formData.stbNumber || !formData.region) {
-      toast.error('Please fill in all required fields');
+
+    if (!formData.name || !formData.mobile || !formData.region) {
+      toast.error('Please fill in name, mobile, and region');
+      return;
+    }
+    if (formData.services.length === 0) {
+      toast.error('Select at least one service');
       return;
     }
 
     setLoading(true);
     try {
       onSubmit(formData);
-      toast.success('Subscriber added successfully!');
-    } catch (error) {
+    } catch {
       toast.error('Failed to add subscriber');
     } finally {
       setLoading(false);
@@ -139,52 +170,102 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="stb">STB Number *</Label>
-            <Select value={formData.stbNumber} onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select available STB" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStbs.length === 0 ? (
-                  <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                    No available STBs in inventory
-                  </div>
-                ) : (
-                  availableStbs.map(stb => (
-                    <SelectItem key={stb.id} value={stb.serial_number}>{stb.serial_number}</SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {availableStbs.length === 0 && (
-              <p className="text-sm text-destructive">Add STBs to inventory first</p>
-            )}
-          </div>
+          {/* Services — only render the chooser when both modules are enabled */}
+          {(cableEnabled && internetEnabled) && (
+            <div className="space-y-2">
+              <Label>Services *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
+                  <Checkbox
+                    checked={wantsCable}
+                    onCheckedChange={(c) => toggleService('cable', !!c)}
+                  />
+                  <Tv className="h-4 w-4" />
+                  <span className="text-sm font-medium">Cable</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
+                  <Checkbox
+                    checked={wantsInternet}
+                    onCheckedChange={(c) => toggleService('internet', !!c)}
+                  />
+                  <Wifi className="h-4 w-4" />
+                  <span className="text-sm font-medium">Internet</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Cable device picker */}
+          {wantsCable && (
+            <div className="space-y-2">
+              <Label>STB (Cable)</Label>
+              <Select
+                value={formData.stbNumber}
+                onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select available STB (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStbs.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      No available STBs
+                    </div>
+                  ) : (
+                    availableStbs.map(stb => (
+                      <SelectItem key={stb.id} value={stb.serial_number}>
+                        {stb.serial_number}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Internet device picker */}
+          {wantsInternet && (
+            <div className="space-y-2">
+              <Label>ONU / Router (Internet)</Label>
+              <Select
+                value={formData.internetDeviceId}
+                onValueChange={(value) => setFormData({ ...formData, internetDeviceId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select available device (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableInternetDevices.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      No available ONU/Router. Add one in Inventory.
+                    </div>
+                  ) : (
+                    availableInternetDevices.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.serial_number} ({d.device_type?.toUpperCase() || 'ONU'})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Location Coordinates</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={getCoordinates}
-                disabled={gettingLocation}
-                className="w-full"
-              >
-                {gettingLocation ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Getting Location...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="mr-2 h-4 w-4" />
-                    Get Coordinates
-                  </>
-                )}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={getCoordinates}
+              disabled={gettingLocation}
+              className="w-full"
+            >
+              {gettingLocation ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Getting Location...</>
+              ) : (
+                <><MapPin className="mr-2 h-4 w-4" />Get Coordinates</>
+              )}
+            </Button>
             {formData.latitude && formData.longitude && (
               <p className="text-sm text-muted-foreground">
                 📍 {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
@@ -237,14 +318,7 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
               Cancel
             </Button>
             <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                'Add Subscriber'
-              )}
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding...</> : 'Add Subscriber'}
             </Button>
           </div>
         </form>
