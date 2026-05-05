@@ -63,7 +63,9 @@ const Index = () => {
     // Generate region-based subscriber ID (e.g., NORTH-001, DOWNTOWN-002)
     const regionName = data.region || 'DEFAULT';
     const subscriberId = await generateSubscriberId(regionName, user.id);
-    
+
+    const services = (data.services && data.services.length > 0) ? data.services : ['cable'];
+
     const success = await addSubscriber({
       subscriber_id: subscriberId,
       name: data.name,
@@ -74,12 +76,34 @@ const Index = () => {
       latitude: data.latitude || null,
       longitude: data.longitude || null,
       cable_balance: 0,
+      internet_balance: 0,
+      services,
       join_date: new Date().toISOString(),
       current_subscription: null,
       subscription_history: [],
-    });
+    } as any);
 
     if (success) {
+      // Best-effort: assign the chosen ONU/router to this new subscriber
+      if (data.internetDeviceId) {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data: row } = await supabase
+            .from('subscribers')
+            .select('id')
+            .eq('subscriber_id', subscriberId)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (row?.id) {
+            await supabase
+              .from('stb_inventory')
+              .update({ status: 'assigned', subscriber_id: row.id })
+              .eq('id', data.internetDeviceId);
+          }
+        } catch (e) {
+          console.warn('Failed to assign internet device:', e);
+        }
+      }
       toast.success(`Subscriber ${subscriberId} added successfully!`);
       setView('list');
     }
