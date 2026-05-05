@@ -188,9 +188,13 @@ export const AddPackageSubscriptionDialog = ({
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   {activePacks.length > 0 ? (
-                    activePacks.map((pack) => (
+                    activePacks.map((pack: any) => (
                       <SelectItem key={pack.id} value={pack.name}>
-                        {pack.name} - ₹{Number(pack.price).toFixed(2)}/month
+                        {pack.name} — ₹{Number(pack.price).toFixed(2)}
+                        {pack.billing_type === 'prepaid'
+                          ? ` / ${pack.validity_days || 30}d`
+                          : ' / month'}
+                        {' '}({pack.billing_type === 'prepaid' ? 'Prepaid' : 'Postpaid'})
                       </SelectItem>
                     ))
                   ) : (
@@ -204,16 +208,29 @@ export const AddPackageSubscriptionDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration">Duration (months)</Label>
+              <Label htmlFor="duration">
+                {isPrepaid ? `Recharges (× ${validityDays} days each)` : 'Duration (months)'}
+              </Label>
               <Select value={duration.toString()} onValueChange={(val) => setDuration(parseInt(val))}>
                 <SelectTrigger id="duration">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 Month</SelectItem>
-                  <SelectItem value="3">3 Months</SelectItem>
-                  <SelectItem value="6">6 Months</SelectItem>
-                  <SelectItem value="12">12 Months</SelectItem>
+                  {isPrepaid ? (
+                    <>
+                      <SelectItem value="1">1 × {validityDays} days</SelectItem>
+                      <SelectItem value="2">2 × {validityDays} days</SelectItem>
+                      <SelectItem value="3">3 × {validityDays} days</SelectItem>
+                      <SelectItem value="6">6 × {validityDays} days</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="1">1 Month</SelectItem>
+                      <SelectItem value="3">3 Months</SelectItem>
+                      <SelectItem value="6">6 Months</SelectItem>
+                      <SelectItem value="12">12 Months</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
