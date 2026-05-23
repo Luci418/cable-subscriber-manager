@@ -121,12 +121,24 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.mobile || !formData.region) {
+    if (!formData.name.trim() || !formData.mobile.trim() || !formData.region) {
       toast.error('Please fill in name, mobile, and region');
+      return;
+    }
+    if (!/^\d{7,15}$/.test(formData.mobile)) {
+      toast.error('Mobile must be 7–15 digits, numbers only');
       return;
     }
     if (formData.services.length === 0) {
       toast.error('Select at least one service');
+      return;
+    }
+    if (wantsCable && !formData.stbNumber) {
+      toast.error('Select an STB for the Cable service');
+      return;
+    }
+    if (wantsInternet && !formData.internetDeviceId) {
+      toast.error('Select an ONU/Router for the Internet service');
       return;
     }
 
@@ -163,9 +175,12 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
             <Input
               id="mobile"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={15}
               value={formData.mobile}
-              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-              placeholder="Enter mobile number"
+              onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
+              placeholder="Digits only"
               required
             />
           </div>
@@ -198,13 +213,13 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
           {/* Cable device picker */}
           {wantsCable && (
             <div className="space-y-2">
-              <Label>STB (Cable)</Label>
+              <Label>STB (Cable) *</Label>
               <Select
                 value={formData.stbNumber}
                 onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select available STB (optional)" />
+                  <SelectValue placeholder="Select available STB" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableStbs.length === 0 ? (
@@ -226,13 +241,13 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
           {/* Internet device picker */}
           {wantsInternet && (
             <div className="space-y-2">
-              <Label>ONU / Router (Internet)</Label>
+              <Label>ONU / Router (Internet) *</Label>
               <Select
                 value={formData.internetDeviceId}
                 onValueChange={(value) => setFormData({ ...formData, internetDeviceId: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select available device (optional)" />
+                  <SelectValue placeholder="Select available device" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableInternetDevices.length === 0 ? (

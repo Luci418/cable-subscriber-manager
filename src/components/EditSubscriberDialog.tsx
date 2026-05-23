@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -15,18 +16,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { MapPin, Loader2 } from 'lucide-react';
+import { MapPin, Loader2, Tv, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
-import { Subscriber, getPacks, getRegions, calculateNextBillingDate } from '@/lib/storage';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRegions } from '@/hooks/useRegions';
 import { useStbInventory } from '@/hooks/useStbInventory';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
+
+// Accepts the raw subscribers DB row shape (snake_case).
+interface SubscriberRow {
+  id: string;
+  name: string;
+  mobile: string;
+  stb_number?: string | null;
+  region?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  services?: string[] | null;
+}
 
 interface EditSubscriberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  subscriber: Subscriber;
-  onSubmit: (updates: Partial<Subscriber>) => void;
+  subscriber: SubscriberRow;
+  // Returns a partial of the subscribers row (snake_case columns).
+  onSubmit: (updates: Record<string, any>) => void;
 }
 
 export const EditSubscriberDialog = ({
@@ -35,56 +50,102 @@ export const EditSubscriberDialog = ({
   subscriber,
   onSubmit,
 }: EditSubscriberDialogProps) => {
-  const [formData, setFormData] = useState({
-    name: subscriber.name,
-    mobile: subscriber.mobile,
-    stbNumber: subscriber.stbNumber,
-    latitude: subscriber.latitude,
-    longitude: subscriber.longitude,
-    region: subscriber.region,
-    billingCycle: subscriber.billingCycle || ('monthly' as const),
-    autoChargeEnabled: subscriber.autoChargeEnabled || false,
-  });
-  const [gettingLocation, setGettingLocation] = useState(false);
-  const [regions, setRegions] = useState<Array<{ id: string; name: string }>>([]);
   const { user } = useAuth();
-  const { stbs } = useStbInventory(user?.id);
+  const { cableEnabled, internetEnabled } = useEnabledServices();
+  const { regions } = useRegions(user?.id);
+  const { stbs, reloadStbs } = useStbInventory(user?.id) as any;
 
-  // Available STBs include: those with 'available' status OR the currently assigned one
-  const availableStbs = stbs.filter(stb => 
-    stb.status === 'available' || stb.serial_number === subscriber.stbNumber
+  const initialServices = useMemo<('cable' | 'internet')[]>(
+    () =>
+      (subscriber.services && subscriber.services.length > 0
+        ? subscriber.services
+        : ['cable']) as ('cable' | 'internet')[],
+    [subscriber]
   );
 
+  const [formData, setFormData] = useState({
+    name: subscriber.name || '',
+    mobile: subscriber.mobile || '',
+    stbNumber: subscriber.stb_number || '',
+    internetDeviceId: '' as string, // id of the assigned internet device row
+    latitude: subscriber.latitude ?? undefined,
+    longitude: subscriber.longitude ?? undefined,
+    region: subscriber.region || '',
+    services: initialServices,
+  });
+  const [originalInternetDeviceId, setOriginalInternetDeviceId] = useState<string>('');
+  const [gettingLocation, setGettingLocation] = useState(false);
+
+  const wantsCable = formData.services.includes('cable');
+  const wantsInternet = formData.services.includes('internet');
+
+  // Reseed whenever the dialog opens for a (possibly different) subscriber.
   useEffect(() => {
-    if (open) {
-      setFormData({
-        name: subscriber.name,
-        mobile: subscriber.mobile,
-        stbNumber: subscriber.stbNumber,
-        latitude: subscriber.latitude,
-        longitude: subscriber.longitude,
-        region: subscriber.region,
-        billingCycle: subscriber.billingCycle || 'monthly',
-        autoChargeEnabled: subscriber.autoChargeEnabled || false,
-      });
-      setRegions(getRegions());
-    }
-  }, [open, subscriber]);
+    if (!open) return;
+    setFormData({
+      name: subscriber.name || '',
+      mobile: subscriber.mobile || '',
+      stbNumber: subscriber.stb_number || '',
+      internetDeviceId: '',
+      latitude: subscriber.latitude ?? undefined,
+      longitude: subscriber.longitude ?? undefined,
+      region: subscriber.region || '',
+      services: initialServices,
+    });
+    setOriginalInternetDeviceId('');
+
+    // Look up the currently-assigned internet device for this subscriber.
+    (async () => {
+      const { data } = await supabase
+        .from('stb_inventory')
+        .select('id')
+        .eq('subscriber_id', subscriber.id)
+        .in('device_type', ['onu', 'router'])
+        .maybeSingle();
+      const id = (data as any)?.id || '';
+      setOriginalInternetDeviceId(id);
+      setFormData((p) => ({ ...p, internetDeviceId: id }));
+    })();
+  }, [open, subscriber, initialServices]);
+
+  // Cable STB picker: available rows plus the currently-assigned one.
+  const cableStbOptions = stbs.filter(
+    (s: any) =>
+      (s.service_type || 'cable') === 'cable' &&
+      (s.status === 'available' || s.serial_number === subscriber.stb_number)
+  );
+
+  // Internet device picker: available rows plus the currently-assigned one.
+  const internetDeviceOptions = stbs.filter(
+    (s: any) =>
+      s.service_type === 'internet' &&
+      (s.status === 'available' || s.id === originalInternetDeviceId)
+  );
+
+  const toggleService = (svc: 'cable' | 'internet', checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      services: checked
+        ? Array.from(new Set([...prev.services, svc]))
+        : prev.services.filter((s) => s !== svc),
+      ...(svc === 'cable' && !checked ? { stbNumber: '' } : {}),
+      ...(svc === 'internet' && !checked ? { internetDeviceId: '' } : {}),
+    }));
+  };
 
   const getCoordinates = () => {
     if (!navigator.geolocation) {
       toast.error('Geolocation is not supported by your browser');
       return;
     }
-
     setGettingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setFormData({
-          ...formData,
+        setFormData((p) => ({
+          ...p,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+        }));
         toast.success('Location updated successfully!');
         setGettingLocation(false);
       },
@@ -92,34 +153,101 @@ export const EditSubscriberDialog = ({
         toast.error('Failed to get location: ' + error.message);
         setGettingLocation(false);
       },
-      {
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 0
-      }
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.mobile || !formData.stbNumber || !formData.region) {
-      toast.error('Please fill in all required fields');
+    if (!formData.name.trim() || !formData.mobile.trim() || !formData.region) {
+      toast.error('Please fill in name, mobile, and region');
+      return;
+    }
+    if (!/^\d{7,15}$/.test(formData.mobile)) {
+      toast.error('Mobile must be 7–15 digits, numbers only');
+      return;
+    }
+    if (formData.services.length === 0) {
+      toast.error('Select at least one service');
+      return;
+    }
+    if (wantsCable && !formData.stbNumber) {
+      toast.error('Select an STB for the Cable service');
+      return;
+    }
+    if (wantsInternet && !formData.internetDeviceId) {
+      toast.error('Select an ONU/Router for the Internet service');
       return;
     }
 
-    const updates: any = { ...formData };
+    // ---- Reconcile inventory assignments ----
+    // Cable STB
+    const prevStb = subscriber.stb_number || '';
+    const newStb = wantsCable ? formData.stbNumber : '';
+    try {
+      if (prevStb && prevStb !== newStb) {
+        await supabase
+          .from('stb_inventory')
+          .update({ status: 'available', subscriber_id: null })
+          .eq('user_id', user!.id)
+          .eq('serial_number', prevStb);
+      }
+      if (newStb && newStb !== prevStb) {
+        await supabase
+          .from('stb_inventory')
+          .update({ status: 'assigned', subscriber_id: subscriber.id })
+          .eq('user_id', user!.id)
+          .eq('serial_number', newStb);
+      }
+    } catch (err) {
+      console.warn('Cable STB reconcile failed:', err);
+    }
 
-    // If auto-charge is being enabled for the first time, set next billing date
-    if (formData.autoChargeEnabled && !subscriber?.autoChargeEnabled) {
-      updates.nextBillingDate = calculateNextBillingDate(
-        new Date().toISOString().split('T')[0],
-        formData.billingCycle
-      );
+    // Internet device
+    const prevDev = originalInternetDeviceId;
+    const newDev = wantsInternet ? formData.internetDeviceId : '';
+    try {
+      if (prevDev && prevDev !== newDev) {
+        await supabase
+          .from('stb_inventory')
+          .update({ status: 'available', subscriber_id: null })
+          .eq('id', prevDev);
+      }
+      if (newDev && newDev !== prevDev) {
+        await supabase
+          .from('stb_inventory')
+          .update({ status: 'assigned', subscriber_id: subscriber.id })
+          .eq('id', newDev);
+      }
+    } catch (err) {
+      console.warn('Internet device reconcile failed:', err);
+    }
+
+    // ---- Build subscriber update (snake_case DB columns) ----
+    const updates: Record<string, any> = {
+      name: formData.name.trim(),
+      mobile: formData.mobile,
+      region: formData.region,
+      latitude: formData.latitude ?? null,
+      longitude: formData.longitude ?? null,
+      services: formData.services,
+      stb_number: wantsCable ? formData.stbNumber : null,
+    };
+
+    // If cable was removed, clear its plan/subscription (balance retained).
+    if (!wantsCable) {
+      updates.current_pack = null;
+      updates.current_subscription = null;
+    }
+    // If internet was removed, clear its plan/subscription (balance retained).
+    if (!wantsInternet) {
+      updates.current_internet_pack = null;
+      updates.internet_subscription = null;
     }
 
     onSubmit(updates);
-    toast.success('Subscriber updated successfully!');
+    reloadStbs?.();
     onOpenChange(false);
   };
 
@@ -136,7 +264,6 @@ export const EditSubscriberDialog = ({
               id="edit-name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Enter full name"
               required
             />
           </div>
@@ -146,111 +273,158 @@ export const EditSubscriberDialog = ({
             <Input
               id="edit-mobile"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={15}
               value={formData.mobile}
-              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-              placeholder="Enter mobile number"
+              onChange={(e) =>
+                setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })
+              }
+              placeholder="Digits only"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="edit-stb">STB Number *</Label>
-            <Select value={formData.stbNumber} onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select STB" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStbs.map(stb => (
-                  <SelectItem key={stb.id} value={stb.serial_number}>
-                    {stb.serial_number} {stb.serial_number === subscriber.stbNumber ? '(current)' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Services chooser — only when both modules are enabled globally */}
+          {cableEnabled && internetEnabled && (
+            <div className="space-y-2">
+              <Label>Services *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
+                  <Checkbox
+                    checked={wantsCable}
+                    onCheckedChange={(c) => toggleService('cable', !!c)}
+                  />
+                  <Tv className="h-4 w-4" />
+                  <span className="text-sm font-medium">Cable</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
+                  <Checkbox
+                    checked={wantsInternet}
+                    onCheckedChange={(c) => toggleService('internet', !!c)}
+                  />
+                  <Wifi className="h-4 w-4" />
+                  <span className="text-sm font-medium">Internet</span>
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Removing a service unassigns its device and clears the active plan. Balances are kept.
+              </p>
+            </div>
+          )}
+
+          {wantsCable && (
+            <div className="space-y-2">
+              <Label>STB (Cable) *</Label>
+              <Select
+                value={formData.stbNumber}
+                onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select STB" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cableStbOptions.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      No available STBs
+                    </div>
+                  ) : (
+                    cableStbOptions.map((stb: any) => (
+                      <SelectItem key={stb.id} value={stb.serial_number}>
+                        {stb.serial_number}
+                        {stb.serial_number === subscriber.stb_number ? ' (current)' : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {wantsInternet && (
+            <div className="space-y-2">
+              <Label>ONU / Router (Internet) *</Label>
+              <Select
+                value={formData.internetDeviceId}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, internetDeviceId: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select ONU/Router" />
+                </SelectTrigger>
+                <SelectContent>
+                  {internetDeviceOptions.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      No available ONU/Router. Add one in Inventory.
+                    </div>
+                  ) : (
+                    internetDeviceOptions.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.serial_number} ({(d.device_type || 'onu').toUpperCase()})
+                        {d.id === originalInternetDeviceId ? ' (current)' : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Location Coordinates</Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={getCoordinates}
-                disabled={gettingLocation}
-                className="w-full"
-              >
-                {gettingLocation ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Getting Location...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="mr-2 h-4 w-4" />
-                    Update Coordinates
-                  </>
-                )}
-              </Button>
-            </div>
-            {formData.latitude && formData.longitude && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={getCoordinates}
+              disabled={gettingLocation}
+              className="w-full"
+            >
+              {gettingLocation ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Getting Location...
+                </>
+              ) : (
+                <>
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Update Coordinates
+                </>
+              )}
+            </Button>
+            {formData.latitude != null && formData.longitude != null && (
               <p className="text-sm text-muted-foreground">
-                📍 {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                📍 {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="edit-region">Region/Cluster *</Label>
-            <Select value={formData.region} onValueChange={(value) => setFormData({ ...formData, region: value })}>
+            <Select
+              value={formData.region}
+              onValueChange={(value) => setFormData({ ...formData, region: value })}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select region" />
               </SelectTrigger>
               <SelectContent>
-                {regions.map(region => (
-                  <SelectItem key={region.id} value={region.name}>{region.name}</SelectItem>
+                {regions.map((region: any) => (
+                  <SelectItem key={region.id} value={region.name}>
+                    {region.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold">Billing Settings</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="billingCycle">Billing Cycle</Label>
-              <Select 
-                value={formData.billingCycle} 
-                onValueChange={(value: any) => setFormData({ ...formData, billingCycle: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly (3 months)</SelectItem>
-                  <SelectItem value="semi-annually">Semi-Annually (6 months)</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoCharge">Auto-Billing</Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically charge subscriber on billing cycle
-                </p>
-              </div>
-              <Switch
-                id="autoCharge"
-                checked={formData.autoChargeEnabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoChargeEnabled: checked })}
-              />
-            </div>
-          </div>
-
           <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+            >
               Cancel
             </Button>
             <Button type="submit" className="flex-1">
