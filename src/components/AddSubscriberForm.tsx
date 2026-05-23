@@ -241,7 +241,7 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
           {/* Internet device picker */}
           {wantsInternet && (
             <div className="space-y-2">
-              <Label>ONU / Router (Internet)</Label>
+              <Label>ONU / Router (Internet) *</Label>
               <Select
                 value={formData.internetDeviceId}
                 onValueChange={(value) => setFormData({ ...formData, internetDeviceId: value })}
