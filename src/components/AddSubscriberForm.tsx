@@ -121,12 +121,24 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.mobile || !formData.region) {
+    if (!formData.name.trim() || !formData.mobile.trim() || !formData.region) {
       toast.error('Please fill in name, mobile, and region');
+      return;
+    }
+    if (!/^\d{7,15}$/.test(formData.mobile)) {
+      toast.error('Mobile must be 7–15 digits, numbers only');
       return;
     }
     if (formData.services.length === 0) {
       toast.error('Select at least one service');
+      return;
+    }
+    if (wantsCable && !formData.stbNumber) {
+      toast.error('Select an STB for the Cable service');
+      return;
+    }
+    if (wantsInternet && !formData.internetDeviceId) {
+      toast.error('Select an ONU/Router for the Internet service');
       return;
     }
 
