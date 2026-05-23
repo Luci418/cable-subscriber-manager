@@ -84,25 +84,32 @@ const Index = () => {
     } as any);
 
     if (success) {
-      // Best-effort: assign the chosen ONU/router to this new subscriber
-      if (data.internetDeviceId) {
-        try {
-          const { supabase } = await import('@/integrations/supabase/client');
-          const { data: row } = await supabase
-            .from('subscribers')
-            .select('id')
-            .eq('subscriber_id', subscriberId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-          if (row?.id) {
+      // Resolve the freshly-inserted row so we can wire up inventory rows.
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: row } = await supabase
+          .from('subscribers')
+          .select('id')
+          .eq('subscriber_id', subscriberId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (row?.id) {
+          if (data.stbNumber) {
+            await supabase
+              .from('stb_inventory')
+              .update({ status: 'assigned', subscriber_id: row.id })
+              .eq('user_id', user.id)
+              .eq('serial_number', data.stbNumber);
+          }
+          if (data.internetDeviceId) {
             await supabase
               .from('stb_inventory')
               .update({ status: 'assigned', subscriber_id: row.id })
               .eq('id', data.internetDeviceId);
           }
-        } catch (e) {
-          console.warn('Failed to assign internet device:', e);
         }
+      } catch (e) {
+        console.warn('Failed to assign device(s) to new subscriber:', e);
       }
       toast.success(`Subscriber ${subscriberId} added successfully!`);
       setView('list');
