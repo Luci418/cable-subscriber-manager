@@ -175,9 +175,12 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
             <Input
               id="mobile"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={15}
               value={formData.mobile}
-              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-              placeholder="Enter mobile number"
+              onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })}
+              placeholder="Digits only"
               required
             />
           </div>
