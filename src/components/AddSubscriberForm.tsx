@@ -219,7 +219,7 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
                 onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select available STB (optional)" />
+                  <SelectValue placeholder="Select available STB" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableStbs.length === 0 ? (
@@ -247,7 +247,7 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
                 onValueChange={(value) => setFormData({ ...formData, internetDeviceId: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select available device (optional)" />
+                  <SelectValue placeholder="Select available device" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableInternetDevices.length === 0 ? (
