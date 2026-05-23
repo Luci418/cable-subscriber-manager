@@ -213,7 +213,7 @@ export const AddSubscriberForm = ({ onSubmit, onCancel }: AddSubscriberFormProps
           {/* Cable device picker */}
           {wantsCable && (
             <div className="space-y-2">
-              <Label>STB (Cable)</Label>
+              <Label>STB (Cable) *</Label>
               <Select
                 value={formData.stbNumber}
                 onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}
