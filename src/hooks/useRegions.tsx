@@ -44,7 +44,7 @@ export const useRegions = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to add region");
+      toast.error(friendlyDbError(error, "Failed to add region"));
       console.error(error);
       return false;
     }
@@ -86,7 +86,7 @@ export const useRegions = (userId: string | undefined) => {
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete region");
+      toast.error(friendlyDbError(error, "Failed to delete region"));
       console.error(error);
       return false;
     }
