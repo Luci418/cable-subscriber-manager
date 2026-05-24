@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { friendlyDbError } from "@/lib/dbErrors";
 import type { Database } from "@/integrations/supabase/types";
 
 type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
