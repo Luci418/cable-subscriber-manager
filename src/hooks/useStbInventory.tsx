@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { friendlyDbError } from "@/lib/dbErrors";
 
 export type StbStatus = 'available' | 'assigned' | 'faulty' | 'decommissioned';
 export type DeviceType = 'stb' | 'onu' | 'router';
