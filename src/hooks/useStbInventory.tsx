@@ -82,7 +82,7 @@ export const useStbInventory = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to add STB");
+      toast.error(friendlyDbError(error, "Failed to add STB"));
       console.error(error);
       return false;
     }
@@ -102,7 +102,7 @@ export const useStbInventory = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to update STB");
+      toast.error(friendlyDbError(error, "Failed to update STB"));
       console.error(error);
       return false;
     }
@@ -128,7 +128,7 @@ export const useStbInventory = (userId: string | undefined) => {
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete STB");
+      toast.error(friendlyDbError(error, "Failed to delete STB"));
       console.error(error);
       return false;
     }
