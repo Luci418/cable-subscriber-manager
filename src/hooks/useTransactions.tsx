@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { friendlyDbError } from "@/lib/dbErrors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
