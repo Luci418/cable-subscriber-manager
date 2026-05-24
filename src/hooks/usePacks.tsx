@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { friendlyDbError } from "@/lib/dbErrors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -47,7 +48,7 @@ export const usePacks = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to add pack");
+      toast.error(friendlyDbError(error, "Failed to add pack"));
       console.error(error);
       return false;
     }
@@ -67,7 +68,7 @@ export const usePacks = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to update pack");
+      toast.error(friendlyDbError(error, "Failed to update pack"));
       console.error(error);
       return false;
     }
@@ -111,7 +112,7 @@ export const usePacks = (userId: string | undefined) => {
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete pack");
+      toast.error(friendlyDbError(error, "Failed to delete pack"));
       console.error(error);
       return false;
     }

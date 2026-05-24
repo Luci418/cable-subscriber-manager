@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { friendlyDbError } from "@/lib/dbErrors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -49,7 +50,7 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
       .single();
 
     if (error) {
-      toast.error("Failed to add transaction");
+      toast.error(friendlyDbError(error, "Failed to add transaction"));
       console.error(error);
       return false;
     }
@@ -68,7 +69,7 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to update transaction");
+      toast.error(friendlyDbError(error, "Failed to update transaction"));
       console.error(error);
       return false;
     }
@@ -87,7 +88,7 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete transaction");
+      toast.error(friendlyDbError(error, "Failed to delete transaction"));
       console.error(error);
       return false;
     }

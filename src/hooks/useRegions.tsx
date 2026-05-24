@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { friendlyDbError } from "@/lib/dbErrors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -43,7 +44,7 @@ export const useRegions = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to add region");
+      toast.error(friendlyDbError(error, "Failed to add region"));
       console.error(error);
       return false;
     }
@@ -85,7 +86,7 @@ export const useRegions = (userId: string | undefined) => {
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete region");
+      toast.error(friendlyDbError(error, "Failed to delete region"));
       console.error(error);
       return false;
     }

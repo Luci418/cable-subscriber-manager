@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { friendlyDbError } from "@/lib/dbErrors";
 import type { Database } from "@/integrations/supabase/types";
 
 type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
@@ -53,7 +54,7 @@ export const useSubscribers = (userId: string | undefined) => {
       .single();
 
     if (error) {
-      toast.error("Failed to add subscriber");
+      toast.error(friendlyDbError(error, "Failed to add subscriber"));
       console.error(error);
       return false;
     }
@@ -71,7 +72,7 @@ export const useSubscribers = (userId: string | undefined) => {
       .maybeSingle();
 
     if (error) {
-      toast.error("Failed to update subscriber");
+      toast.error(friendlyDbError(error, "Failed to update subscriber"));
       console.error(error);
       return false;
     }
@@ -87,7 +88,7 @@ export const useSubscribers = (userId: string | undefined) => {
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete subscriber");
+      toast.error(friendlyDbError(error, "Failed to delete subscriber"));
       console.error(error);
       return false;
     }
