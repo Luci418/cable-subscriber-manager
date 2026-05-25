@@ -10,7 +10,8 @@ import { useSubscribers } from '@/hooks/useSubscribers';
 import { usePacks } from '@/hooks/usePacks';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { friendlyDbError }<span class="highlight-text">import type { Database } from '@/integrations/supabase/types';
+import { friendlyDbError } from '@/lib/dbErrors';
+import type { Database } from '@/integrations/supabase/types';
 
 type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
 type BillingHistoryRow = Database["public"]["Tables"]["billing_history"]["Row"];
