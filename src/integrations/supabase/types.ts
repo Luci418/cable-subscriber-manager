@@ -51,43 +51,45 @@ export type Database = {
       }
       complaints: {
         Row: {
+          category: string
           created_at: string
           date: string
           description: string
           id: string
+          priority: string
+          resolution_notes: string | null
           resolved_date: string | null
           status: string
           subscriber_id: string
           user_id: string
         }
         Insert: {
+          category?: string
           created_at?: string
           date?: string
           description: string
           id?: string
+          priority?: string
+          resolution_notes?: string | null
           resolved_date?: string | null
           status?: string
           subscriber_id: string
           user_id: string
         }
         Update: {
+          category?: string
           created_at?: string
           date?: string
           description?: string
           id?: string
+          priority?: string
+          resolution_notes?: string | null
           resolved_date?: string | null
           status?: string
           subscriber_id?: string
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "complaints_subscriber_fk"
-            columns: ["subscriber_id"]
-            isOneToOne: false
-            referencedRelation: "subscribers"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "complaints_subscriber_id_fkey"
             columns: ["subscriber_id"]
@@ -373,13 +375,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "transactions_subscriber_fk"
-            columns: ["subscriber_id"]
-            isOneToOne: false
-            referencedRelation: "subscribers"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "transactions_subscriber_id_fkey"
             columns: ["subscriber_id"]

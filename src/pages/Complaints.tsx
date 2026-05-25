@@ -1,94 +1,119 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { useState, useEffect }      from 'react';
+import { Card, CardContent, CardHeader, CardTitle }    from '@/components/ui/card';
+import { Button }        from '@/components/ui/button';
+import { Input }         from '@/components/ui/input';
+import { Label }         from '@/components/ui/label';
+import { Textarea }      from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { Badge }         from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus } from 'lucide-react';
-import { getComplaints, addComplaint, updateComplaint, deleteComplaint, getSubscribers, Complaint } from '@/lib/storage';
-import { toast } from 'sonner';
+import { useAuth }       from '@/hooks/useAuth';
+import { useSubscribers } from '@/hooks/useSubscribers';
+import { useComplaints }  from '@/hooks/useComplaints';
+import { toast }          from 'sonner';
 
 interface ComplaintsProps {
   onBack: () => void;
 }
 
 export const Complaints = ({ onBack }: ComplaintsProps) => {
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>([]);
+  const { user } = useAuth();
+  const { subscribers } = useSubscribers(user?.id);
+  const { complaints, loading, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
+
+  const [filteredComplaints, setFilteredComplaints] = useState(complaints);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [selectedComplaint, setSelectedComplaint] = useState<(typeof complaints)[0] | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-
-  useEffect(() => {
-    loadComplaints();
-  }, []);
 
   useEffect(() => {
     filterComplaints();
   }, [complaints, searchTerm, statusFilter]);
 
-  const loadComplaints = () => {
-    setComplaints(getComplaints());
-  };
-
   const filterComplaints = () => {
-    let filtered = complaints;
+    let filtered = [...complaints];
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(c => c.status === statusFilter);
+      filtered = filtered.filter((c) => c.status === statusFilter);
     }
 
     if (searchTerm) {
-      filtered = filtered.filter(c =>
-        c.subscriberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.id.toLowerCase().includes(searchTerm.toLowerCase())
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (c) =>
+          (c.subscriber_name || '').toLowerCase().includes(q) ||
+          c.description.toLowerCase().includes(q) ||
+          c.id.toLowerCase().includes(q)
       );
     }
 
-    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setFilteredComplaints(filtered);
   };
 
-  const handleAddComplaint = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddComplaint = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
-    const subscriberId = formData.get('subscriberId') as string;
-    const subscriber = getSubscribers().find(s => s.id === subscriberId);
-    
+
+    const subscriberDisplayId = formData.get('subscriberId') as string;
+    const subscriber = subscribers.find((s) => s.subscriber_id === subscriberDisplayId);
+
     if (!subscriber) {
       toast.error('Subscriber not found');
       return;
     }
 
-    addComplaint({
-      subscriberId,
-      subscriberName: subscriber.name,
-      category: formData.get('category') as any,
-      priority: formData.get('priority') as any,
-      description: formData.get('description') as string,
-      status: 'pending',
+    const category = formData.get('category') as string;
+    const priority = formData.get('priority') as string;
+    const description = formData.get('description') as string;
+
+    if (!description.trim()) {
+      toast.error('Description is required');
+      return;
+    }
+
+    const created = await addComplaint({
+      subscriber_id: subscriber.id,
+      description,
+      category,
+      priority,
     });
 
-    toast.success('Complaint registered successfully');
-    setShowAddDialog(false);
-    loadComplaints();
-    e.currentTarget.reset();
+    if (created) {
+      toast.success('Complaint registered successfully');
+      setShowAddDialog(false);
+      e.currentTarget.reset();
+    }
   };
 
-  const handleUpdateStatus = (id: string, status: Complaint['status'], resolutionNotes?: string) => {
-    updateComplaint(id, { status, resolutionNotes });
-    toast.success('Complaint updated successfully');
-    loadComplaints();
-    if (selectedComplaint?.id === id) {
-      setSelectedComplaint(getComplaints().find(c => c.id === id) || null);
+  const handleUpdateStatus = async (
+    id: string,
+    status: 'pending' | 'in-progress' | 'resolved',
+    resolutionNotes?: string
+  ) => {
+    const updates: Parameters<typeof updateComplaint>[1] = { status };
+    if (status === 'resolved') {
+      updates.resolved_date = new Date().toISOString();
+      updates.resolution_notes = resolutionNotes || null;
+    }
+
+    const updated = await updateComplaint(id, updates);
+    if (updated) {
+      toast.success('Complaint updated successfully');
+      if (selectedComplaint?.id === id) setSelectedComplaint(updated);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this complaint?')) {
+      const ok = await deleteComplaint(id);
+      if (ok) {
+        toast.success('Complaint deleted');
+        setShowDetailDialog(false);
+      }
     }
   };
 
@@ -121,10 +146,18 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
 
   const stats = {
     total: complaints.length,
-    pending: complaints.filter(c => c.status === 'pending').length,
-    inProgress: complaints.filter(c => c.status === 'in-progress').length,
-    resolved: complaints.filter(c => c.status === 'resolved').length,
+    pending: complaints.filter((c) => c.status === 'pending').length,
+    inProgress: complaints.filter((c) => c.status === 'in-progress').length,
+    resolved: complaints.filter((c) => c.status === 'resolved').length,
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Loading complaints…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -151,12 +184,23 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
             </DialogHeader>
             <form onSubmit={handleAddComplaint} className="space-y-4">
               <div>
-                <Label htmlFor="subscriberId">Subscriber ID</Label>
-                <Input id="subscriberId" name="subscriberId" required placeholder="SUB-000001" />
+                <Label htmlFor="subscriberId">Subscriber</Label>
+                <Select name="subscriberId" required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select subscriber" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subscribers.map((s) => (
+                      <SelectItem key={s.id} value={s.subscriber_id}>
+                        {s.name} — {s.subscriber_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>
-                <Select name="category" required>
+                <Select name="category" required defaultValue="technical">
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -170,7 +214,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
               </div>
               <div>
                 <Label htmlFor="priority">Priority</Label>
-                <Select name="priority" required>
+                <Select name="priority" required defaultValue="medium">
                   <SelectTrigger>
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
@@ -183,7 +227,13 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
               </div>
               <div>
                 <Label htmlFor="description">Description</Label>
-                <Textarea id="description" name="description" required placeholder="Describe the issue..." rows={4} />
+                <Textarea
+                  id="description"
+                  name="description"
+                  required
+                  placeholder="Describe the issue…"
+                  rows={4}
+                />
               </div>
               <Button type="submit" className="w-full">Submit Complaint</Button>
             </form>
@@ -240,7 +290,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Search by ID, name, or description..."
+                  placeholder="Search by ID, name, or description…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -276,16 +326,19 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
           </Card>
         ) : (
           filteredComplaints.map((complaint) => (
-            <Card key={complaint.id} className="cursor-pointer hover:bg-accent/50 transition-colors"
+            <Card
+              key={complaint.id}
+              className="cursor-pointer hover:bg-accent/50 transition-colors"
               onClick={() => {
                 setSelectedComplaint(complaint);
                 setShowDetailDialog(true);
-              }}>
+              }}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{complaint.subscriberName}</h3>
+                      <h3 className="font-semibold">{complaint.subscriber_name || 'Unknown'}</h3>
                       <Badge variant={getPriorityColor(complaint.priority) as any}>
                         {complaint.priority}
                       </Badge>
@@ -294,10 +347,16 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                         {complaint.status}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">ID: {complaint.id} • Subscriber: {complaint.subscriberId}</p>
-                    <p className="text-sm"><strong>Category:</strong> {complaint.category}</p>
+                    <p className="text-sm text-muted-foreground">
+                      ID: {complaint.id} • Subscriber: {complaint.subscriber_id_text || complaint.subscriber_id}
+                    </p>
+                    <p className="text-sm">
+                      <strong>Category:</strong> {complaint.category}
+                    </p>
                     <p className="text-sm">{complaint.description}</p>
-                    <p className="text-xs text-muted-foreground">Created: {new Date(complaint.createdAt).toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Created: {new Date(complaint.created_at).toLocaleString('en-IN')}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -330,8 +389,10 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Subscriber</Label>
-                  <p className="font-medium">{selectedComplaint.subscriberName}</p>
-                  <p className="text-sm text-muted-foreground">{selectedComplaint.subscriberId}</p>
+                  <p className="font-medium">{selectedComplaint.subscriber_name || 'Unknown'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedComplaint.subscriber_id_text || selectedComplaint.subscriber_id}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Priority</Label>
@@ -347,32 +408,36 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Created At</Label>
-                  <p className="font-medium">{new Date(selectedComplaint.createdAt).toLocaleString('en-IN')}</p>
+                  <p className="font-medium">
+                    {new Date(selectedComplaint.created_at).toLocaleString('en-IN')}
+                  </p>
                 </div>
               </div>
-              
+
               <div>
                 <Label className="text-muted-foreground">Description</Label>
                 <p className="mt-1 text-sm">{selectedComplaint.description}</p>
               </div>
 
-              {selectedComplaint.resolutionNotes && (
+              {selectedComplaint.resolution_notes && (
                 <div>
                   <Label className="text-muted-foreground">Resolution Notes</Label>
-                  <p className="mt-1 text-sm">{selectedComplaint.resolutionNotes}</p>
+                  <p className="mt-1 text-sm">{selectedComplaint.resolution_notes}</p>
                 </div>
               )}
 
-              {selectedComplaint.resolvedAt && (
+              {selectedComplaint.resolved_date && (
                 <div>
                   <Label className="text-muted-foreground">Resolved At</Label>
-                  <p className="font-medium">{new Date(selectedComplaint.resolvedAt).toLocaleString('en-IN')}</p>
+                  <p className="font-medium">
+                    {new Date(selectedComplaint.resolved_date).toLocaleString('en-IN')}
+                  </p>
                 </div>
               )}
 
               <div className="space-y-2">
                 <Label>Update Status</Label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {selectedComplaint.status !== 'in-progress' && (
                     <Button
                       variant="outline"
@@ -386,7 +451,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                       variant="default"
                       onClick={() => {
                         const notes = prompt('Enter resolution notes:');
-                        if (notes) {
+                        if (notes !== null) {
                           handleUpdateStatus(selectedComplaint.id, 'resolved', notes);
                         }
                       }}
@@ -396,14 +461,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                   )}
                   <Button
                     variant="destructive"
-                    onClick={() => {
-                      if (confirm('Are you sure you want to delete this complaint?')) {
-                        deleteComplaint(selectedComplaint.id);
-                        toast.success('Complaint deleted');
-                        setShowDetailDialog(false);
-                        loadComplaints();
-                      }
-                    }}
+                    onClick={() => handleDelete(selectedComplaint.id)}
                   >
                     Delete
                   </Button>
