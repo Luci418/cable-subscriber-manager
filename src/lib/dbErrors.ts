@@ -27,6 +27,14 @@ export const friendlyDbError = (error: any, fallback: string): string => {
     if (text.includes("subscribers_name_nonblank")) return "Name cannot be blank.";
     if (text.includes("transactions_amount_nonneg")) return "Amount cannot be negative.";
     if (text.includes("packs_price_nonneg")) return "Price cannot be negative.";
+    if (text.includes("packs_prepaid_validity")) return "Prepaid packs must have a validity period greater than 0 days.";
+    if (text.includes("stb_inventory_device_service_match")) return "Device type and service type must match (STB ↔ cable, ONU/Router ↔ internet).";
+    if (text.includes("complaints_description_nonblank")) return "Description cannot be blank.";
+    if (text.includes("complaints_resolved_has_date")) return "A resolved complaint must have a resolution date.";
+    if (text.includes("complaints_category_check")) return "Invalid complaint category.";
+    if (text.includes("complaints_priority_check")) return "Invalid priority level.";
+    if (text.includes("billing_history_month_format")) return "Month must be in YYYY-MM format.";
+    if (text.includes("billing_history_totals_nonneg")) return "Total values cannot be negative.";
     return "Value failed a validation check.";
   }
 
