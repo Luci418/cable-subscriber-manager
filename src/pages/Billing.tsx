@@ -64,7 +64,8 @@ export const Billing = ({ onBack }: BillingProps) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Failed to load billing history:', error);
+      toast.error(friendlyDbError(error, 'Failed to load billing history'));
+      console.error(error);
     } else {
       setBillingHistory(data || []);
     }
