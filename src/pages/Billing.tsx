@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Calendar, CreditCard, History, Play, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, History, Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { usePacks } from '@/hooks/usePacks';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Database } from '@/integrations/supabase/types';
+import { friendlyDbError }<span class="highlight-text">import type { Database } from '@/integrations/supabase/types';
 
 type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
 type BillingHistoryRow = Database["public"]["Tables"]["billing_history"]["Row"];
