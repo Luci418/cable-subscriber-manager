@@ -82,13 +82,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "complaints_subscriber_fk"
-            columns: ["subscriber_id"]
-            isOneToOne: false
-            referencedRelation: "subscribers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "complaints_subscriber_id_fkey"
             columns: ["subscriber_id"]
             isOneToOne: false
@@ -373,13 +366,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "transactions_subscriber_fk"
-            columns: ["subscriber_id"]
-            isOneToOne: false
-            referencedRelation: "subscribers"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "transactions_subscriber_id_fkey"
             columns: ["subscriber_id"]
