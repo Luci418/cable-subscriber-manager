@@ -51,30 +51,39 @@ export type Database = {
       }
       complaints: {
         Row: {
+          category: string
           created_at: string
           date: string
           description: string
           id: string
+          priority: string
+          resolution_notes: string | null
           resolved_date: string | null
           status: string
           subscriber_id: string
           user_id: string
         }
         Insert: {
+          category?: string
           created_at?: string
           date?: string
           description: string
           id?: string
+          priority?: string
+          resolution_notes?: string | null
           resolved_date?: string | null
           status?: string
           subscriber_id: string
           user_id: string
         }
         Update: {
+          category?: string
           created_at?: string
           date?: string
           description?: string
           id?: string
+          priority?: string
+          resolution_notes?: string | null
           resolved_date?: string | null
           status?: string
           subscriber_id?: string
