@@ -28,24 +28,32 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Transaction } from '@/lib/storage';
+import { Tv, Wifi } from 'lucide-react';
 
 interface EditTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
-  onSubmit: (transactionId: string, updates: { type: 'payment' | 'charge'; amount: number; description: string }) => void;
+  // The subscriber's enabled services govern whether the service picker is shown.
+  availableServices?: string[];
+  onSubmit: (transactionId: string, updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' }) => void;
 }
 
 export const EditTransactionDialog = ({
   open,
   onOpenChange,
   transaction,
+  availableServices,
   onSubmit,
 }: EditTransactionDialogProps) => {
+  const services = availableServices?.length ? availableServices : ['cable'];
+  const showServicePicker = services.includes('cable') && services.includes('internet');
+
   const [formData, setFormData] = useState({
     type: 'payment' as 'payment' | 'charge',
     amount: '',
     description: '',
+    service_type: 'cable' as 'cable' | 'internet',
   });
   const [showConfirm, setShowConfirm] = useState(false);
   const [password, setPassword] = useState('');
@@ -57,6 +65,7 @@ export const EditTransactionDialog = ({
         type: transaction.type,
         amount: transaction.amount.toString(),
         description: transaction.description,
+        service_type: ((transaction as any).service_type as 'cable' | 'internet') || 'cable',
       });
       setPassword('');
     }
@@ -91,11 +100,11 @@ export const EditTransactionDialog = ({
       type: formData.type,
       amount: parseFloat(formData.amount),
       description: formData.description,
+      service_type: formData.service_type,
     });
 
     setShowConfirm(false);
     onOpenChange(false);
-    toast.success('Transaction updated successfully!');
   };
 
   return (
