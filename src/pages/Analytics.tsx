@@ -36,7 +36,20 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     .filter(t => t.type === 'charge')
     .reduce((sum, t) => sum + t.amount, 0);
   const netRevenue = totalRevenue - totalCharges;
-  const totalBalance = subscribers.reduce((sum, s) => sum + s.cable_balance, 0);
+
+  // Combined outstanding across both services. Legacy rows without
+  // internet_balance default to 0 so no inflation.
+  const totalCableBalance = subscribers.reduce((sum, s) => sum + Number(s.cable_balance || 0), 0);
+  const totalInternetBalance = subscribers.reduce((sum, s) => sum + Number((s as any).internet_balance || 0), 0);
+  const totalBalance = totalCableBalance + totalInternetBalance;
+
+  // Per-service revenue split. Untagged historic transactions assumed cable.
+  const cableRevenue = transactions
+    .filter(t => t.type === 'payment' && ((t as any).service_type || 'cable') === 'cable')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const internetRevenue = transactions
+    .filter(t => t.type === 'payment' && (t as any).service_type === 'internet')
+    .reduce((sum, t) => sum + t.amount, 0);
 
   // Filter transactions by time range
   const getFilteredTransactions = () => {
@@ -99,12 +112,21 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
       });
   };
 
-  // Pack distribution
+  // Pack distribution — count both cable and internet packs separately so
+  // an internet-only subscriber doesn't disappear into "No Pack".
   const getPackDistribution = () => {
     const packCounts: { [key: string]: number } = {};
     subscribers.forEach(s => {
-      const packName = s.current_pack || 'No Pack';
-      packCounts[packName] = (packCounts[packName] || 0) + 1;
+      const services = (s as any).services?.length ? (s as any).services : ['cable'];
+      if (services.includes('cable')) {
+        const name = s.current_pack ? `${s.current_pack} (Cable)` : 'No Cable Pack';
+        packCounts[name] = (packCounts[name] || 0) + 1;
+      }
+      if (services.includes('internet')) {
+        const ip = (s as any).current_internet_pack;
+        const name = ip ? `${ip} (Internet)` : 'No Internet Pack';
+        packCounts[name] = (packCounts[name] || 0) + 1;
+      }
     });
 
     return Object.entries(packCounts).map(([name, value]) => ({ name, value }));
@@ -121,15 +143,25 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     return Object.entries(regionCounts).map(([name, value]) => ({ name, value }));
   };
 
-  // Balance distribution
+  // Balance distribution — evaluate per service line so a subscriber
+  // with cable debt + internet credit is counted in both buckets.
   const getBalanceDistribution = () => {
-    const positive = subscribers.filter(s => s.cable_balance > 0).length;
-    const negative = subscribers.filter(s => s.cable_balance < 0).length;
-    const zero = subscribers.filter(s => s.cable_balance === 0).length;
+    let debt = 0, credit = 0, zero = 0;
+    subscribers.forEach(s => {
+      const services = (s as any).services?.length ? (s as any).services : ['cable'];
+      const lines: number[] = [];
+      if (services.includes('cable')) lines.push(Number(s.cable_balance || 0));
+      if (services.includes('internet')) lines.push(Number((s as any).internet_balance || 0));
+      lines.forEach(b => {
+        if (b > 0) debt++;
+        else if (b < 0) credit++;
+        else zero++;
+      });
+    });
 
     return [
-      { name: 'Debt (Due)', value: positive },
-      { name: 'Credit (Advance)', value: negative },
+      { name: 'Debt (Due)', value: debt },
+      { name: 'Credit (Advance)', value: credit },
       { name: 'Zero Balance', value: zero },
     ].filter(item => item.value > 0);
   };
@@ -226,6 +258,45 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
           </CardContent>
         </Card>
       </div>
+
+      {/* Per-service revenue + outstanding split. Shown only when there is
+          any internet activity so cable-only operators aren't bothered. */}
+      {(internetRevenue > 0 || totalInternetBalance !== 0) && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Cable Revenue</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold">₹{cableRevenue.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground">Payments tagged as cable</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Internet Revenue</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold">₹{internetRevenue.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground">Payments tagged as internet</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Cable Outstanding</CardTitle></CardHeader>
+            <CardContent>
+              <div className={`text-xl font-bold ${totalCableBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+                ₹{Math.abs(totalCableBalance).toLocaleString('en-IN')}
+              </div>
+              <p className="text-xs text-muted-foreground">{totalCableBalance > 0 ? 'Due' : 'Credit'}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Internet Outstanding</CardTitle></CardHeader>
+            <CardContent>
+              <div className={`text-xl font-bold ${totalInternetBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+                ₹{Math.abs(totalInternetBalance).toLocaleString('en-IN')}
+              </div>
+              <p className="text-xs text-muted-foreground">{totalInternetBalance > 0 ? 'Due' : 'Credit'}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Charts */}
       <Tabs defaultValue="revenue" className="space-y-4">

@@ -18,11 +18,12 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Subscriber } from '@/lib/storage';
+import { Tv, Wifi } from 'lucide-react';
 
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { type: 'payment' | 'charge'; amount: number; description: string }) => void;
+  onSubmit: (data: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' }) => void;
   subscriber: Subscriber;
 }
 
@@ -32,11 +33,32 @@ export const AddTransactionDialog = ({
   onSubmit,
   subscriber,
 }: AddTransactionDialogProps) => {
+  // Determine which services this subscriber has. Default to cable when the
+  // legacy `services` array is missing so we never break older records.
+  const subscriberServices: string[] = (subscriber as any).services?.length
+    ? (subscriber as any).services
+    : ['cable'];
+  const hasCable = subscriberServices.includes('cable');
+  const hasInternet = subscriberServices.includes('internet');
+  const showServicePicker = hasCable && hasInternet;
+
+  const defaultService: 'cable' | 'internet' = hasCable ? 'cable' : 'internet';
+
   const [formData, setFormData] = useState({
     type: 'payment' as 'payment' | 'charge',
     amount: '',
     description: '',
+    service_type: defaultService,
   });
+
+  // Reset to the correct default whenever the dialog (re-)opens for a
+  // subscriber with a different service mix.
+  useEffect(() => {
+    if (open) {
+      setFormData(f => ({ ...f, service_type: defaultService }));
+    }
+  }, [open, defaultService]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -55,15 +77,16 @@ export const AddTransactionDialog = ({
       type: formData.type,
       amount,
       description: formData.description,
+      service_type: formData.service_type,
     });
 
     setFormData({
       type: 'payment',
       amount: '',
       description: '',
+      service_type: defaultService,
     });
     onOpenChange(false);
-    toast.success('Transaction added successfully!');
   };
 
   return (
@@ -73,6 +96,28 @@ export const AddTransactionDialog = ({
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {showServicePicker && (
+            <div className="space-y-2">
+              <Label htmlFor="service">Service</Label>
+              <Select
+                value={formData.service_type}
+                onValueChange={(value: 'cable' | 'internet') => setFormData({ ...formData, service_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cable">
+                    <span className="flex items-center gap-2"><Tv className="h-3.5 w-3.5" /> Cable</span>
+                  </SelectItem>
+                  <SelectItem value="internet">
+                    <span className="flex items-center gap-2"><Wifi className="h-3.5 w-3.5" /> Internet</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
             <Select
@@ -94,6 +139,8 @@ export const AddTransactionDialog = ({
             <Input
               id="amount"
               type="number"
+              inputMode="decimal"
+              min="0.01"
               step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
