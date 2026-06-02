@@ -892,6 +892,7 @@ export const SubscriberDetail = ({
         open={showEditTransaction}
         onOpenChange={setShowEditTransaction}
         transaction={editingTransaction}
+        availableServices={subscriberServices}
         onSubmit={handleUpdateTransaction}
       />
 
