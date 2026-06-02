@@ -43,7 +43,7 @@ interface SubscriberDetailProps {
   subscriber: Subscriber;
   transactions: Transaction[];
   onBack: () => void;
-  onAddTransaction: (transaction: { type: 'payment' | 'charge'; amount: number; description: string }) => void;
+  onAddTransaction: (transaction: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' }) => void;
   onEdit: (updates: Partial<Subscriber>) => void;
   onDelete: () => void;
   onReload?: () => void;
