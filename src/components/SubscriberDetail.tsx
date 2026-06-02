@@ -152,12 +152,85 @@ export const SubscriberDetail = ({
     setShowEditTransaction(true);
   };
 
-  const handleUpdateTransaction = (transactionId: string, updates: any) => {
-    updateTransaction(transactionId, updates);
+  // Apply or reverse a transaction's balance impact on the matching service column.
+  // Payment & refund both reduce debt; charge increases debt.
+  const balanceDelta = (
+    type: 'payment' | 'charge' | 'refund',
+    amount: number,
+    sign: 1 | -1, // +1 to apply, -1 to reverse
+  ) => (type === 'charge' ? amount : -amount) * sign;
+
+  const applyBalanceChange = async (
+    service: 'cable' | 'internet',
+    delta: number,
+  ) => {
+    if (delta === 0) return true;
+    const balCol = service === 'internet' ? 'internet_balance' : 'cable_balance';
+    const current = Number((subscriber as any)[balCol] || 0);
+    const { error } = await (supabase.from('subscribers') as any)
+      .update({ [balCol]: current + delta })
+      .eq('id', subscriber.id);
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to update subscriber balance'));
+      return false;
+    }
+    return true;
+  };
+
+  const handleUpdateTransaction = async (
+    transactionId: string,
+    updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' },
+  ) => {
+    const old = transactions.find(t => t.id === transactionId) as any;
+    if (!old) return;
+
+    const oldSvc = (old.service_type || 'cable') as 'cable' | 'internet';
+    const oldType = old.type as 'payment' | 'charge' | 'refund';
+
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        type: updates.type,
+        amount: updates.amount,
+        description: updates.description,
+        service_type: updates.service_type,
+      })
+      .eq('id', transactionId);
+
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to update transaction'));
+      return;
+    }
+
+    // Reverse old impact on the old service, then apply new impact on the new service.
+    if (oldSvc === updates.service_type) {
+      const delta = balanceDelta(oldType, Number(old.amount), -1) + balanceDelta(updates.type, updates.amount, 1);
+      await applyBalanceChange(oldSvc, delta);
+    } else {
+      await applyBalanceChange(oldSvc, balanceDelta(oldType, Number(old.amount), -1));
+      await applyBalanceChange(updates.service_type, balanceDelta(updates.type, updates.amount, 1));
+    }
+
     setShowEditTransaction(false);
     setEditingTransaction(null);
-    // Trigger parent component to reload data
-    onBack();
+    toast.success('Transaction updated successfully!');
+    onReload?.();
+  };
+
+  const handleDeleteTransaction = async (transaction: Transaction) => {
+    const svc = (((transaction as any).service_type as 'cable' | 'internet') || 'cable');
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', transaction.id);
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to delete transaction'));
+      return;
+    }
+    // Reverse the deleted transaction's balance impact.
+    await applyBalanceChange(svc, balanceDelta(transaction.type as any, Number(transaction.amount), -1));
+    toast.success('Transaction deleted');
+    onReload?.();
   };
 
   const handleCancelSubscription = async (refundAmount: number) => {
