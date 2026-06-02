@@ -115,6 +115,28 @@ export const EditTransactionDialog = ({
             <DialogTitle>Edit Transaction</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {showServicePicker && (
+              <div className="space-y-2">
+                <Label htmlFor="service">Service</Label>
+                <Select
+                  value={formData.service_type}
+                  onValueChange={(value: 'cable' | 'internet') => setFormData({ ...formData, service_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cable">
+                      <span className="flex items-center gap-2"><Tv className="h-3.5 w-3.5" /> Cable</span>
+                    </SelectItem>
+                    <SelectItem value="internet">
+                      <span className="flex items-center gap-2"><Wifi className="h-3.5 w-3.5" /> Internet</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="type">Type</Label>
               <Select
@@ -136,6 +158,8 @@ export const EditTransactionDialog = ({
               <Input
                 id="amount"
                 type="number"
+                inputMode="decimal"
+                min="0.01"
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
