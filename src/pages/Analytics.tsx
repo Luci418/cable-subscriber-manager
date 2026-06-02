@@ -259,6 +259,45 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         </Card>
       </div>
 
+      {/* Per-service revenue + outstanding split. Shown only when there is
+          any internet activity so cable-only operators aren't bothered. */}
+      {(internetRevenue > 0 || totalInternetBalance !== 0) && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Cable Revenue</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold">₹{cableRevenue.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground">Payments tagged as cable</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Internet Revenue</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold">₹{internetRevenue.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground">Payments tagged as internet</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Cable Outstanding</CardTitle></CardHeader>
+            <CardContent>
+              <div className={`text-xl font-bold ${totalCableBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+                ₹{Math.abs(totalCableBalance).toLocaleString('en-IN')}
+              </div>
+              <p className="text-xs text-muted-foreground">{totalCableBalance > 0 ? 'Due' : 'Credit'}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Internet Outstanding</CardTitle></CardHeader>
+            <CardContent>
+              <div className={`text-xl font-bold ${totalInternetBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+                ₹{Math.abs(totalInternetBalance).toLocaleString('en-IN')}
+              </div>
+              <p className="text-xs text-muted-foreground">{totalInternetBalance > 0 ? 'Due' : 'Credit'}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Charts */}
       <Tabs defaultValue="revenue" className="space-y-4">
         <TabsList>
