@@ -20,7 +20,7 @@ import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
 import { EditTransactionDialog } from './EditTransactionDialog';
-import { updateTransaction } from '@/lib/storage';
+import { friendlyDbError } from '@/lib/dbErrors';
 import {
   AlertDialog,
   AlertDialogAction,
