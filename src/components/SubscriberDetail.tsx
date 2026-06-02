@@ -830,11 +830,24 @@ export const SubscriberDetail = ({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)} title="Edit">
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)}>
+                              <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)} title="Download invoice">
                                 <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                title="Delete"
+                                onClick={() => {
+                                  if (confirm(`Delete this ${transaction.type} of ₹${transaction.amount.toFixed(2)}? The subscriber's balance will be reversed.`)) {
+                                    handleDeleteTransaction(transaction);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
