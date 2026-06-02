@@ -121,37 +121,33 @@ const Index = () => {
     setView('detail');
   };
 
-  const handleAddTransaction = async (data: { type: 'payment' | 'charge' | 'refund'; amount: number; description: string }) => {
+  const handleAddTransaction = async (data: { type: 'payment' | 'charge' | 'refund'; amount: number; description: string; service_type?: 'cable' | 'internet' }) => {
     if (!selectedSubscriberId) return;
-    
+
     const subscriber = subscribers.find(s => s.id === selectedSubscriberId);
     if (!subscriber) return;
+
+    // Route to the correct service. Default to cable for back-compat with
+    // subscribers that only have the cable service.
+    const svc: 'cable' | 'internet' = data.service_type
+      ?? ((subscriber as any).services?.includes('internet') && !(subscriber as any).services?.includes('cable') ? 'internet' : 'cable');
 
     const success = await createTransaction({
       subscriber_id: selectedSubscriberId,
       type: data.type,
       amount: data.amount,
       description: data.description,
+      service_type: svc,
       date: new Date().toISOString(),
     });
 
     if (success) {
-      // Update subscriber balance (positive = debt, negative = credit)
-      const currentBalance = subscriber.cable_balance || 0;
-      let newBalance = currentBalance;
-      
-      if (data.type === 'payment') {
-        // Payment reduces debt
-        newBalance = currentBalance - data.amount;
-      } else if (data.type === 'charge') {
-        // Charge increases debt
-        newBalance = currentBalance + data.amount;
-      } else if (data.type === 'refund') {
-        // Refund reduces debt
-        newBalance = currentBalance - data.amount;
-      }
-
-      await updateSubscriber(selectedSubscriberId, { cable_balance: newBalance });
+      // Positive balance = debt, negative = credit. Route to the matching
+      // service column so cable and internet ledgers stay independent.
+      const balCol = svc === 'internet' ? 'internet_balance' : 'cable_balance';
+      const currentBalance = Number((subscriber as any)[balCol] || 0);
+      const delta = data.type === 'charge' ? data.amount : -data.amount; // payment & refund both reduce debt
+      await updateSubscriber(selectedSubscriberId, { [balCol]: currentBalance + delta } as any);
       toast.success('Transaction added successfully!');
     }
   };
