@@ -179,7 +179,7 @@ export const SubscriberDetail = ({
 
   const handleUpdateTransaction = async (
     transactionId: string,
-    updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' },
+    updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null },
   ) => {
     const old = transactions.find(t => t.id === transactionId) as any;
     if (!old) return;
@@ -187,14 +187,17 @@ export const SubscriberDetail = ({
     const oldSvc = (old.service_type || 'cable') as 'cable' | 'internet';
     const oldType = old.type as 'payment' | 'charge' | 'refund';
 
-    const { error } = await supabase
+    const dbUpdates: any = {
+      type: updates.type,
+      amount: updates.amount,
+      description: updates.description,
+      service_type: updates.service_type,
+    };
+    if (updates.provider_id !== undefined) dbUpdates.provider_id = updates.provider_id;
+
+    const { error } = await (supabase as any)
       .from('transactions')
-      .update({
-        type: updates.type,
-        amount: updates.amount,
-        description: updates.description,
-        service_type: updates.service_type,
-      })
+      .update(dbUpdates)
       .eq('id', transactionId);
 
     if (error) {
