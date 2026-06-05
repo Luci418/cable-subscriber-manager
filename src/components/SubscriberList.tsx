@@ -45,6 +45,7 @@ export const SubscriberList = ({
   onImport,
   onManagePacks,
   onManageRegions,
+  onManageProviders,
   onManageStbs,
   initialPackFilter,
   initialRegionFilter,
