@@ -365,6 +365,11 @@ const Index = () => {
         onOpenChange={setShowRegionManagement}
       />
 
+      <ProviderManagementDialog
+        open={showProviderManagement}
+        onOpenChange={setShowProviderManagement}
+      />
+
       <StbInventoryDialog
         open={showStbInventory}
         onOpenChange={setShowStbInventory}
