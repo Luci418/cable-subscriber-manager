@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv } from 'lucide-react';
+import { Search, Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv, Building } from 'lucide-react';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import {
   Select,
