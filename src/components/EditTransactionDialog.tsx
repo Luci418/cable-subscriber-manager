@@ -29,14 +29,15 @@ import {
 import { toast } from 'sonner';
 import { Transaction } from '@/lib/storage';
 import { Tv, Wifi } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useProviders } from '@/hooks/useProviders';
 
 interface EditTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
-  // The subscriber's enabled services govern whether the service picker is shown.
   availableServices?: string[];
-  onSubmit: (transactionId: string, updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' }) => void;
+  onSubmit: (transactionId: string, updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null }) => void;
 }
 
 export const EditTransactionDialog = ({
