@@ -60,6 +60,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   const { subscribers, loading: subsLoading } = useSubscribers(user?.id);
   const { transactions, loading: txnLoading } = useTransactions(user?.id);
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
+  const { providers } = useProviders(user?.id);
 
   const [service, setService] = useState<ServiceFilter>('all');
   const [preset, setPreset] = useState<PresetKey>('30d');
