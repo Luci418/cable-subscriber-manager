@@ -134,6 +134,24 @@ export const EditTransactionDialog = ({
               </div>
             )}
 
+            {showProviderPicker && (
+              <div className="space-y-2">
+                <Label>Provider</Label>
+                <Select
+                  value={formData.provider_id}
+                  onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                  <SelectContent>
+                    {providersForService.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+
             <div className="space-y-2">
               <Label htmlFor="type">Type</Label>
               <Select
