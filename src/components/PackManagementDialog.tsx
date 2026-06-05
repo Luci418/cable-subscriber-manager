@@ -43,15 +43,18 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
   const { user } = useAuth();
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const { packs, addPack, updatePack, deletePack, retirePack, reactivatePack } = usePacks(user?.id);
+  const { providers, getActiveProviders } = useProviders(user?.id);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeService, setActiveService] = useState<ServiceType>(
     cableEnabled ? 'cable' : 'internet'
   );
   const [formData, setFormData] = useState(emptyForm);
 
+  const providersForService = getActiveProviders(activeService);
+
   const resetForm = () => {
     setEditingId(null);
-    setFormData(emptyForm);
+    setFormData({ ...emptyForm, provider_id: providersForService[0]?.id || '' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,6 +67,10 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       toast.error('Prepaid plans need a validity (days)');
       return;
     }
+    if (!formData.provider_id) {
+      toast.error('Please select a provider (or add one via Manage → Providers)');
+      return;
+    }
 
     const payload: any = {
       name: formData.name,
@@ -72,6 +79,7 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       service_type: activeService,
       billing_type: formData.billing_type,
       validity_days: formData.billing_type === 'prepaid' ? formData.validity_days : null,
+      provider_id: formData.provider_id,
     };
 
     const success = editingId
@@ -93,6 +101,7 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       channels: pack.channels || '',
       billing_type: (pack.billing_type as BillingType) || 'postpaid',
       validity_days: pack.validity_days ?? 30,
+      provider_id: pack.provider_id || '',
     });
   };
 
