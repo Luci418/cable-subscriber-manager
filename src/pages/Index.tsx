@@ -10,6 +10,7 @@ import { Billing } from '@/pages/Billing';
 import { ImportDialog } from '@/components/ImportDialog';
 import { PackManagementDialog } from '@/components/PackManagementDialog';
 import { RegionManagementDialog } from '@/components/RegionManagementDialog';
+import { ProviderManagementDialog } from '@/components/ProviderManagementDialog';
 import { StbInventoryDialog } from '@/components/StbInventoryDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
