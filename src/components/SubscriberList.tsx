@@ -159,6 +159,10 @@ export const SubscriberList = ({
                 <MapPin className="h-4 w-4 mr-2" />
                 Regions
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onManageProviders}>
+                <Building className="h-4 w-4 mr-2" />
+                Providers
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Inventory</DropdownMenuLabel>
               {/* Inventory label adapts: cable-only → "STBs", internet-only → "ONU / Routers", both → unified label */}
