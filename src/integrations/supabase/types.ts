@@ -115,6 +115,7 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          provider_id: string | null
           service_type: string
           user_id: string
           validity_days: number | null
@@ -127,6 +128,7 @@ export type Database = {
           is_active?: boolean
           name: string
           price: number
+          provider_id?: string | null
           service_type?: string
           user_id: string
           validity_days?: number | null
@@ -139,6 +141,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          provider_id?: string | null
           service_type?: string
           user_id?: string
           validity_days?: number | null
@@ -174,6 +177,39 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      providers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          service_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          service_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          service_type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -263,12 +299,14 @@ export type Database = {
       subscribers: {
         Row: {
           cable_balance: number
+          cable_provider_id: string | null
           created_at: string
           current_internet_pack: string | null
           current_pack: string | null
           current_subscription: Json | null
           id: string
           internet_balance: number
+          internet_provider_id: string | null
           internet_subscription: Json | null
           internet_subscription_history: Json[] | null
           join_date: string
@@ -286,12 +324,14 @@ export type Database = {
         }
         Insert: {
           cable_balance?: number
+          cable_provider_id?: string | null
           created_at?: string
           current_internet_pack?: string | null
           current_pack?: string | null
           current_subscription?: Json | null
           id?: string
           internet_balance?: number
+          internet_provider_id?: string | null
           internet_subscription?: Json | null
           internet_subscription_history?: Json[] | null
           join_date?: string
@@ -309,12 +349,14 @@ export type Database = {
         }
         Update: {
           cable_balance?: number
+          cable_provider_id?: string | null
           created_at?: string
           current_internet_pack?: string | null
           current_pack?: string | null
           current_subscription?: Json | null
           id?: string
           internet_balance?: number
+          internet_provider_id?: string | null
           internet_subscription?: Json | null
           internet_subscription_history?: Json[] | null
           join_date?: string
@@ -347,6 +389,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          provider_id: string | null
           service_type: string
           subscriber_id: string
           type: string
@@ -358,6 +401,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          provider_id?: string | null
           service_type?: string
           subscriber_id: string
           type: string
@@ -369,6 +413,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          provider_id?: string | null
           service_type?: string
           subscriber_id?: string
           type?: string
@@ -398,6 +443,7 @@ export type Database = {
     Functions: {
       expire_lapsed_subscriptions: { Args: never; Returns: number }
       is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
+      is_provider_in_use: { Args: { provider_uuid: string }; Returns: boolean }
       is_region_in_use: { Args: { region_name: string }; Returns: boolean }
     }
     Enums: {

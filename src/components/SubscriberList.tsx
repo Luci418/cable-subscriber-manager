@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv } from 'lucide-react';
+import { Search, Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv, Building } from 'lucide-react';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import {
   Select,
@@ -30,6 +30,7 @@ interface SubscriberListProps {
   onImport: () => void;
   onManagePacks: () => void;
   onManageRegions: () => void;
+  onManageProviders: () => void;
   onManageStbs: () => void;
   initialPackFilter?: string;
   initialRegionFilter?: string;
@@ -44,6 +45,7 @@ export const SubscriberList = ({
   onImport,
   onManagePacks,
   onManageRegions,
+  onManageProviders,
   onManageStbs,
   initialPackFilter,
   initialRegionFilter,
@@ -156,6 +158,10 @@ export const SubscriberList = ({
               <DropdownMenuItem onClick={onManageRegions}>
                 <MapPin className="h-4 w-4 mr-2" />
                 Regions
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onManageProviders}>
+                <Building className="h-4 w-4 mr-2" />
+                Providers
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Inventory</DropdownMenuLabel>

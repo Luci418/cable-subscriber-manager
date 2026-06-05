@@ -106,6 +106,14 @@ export const AddPackageSubscriptionDialog = ({
       return;
     }
 
+    // Lookup provider name for receipts/analytics.
+    let providerName: string | null = null;
+    if (selectedPackData.provider_id) {
+      const { data: prov } = await (supabase as any)
+        .from('providers').select('name').eq('id', selectedPackData.provider_id).maybeSingle();
+      providerName = (prov?.name as string) || null;
+    }
+
     const newSubscription = {
       id: `sub-${Date.now()}`,
       packName: selectedPackData.name,
@@ -115,6 +123,8 @@ export const AddPackageSubscriptionDialog = ({
       duration,
       status: 'active',
       subscribedAt: new Date().toISOString(),
+      providerId: selectedPackData.provider_id || null,
+      providerName,
     };
 
     const subscriptionHistory = (currentSubscriber?.[historyCol] || []).map((sub: any) => ({
@@ -125,12 +135,16 @@ export const AddPackageSubscriptionDialog = ({
     const chargeAmount = Number(selectedPackData.price) * duration;
     const newBalance = Number(currentSubscriber?.[balanceCol] || 0) + chargeAmount;
 
+    const providerCol = serviceType === 'internet' ? 'internet_provider_id' : 'cable_provider_id';
     const updates: Record<string, any> = {
       [packCol]: selectedPackData.name,
       [subscriptionCol]: newSubscription,
       [historyCol]: [...subscriptionHistory, newSubscription],
       [balanceCol]: newBalance,
     };
+    if (selectedPackData.provider_id) {
+      updates[providerCol] = selectedPackData.provider_id;
+    }
     const { error } = await (supabase
       .from('subscribers') as any)
       .update(updates)
@@ -143,12 +157,13 @@ export const AddPackageSubscriptionDialog = ({
       return;
     }
 
-    await supabase.from('transactions').insert({
+    await (supabase.from('transactions') as any).insert({
       subscriber_id: subscriberId,
       user_id: currentSubscriber?.user_id,
       type: 'charge',
       amount: chargeAmount,
       service_type: serviceType,
+      provider_id: selectedPackData.provider_id || null,
       description: `${serviceLabel} ${isPrepaid ? 'recharge' : 'subscription charge'}: ${selectedPackData.name} (${duration} ${isPrepaid ? `× ${validityDays}d` : `month${duration > 1 ? 's' : ''}`})`,
       date: new Date().toISOString(),
     });
