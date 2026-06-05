@@ -845,7 +845,47 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
             </Table>
           </CardContent>
         </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Provider Performance</CardTitle>
+            <CardDescription>Revenue, active subscribers and outstanding by upstream provider</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead className="text-right">Subscribers</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Outstanding</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {providerPerf.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No provider data yet</TableCell></TableRow>
+                )}
+                {providerPerf.map(p => (
+                  <TableRow key={`${p.name}-${p.service}`}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="capitalize">
+                      <span className="inline-flex items-center gap-1">
+                        {p.service === 'internet' ? <Wifi className="h-3.5 w-3.5" /> : <Tv className="h-3.5 w-3.5" />}
+                        {p.service}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">{p.subs}</TableCell>
+                    <TableCell className="text-right">{inr(p.revenue)}</TableCell>
+                    <TableCell className={cn('text-right', p.outstanding > 0 && 'text-destructive')}>{inr(p.outstanding)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
+
     </div>
   );
 };
