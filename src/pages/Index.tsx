@@ -298,6 +298,7 @@ const Index = () => {
                 onImport={() => setShowImportDialog(true)}
                 onManagePacks={() => setShowPackManagement(true)}
                 onManageRegions={() => setShowRegionManagement(true)}
+                onManageProviders={() => setShowProviderManagement(true)}
                 onManageStbs={() => setShowStbInventory(true)}
                 initialPackFilter={packFilter}
                 initialRegionFilter={regionFilter}
