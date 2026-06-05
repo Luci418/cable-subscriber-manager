@@ -332,6 +332,47 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
       .sort((a, b) => b.revenue - a.revenue);
   }, [subsScoped, txnsInRange, subsById, service]);
 
+  // ---------- provider performance ----------
+  const providerPerf = useMemo(() => {
+    const providerById = new Map(providers.map(p => [p.id, p]));
+    const map = new Map<string, { name: string; service: string; subs: number; revenue: number; outstanding: number }>();
+
+    const ensure = (id: string | null | undefined, fallbackSvc: string) => {
+      const pid = id || `__none_${fallbackSvc}`;
+      const prov = id ? providerById.get(id) : undefined;
+      const name = prov?.name || 'Unassigned';
+      const svc = prov?.service_type || fallbackSvc;
+      const key = `${pid}::${svc}`;
+      if (!map.has(key)) map.set(key, { name, service: svc, subs: 0, revenue: 0, outstanding: 0 });
+      return map.get(key)!;
+    };
+
+    subsScoped.forEach(s => {
+      const svcs = (s as any).services?.length ? (s as any).services : ['cable'];
+      if ((service === 'all' || service === 'cable') && svcs.includes('cable')) {
+        const e = ensure((s as any).cable_provider_id, 'cable');
+        e.subs += 1;
+        const bal = Number((s as any).cable_balance || 0);
+        if (bal > 0) e.outstanding += bal;
+      }
+      if ((service === 'all' || service === 'internet') && svcs.includes('internet')) {
+        const e = ensure((s as any).internet_provider_id, 'internet');
+        e.subs += 1;
+        const bal = Number((s as any).internet_balance || 0);
+        if (bal > 0) e.outstanding += bal;
+      }
+    });
+
+    txnsInRange.filter(t => t.type === 'payment').forEach(t => {
+      const svc = (t as any).service_type || 'cable';
+      const e = ensure((t as any).provider_id, svc);
+      e.revenue += Number(t.amount || 0);
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }, [providers, subsScoped, txnsInRange, service]);
+
+
   // ---------- aging buckets ----------
   const aging = useMemo(() => {
     const lastPay = new Map<string, number>();
