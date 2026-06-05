@@ -37,6 +37,7 @@ const Index = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showPackManagement, setShowPackManagement] = useState(false);
   const [showRegionManagement, setShowRegionManagement] = useState(false);
+  const [showProviderManagement, setShowProviderManagement] = useState(false);
   const [showStbInventory, setShowStbInventory] = useState(false);
   const [packFilter, setPackFilter] = useState<string | undefined>();
   const [regionFilter, setRegionFilter] = useState<string | undefined>();
