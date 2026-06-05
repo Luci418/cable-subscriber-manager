@@ -50,15 +50,19 @@ export const EditTransactionDialog = ({
   const services = availableServices?.length ? availableServices : ['cable'];
   const showServicePicker = services.includes('cable') && services.includes('internet');
 
+  const { user } = useAuth();
+  const { getActiveProviders } = useProviders(user?.id);
+
   const [formData, setFormData] = useState({
     type: 'payment' as 'payment' | 'charge',
     amount: '',
     description: '',
     service_type: 'cable' as 'cable' | 'internet',
+    provider_id: '' as string,
   });
   const [showConfirm, setShowConfirm] = useState(false);
   const [password, setPassword] = useState('');
-  const EDIT_PASSWORD = '1234'; // Simple password for editing
+  const EDIT_PASSWORD = '1234';
 
   useEffect(() => {
     if (transaction && open) {
@@ -67,34 +71,25 @@ export const EditTransactionDialog = ({
         amount: transaction.amount.toString(),
         description: transaction.description,
         service_type: ((transaction as any).service_type as 'cable' | 'internet') || 'cable',
+        provider_id: ((transaction as any).provider_id as string) || '',
       });
       setPassword('');
     }
   }, [transaction, open]);
 
+  const providersForService = getActiveProviders(formData.service_type);
+  const showProviderPicker = providersForService.length > 1;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-
-    if (!formData.description.trim()) {
-      toast.error('Please enter a description');
-      return;
-    }
-
+    if (isNaN(amount) || amount <= 0) { toast.error('Please enter a valid amount'); return; }
+    if (!formData.description.trim()) { toast.error('Please enter a description'); return; }
     setShowConfirm(true);
   };
 
   const handleConfirm = () => {
-    if (password !== EDIT_PASSWORD) {
-      toast.error('Incorrect password');
-      return;
-    }
-
+    if (password !== EDIT_PASSWORD) { toast.error('Incorrect password'); return; }
     if (!transaction) return;
 
     onSubmit(transaction.id, {
@@ -102,6 +97,7 @@ export const EditTransactionDialog = ({
       amount: parseFloat(formData.amount),
       description: formData.description,
       service_type: formData.service_type,
+      provider_id: formData.provider_id || null,
     });
 
     setShowConfirm(false);
