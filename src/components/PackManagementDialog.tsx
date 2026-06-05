@@ -12,12 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { useProviders } from '@/hooks/useProviders';
 import type { Database } from '@/integrations/supabase/types';
 
 type Pack = Database["public"]["Tables"]["packs"]["Row"] & {
   service_type?: string;
   billing_type?: string;
   validity_days?: number | null;
+  provider_id?: string | null;
 };
 
 type ServiceType = 'cable' | 'internet';
@@ -34,6 +36,7 @@ const emptyForm = {
   channels: '',
   billing_type: 'postpaid' as BillingType,
   validity_days: 30,
+  provider_id: '' as string,
 };
 
 export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialogProps) => {
