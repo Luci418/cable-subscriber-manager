@@ -30,6 +30,7 @@ interface SubscriberListProps {
   onImport: () => void;
   onManagePacks: () => void;
   onManageRegions: () => void;
+  onManageProviders: () => void;
   onManageStbs: () => void;
   initialPackFilter?: string;
   initialRegionFilter?: string;
