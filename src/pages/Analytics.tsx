@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { useProviders } from '@/hooks/useProviders';
 import { cn } from '@/lib/utils';
 
 type ServiceFilter = 'all' | 'cable' | 'internet';
