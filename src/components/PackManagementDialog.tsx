@@ -138,6 +138,11 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
               <Badge variant="outline" className="capitalize">
                 {pack.billing_type || 'postpaid'}
               </Badge>
+              {pack.provider_id && (
+                <Badge variant="outline" className="text-xs">
+                  {providers.find(p => p.id === pack.provider_id)?.name || 'Unknown'}
+                </Badge>
+              )}
               {retiredView && <Badge variant="secondary">Retired</Badge>}
             </div>
             <p className="text-sm text-muted-foreground">
