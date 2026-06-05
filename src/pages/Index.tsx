@@ -123,7 +123,7 @@ const Index = () => {
     setView('detail');
   };
 
-  const handleAddTransaction = async (data: { type: 'payment' | 'charge' | 'refund'; amount: number; description: string; service_type?: 'cable' | 'internet' }) => {
+  const handleAddTransaction = async (data: { type: 'payment' | 'charge' | 'refund'; amount: number; description: string; service_type?: 'cable' | 'internet'; provider_id?: string | null }) => {
     if (!selectedSubscriberId) return;
 
     const subscriber = subscribers.find(s => s.id === selectedSubscriberId);
@@ -134,14 +134,20 @@ const Index = () => {
     const svc: 'cable' | 'internet' = data.service_type
       ?? ((subscriber as any).services?.includes('internet') && !(subscriber as any).services?.includes('cable') ? 'internet' : 'cable');
 
+    // Provider: explicit > subscriber's per-service default
+    const providerId = data.provider_id
+      ?? (svc === 'internet' ? (subscriber as any).internet_provider_id : (subscriber as any).cable_provider_id)
+      ?? null;
+
     const success = await createTransaction({
       subscriber_id: selectedSubscriberId,
       type: data.type,
       amount: data.amount,
       description: data.description,
       service_type: svc,
+      provider_id: providerId,
       date: new Date().toISOString(),
-    });
+    } as any);
 
     if (success) {
       // Positive balance = debt, negative = credit. Route to the matching
