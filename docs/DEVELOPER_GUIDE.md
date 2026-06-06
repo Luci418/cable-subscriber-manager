@@ -1,8 +1,25 @@
-# 📺 Cable TV Management System - Developer Guide
+# 📺 Subscriber Management System — Developer Guide
 
-> A comprehensive, production-ready web application for managing cable TV subscribers, subscriptions, billing, and complaints. Built with modern React patterns and best practices.
+> **This is the code-level reference.** For higher-level context, see the
+> [documentation index](./README.md):
+> [Vision](./PROJECT_VISION.md) ·
+> [Architecture Decisions](./ARCHITECTURE_DECISIONS.md) ·
+> [Business Rules](./BUSINESS_RULES.md) ·
+> [Analytics Strategy](./ANALYTICS_STRATEGY.md) ·
+> [Deployment](./DEPLOYMENT.md) ·
+> [Production Readiness](./PRODUCTION_READINESS.md) ·
+> [Future Evolution](./FUTURE_EVOLUTION.md).
+
+> ⚠️ **Schema sections are partly stale.** The ER diagram (§4) and table
+> definitions (§5) predate the cable/internet split, the per-service balance
+> columns (`cable_balance`, `internet_balance`), the per-service subscription
+> blobs, and the Provider entity (see ADR-007). The authoritative schema is
+> the live Supabase project; a focused refresh of these sections is tracked
+> in `docs/AUDIT_REPORT.md` §6. Other sections (components, hooks, patterns,
+> RLS, PDF generation) remain accurate.
 
 ---
+
 
 ## 📋 Table of Contents
 
