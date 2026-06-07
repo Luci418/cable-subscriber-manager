@@ -10,11 +10,38 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
-### Added
+### Added — Tier 0 hardening (per `docs/REVIEW_RESPONSE_2026-06.md`)
+- **A1 — Automatic balance recalculation**: `recalc_subscriber_balance()` plus
+  AFTER INSERT/UPDATE/DELETE trigger on `transactions` keeps
+  `cable_balance` / `internet_balance` in lockstep with the ledger. One-time
+  backfill recomputed all existing balances at migration time.
+- **A2-min — Transaction audit fields**: `created_by`, `edited_at`, `edited_by`
+  on `public.transactions`, auto-stamped by a BEFORE trigger using
+  `auth.uid()`.
+- **A4 — Concurrent-safe subscriber IDs**: new RPC
+  `generate_subscriber_id(region_name)` (SECURITY DEFINER, per-prefix
+  `pg_advisory_xact_lock`). Client `generateSubscriberId()` now calls the
+  RPC.
+- **I3 — Concurrent-safe expiry job**: `expire_lapsed_subscriptions()` takes
+  an advisory transaction lock so cron + UI-triggered runs cannot overlap.
+
+### Removed — Tier 0 cleanup
+- **C2 — `billing_history` table dropped**. Confirmed unused (no writers,
+  0 rows, only read once into unused state in `Billing.tsx`). Code
+  references and related validation messages removed.
+
+### Documentation
 - Documentation system: `docs/README.md` index, `PROJECT_VISION`,
   `ARCHITECTURE_DECISIONS` (ADR log), `BUSINESS_RULES`,
   `ANALYTICS_STRATEGY`, `FUTURE_EVOLUTION`, `PRODUCTION_READINESS`,
-  `DEPLOYMENT`, `AUDIT_REPORT`.
+  `DEPLOYMENT`, `AUDIT_REPORT`, `REVIEW_RESPONSE_2026-06`.
+
+### Notes
+- **E3 (storage bucket privacy)**: no storage buckets exist in the project
+  yet — this becomes relevant the day the first bucket is created.
+- **I2 (restore drill) and I1 (off-platform `pg_dump`)** are operational
+  tasks; runbook to be added to `docs/DEPLOYMENT.md` in the Tier-1 sprint.
+
 
 ### Notes
 - `docs/DEVELOPER_GUIDE.md` is retained as the code-level reference. Its
