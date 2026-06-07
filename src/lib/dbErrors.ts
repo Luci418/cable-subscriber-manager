@@ -33,8 +33,6 @@ export const friendlyDbError = (error: any, fallback: string): string => {
     if (text.includes("complaints_resolved_has_date")) return "A resolved complaint must have a resolution date.";
     if (text.includes("complaints_category_check")) return "Invalid complaint category.";
     if (text.includes("complaints_priority_check")) return "Invalid priority level.";
-    if (text.includes("billing_history_month_format")) return "Month must be in YYYY-MM format.";
-    if (text.includes("billing_history_totals_nonneg")) return "Total values cannot be negative.";
     return "Value failed a validation check.";
   }
 

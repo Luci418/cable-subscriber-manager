@@ -15,7 +15,6 @@ import { friendlyDbError } from '@/lib/dbErrors';
 import type { Database } from '@/integrations/supabase/types';
 
 type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
-type BillingHistoryRow = Database["public"]["Tables"]["billing_history"]["Row"];
 
 interface BillingProps {
   onBack: () => void;
@@ -28,8 +27,7 @@ export const Billing = ({ onBack }: BillingProps) => {
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const { subscribers, loading: subscribersLoading } = useSubscribers(user?.id);
   const { packs } = usePacks(user?.id);
-  const [billingHistory, setBillingHistory] = useState<BillingHistoryRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const loading = false;
 
   // Service filter. Default to whatever is enabled. When both services are
   // enabled we start with "All" so the operator sees the full picture first.
@@ -37,27 +35,6 @@ export const Billing = ({ onBack }: BillingProps) => {
     bothEnabled ? 'all' : internetEnabled && !cableEnabled ? 'internet' : 'cable'
   );
 
-  useEffect(() => {
-    if (user?.id) {
-      loadBillingHistory();
-    }
-  }, [user?.id]);
-
-  const loadBillingHistory = async () => {
-    const { data, error } = await supabase
-      .from('billing_history')
-      .select('*')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error(friendlyDbError(error, 'Failed to load billing history'));
-      console.error(error);
-    } else {
-      setBillingHistory(data || []);
-    }
-    setLoading(false);
-  };
 
   // Per-subscriber view of one service line (cable or internet). We compute
   // this so all downstream metrics/tables share a single shape and the
