@@ -14,41 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      billing_history: {
-        Row: {
-          created_at: string
-          id: string
-          month: string
-          total_revenue: number
-          total_subscribers: number
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          month: string
-          total_revenue: number
-          total_subscribers: number
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          month?: string
-          total_revenue?: number
-          total_subscribers?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_history_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       complaints: {
         Row: {
           category: string
@@ -386,8 +351,11 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          created_by: string | null
           date: string
           description: string | null
+          edited_at: string | null
+          edited_by: string | null
           id: string
           provider_id: string | null
           service_type: string
@@ -398,8 +366,11 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          created_by?: string | null
           date?: string
           description?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
           id?: string
           provider_id?: string | null
           service_type?: string
@@ -410,8 +381,11 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          created_by?: string | null
           date?: string
           description?: string | null
+          edited_at?: string | null
+          edited_by?: string | null
           id?: string
           provider_id?: string | null
           service_type?: string
@@ -442,9 +416,17 @@ export type Database = {
     }
     Functions: {
       expire_lapsed_subscriptions: { Args: never; Returns: number }
+      generate_subscriber_id: {
+        Args: { p_region_name: string }
+        Returns: string
+      }
       is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
       is_provider_in_use: { Args: { provider_uuid: string }; Returns: boolean }
       is_region_in_use: { Args: { region_name: string }; Returns: boolean }
+      recalc_subscriber_balance: {
+        Args: { p_service_type: string; p_subscriber_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       stb_status: "available" | "assigned" | "faulty" | "decommissioned"
