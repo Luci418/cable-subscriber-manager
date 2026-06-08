@@ -629,7 +629,23 @@ export const SubscriberDetail = ({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5" />Internet Device</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Provider</p>
+                    <p className="font-medium">{providerNames.internet || 'Not assigned'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Balance</p>
+                    <p className={`font-medium ${getBalanceColor(subscriber.internet_balance || 0)}`}>
+                      ₹{Math.abs(subscriber.internet_balance || 0).toFixed(2)}{' '}
+                      <span className="text-xs text-muted-foreground">
+                        {(subscriber.internet_balance || 0) >= 0 ? 'dues' : 'advance'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <Separator />
                 {internetDevice ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -652,7 +668,7 @@ export const SubscriberDetail = ({
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-muted-foreground">
+                  <div className="text-center py-4 text-muted-foreground">
                     <Wifi className="h-8 w-8 mx-auto opacity-40 mb-2" />
                     <p>No ONU/Router assigned to this subscriber.</p>
                     <p className="text-sm mt-1">Assign one from the Inventory screen.</p>
