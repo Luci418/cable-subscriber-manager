@@ -71,6 +71,9 @@ export const SubscriberDetail = ({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
   const [internetDevice, setInternetDevice] = useState<any>(null);
+  const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
+  const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
+  const [deleteChecking, setDeleteChecking] = useState(false);
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const subscriberServices = subscriber.services && subscriber.services.length > 0
