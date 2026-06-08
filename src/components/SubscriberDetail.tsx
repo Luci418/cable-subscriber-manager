@@ -804,8 +804,12 @@ export const SubscriberDetail = ({
                   <TableBody>
                     {visibleTransactions.map(transaction => {
                       const svc = ((transaction as any).service_type || 'cable') as 'cable' | 'internet';
+                      const status = ((transaction as any).status as string) || 'posted';
+                      const isVoided = status === 'voided';
+                      const isReversal = status === 'reversal';
+                      const rowMuted = isVoided ? 'opacity-60 line-through' : '';
                       return (
-                        <TableRow key={transaction.id}>
+                        <TableRow key={transaction.id} className={rowMuted}>
                           <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="gap-1">
@@ -814,9 +818,13 @@ export const SubscriberDetail = ({
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
-                              {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
-                            </Badge>
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
+                                {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
+                              </Badge>
+                              {isVoided && <Badge variant="outline" className="text-xs">Voided</Badge>}
+                              {isReversal && <Badge variant="outline" className="text-xs">Reversal</Badge>}
+                            </div>
                           </TableCell>
                           <TableCell>{transaction.description}</TableCell>
                           <TableCell className={`text-right font-semibold ${
@@ -826,30 +834,29 @@ export const SubscriberDetail = ({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)} title="Edit">
+                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)} title="Edit description">
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)} title="Download invoice">
                                 <Download className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                title="Delete"
-                                onClick={() => {
-                                  if (confirm(`Delete this ${transaction.type} of ₹${transaction.amount.toFixed(2)}? The subscriber's balance will be reversed.`)) {
-                                    handleDeleteTransaction(transaction);
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {!isVoided && !isReversal && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  title="Void transaction"
+                                  onClick={() => handleVoidTransaction(transaction)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
                       );
                     })}
+
                   </TableBody>
                 </Table>
               )}
