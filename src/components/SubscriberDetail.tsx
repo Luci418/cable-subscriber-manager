@@ -101,6 +101,54 @@ export const SubscriberDetail = ({
     return () => { cancelled = true; };
   }, [subscriber.id, showInternetTab]);
 
+  // Resolve provider names linked to this subscriber's services so the
+  // operator can see WHO is delivering each service without leaving the page.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [
+      (subscriber as any).cable_provider_id,
+      (subscriber as any).internet_provider_id,
+    ].filter(Boolean) as string[];
+    if (ids.length === 0) {
+      setProviderNames({});
+      return;
+    }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('providers')
+        .select('id,name')
+        .in('id', ids);
+      if (cancelled || !data) return;
+      const lookup: Record<string, string> = {};
+      (data as any[]).forEach((p) => { lookup[p.id] = p.name; });
+      setProviderNames({
+        cable: lookup[(subscriber as any).cable_provider_id] || undefined,
+        internet: lookup[(subscriber as any).internet_provider_id] || undefined,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [subscriber.id, (subscriber as any).cable_provider_id, (subscriber as any).internet_provider_id]);
+
+  // Pre-flight check before opening the destructive delete dialog. The RPC
+  // returns a list of human-readable blockers (active subs, balance owed,
+  // assigned devices, immutable transactions) so operators don't see the
+  // generic "Validation check failed" that bubbles out of the ledger trigger.
+  const openDeleteDialog = async () => {
+    setDeleteChecking(true);
+    setShowDeleteDialog(true);
+    setDeleteBlockers(null);
+    const { data, error } = await (supabase as any).rpc('check_subscriber_deletable', {
+      p_subscriber_id: subscriber.id,
+    });
+    setDeleteChecking(false);
+    if (error) {
+      setDeleteBlockers(['Unable to check deletion eligibility. Please try again.']);
+      return;
+    }
+    const blockers = (data?.blockers as string[]) || [];
+    setDeleteBlockers(blockers);
+  };
+
   // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
   // RPC before every fetch, and an hourly pg_cron job runs the same function.
   // No client-side lazy cleanup is needed here — the data we receive is already
