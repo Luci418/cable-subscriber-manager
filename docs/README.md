@@ -17,6 +17,8 @@ of creating parallel versions.
 | [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md) | Checklist: can this be safely run today? | Owner, engineers |
 | [FUTURE_EVOLUTION.md](./FUTURE_EVOLUTION.md) | Possibilities (SaaS, multi-operator, service lines). Not commitments. | Strategy |
 | [AUDIT_REPORT.md](./AUDIT_REPORT.md) | One-time documentation audit + recommended structure | Reviewers |
+| [LIFECYCLE_AUDIT_2026-06.md](./LIFECYCLE_AUDIT_2026-06.md) | Operational lifecycle integrity audit — states, transitions, deletion/archive rules, invalid states, A0 fixes | Reviewers, engineers |
+| [REVIEW_RESPONSE_2026-06.md](./REVIEW_RESPONSE_2026-06.md) | Response to external architecture review + revised roadmap | Reviewers |
 | [releases/](./releases/) | Per-version release notes | Operator |
 | [../CHANGELOG.md](../CHANGELOG.md) | Human-readable changelog | Everyone |
 
