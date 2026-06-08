@@ -99,7 +99,7 @@ export const VoidTransactionDialog = ({ open, onOpenChange, transaction, onVoide
             <div className="flex justify-between">
               <span className="text-muted-foreground">Type</span>
               <span className="font-medium">
-                {transaction.type === 'payment' ? 'Cash Received' : transaction.type === 'refund' ? 'Refund' : 'Bill'}
+                {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
               </span>
             </div>
             <div className="flex justify-between">
