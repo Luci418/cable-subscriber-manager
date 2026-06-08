@@ -351,13 +351,18 @@ export const SubscriberDetail = ({
                   </p>
                   <p className="text-muted-foreground mt-2">{subscriber.mobile}</p>
                 </div>
-                <div className="flex flex-wrap gap-1.5 justify-end">
-                  {subscriberServices.includes('cable') && (
-                    <Badge variant="secondary" className="gap-1"><Tv className="h-3 w-3" />Cable</Badge>
-                  )}
-                  {subscriberServices.includes('internet') && (
-                    <Badge variant="secondary" className="gap-1"><Wifi className="h-3 w-3" />Internet</Badge>
-                  )}
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`text-xs px-2 py-1 rounded-full ${accountStatus.tone}`}>
+                    {accountStatus.label}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 justify-end">
+                    {subscriberServices.includes('cable') && (
+                      <Badge variant="secondary" className="gap-1"><Tv className="h-3 w-3" />Cable</Badge>
+                    )}
+                    {subscriberServices.includes('internet') && (
+                      <Badge variant="secondary" className="gap-1"><Wifi className="h-3 w-3" />Internet</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardHeader>
