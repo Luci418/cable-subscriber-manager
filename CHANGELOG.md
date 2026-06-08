@@ -35,6 +35,15 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
   `ARCHITECTURE_DECISIONS` (ADR log), `BUSINESS_RULES`,
   `ANALYTICS_STRATEGY`, `FUTURE_EVOLUTION`, `PRODUCTION_READINESS`,
   `DEPLOYMENT`, `AUDIT_REPORT`, `REVIEW_RESPONSE_2026-06`.
+- **`docs/LIFECYCLE_AUDIT_2026-06.md`** — operational lifecycle integrity
+  audit covering every business object (states, transitions, creation /
+  edit / delete / archive rules, invalid states, analytics impact). Surfaces
+  several Critical findings (A0): client-side balance mutation now
+  double-counts against the Tier-0 balance trigger; subscribers can be
+  hard-deleted with active subscriptions / non-zero balance / assigned
+  devices, silently rewriting analytics; STB orphan state after subscriber
+  delete; stray `packs_name_key` unique constraint. No code changes yet —
+  fixes are queued as a follow-up.
 
 ### Notes
 - **E3 (storage bucket privacy)**: no storage buckets exist in the project
