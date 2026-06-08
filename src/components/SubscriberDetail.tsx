@@ -985,13 +985,40 @@ export const SubscriberDetail = ({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Subscriber</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {subscriber.name}? This will also delete all associated transactions. This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {deleteChecking ? (
+                  <p>Checking whether {subscriber.name} can be deleted…</p>
+                ) : deleteBlockers && deleteBlockers.length > 0 ? (
+                  <>
+                    <p>
+                      {subscriber.name} cannot be deleted yet. Resolve the following first:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1 text-sm text-foreground">
+                      {deleteBlockers.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      Historical financial records are intentionally preserved on the immutable ledger.
+                      If this subscriber has ever transacted, deletion will be blocked permanently.
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    Are you sure you want to delete {subscriber.name}? This action cannot be undone.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={onDelete}
+              disabled={deleteChecking || (deleteBlockers?.length ?? 1) > 0}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
