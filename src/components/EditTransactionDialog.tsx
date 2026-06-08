@@ -1,233 +1,115 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Transaction } from '@/lib/storage';
-import { Tv, Wifi } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useProviders } from '@/hooks/useProviders';
 
 interface EditTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
+  /** Kept for backwards-compatibility with existing callers; unused now. */
   availableServices?: string[];
-  onSubmit: (transactionId: string, updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null }) => void;
+  onSubmit: (transactionId: string, updates: { description: string }) => void;
 }
 
+/**
+ * Per ADR-011 (revised, 2026-06): transactions are an immutable ledger.
+ * Financial fields (amount, type, service_type, subscriber, provider, date)
+ * cannot be edited after the row is written. Only the human-readable
+ * description (a note / memo field) remains editable. To correct an amount,
+ * type, or any other financial detail, void the original and post a
+ * replacement.
+ */
 export const EditTransactionDialog = ({
   open,
   onOpenChange,
   transaction,
-  availableServices,
   onSubmit,
 }: EditTransactionDialogProps) => {
-  const services = availableServices?.length ? availableServices : ['cable'];
-  const showServicePicker = services.includes('cable') && services.includes('internet');
-
-  const { user } = useAuth();
-  const { getActiveProviders } = useProviders(user?.id);
-
-  const [formData, setFormData] = useState({
-    type: 'payment' as 'payment' | 'charge',
-    amount: '',
-    description: '',
-    service_type: 'cable' as 'cable' | 'internet',
-    provider_id: '' as string,
-  });
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [password, setPassword] = useState('');
-  const EDIT_PASSWORD = '1234';
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     if (transaction && open) {
-      setFormData({
-        type: transaction.type,
-        amount: transaction.amount.toString(),
-        description: transaction.description,
-        service_type: ((transaction as any).service_type as 'cable' | 'internet') || 'cable',
-        provider_id: ((transaction as any).provider_id as string) || '',
-      });
-      setPassword('');
+      setDescription(transaction.description ?? '');
     }
   }, [transaction, open]);
 
-  const providersForService = getActiveProviders(formData.service_type);
-  const showProviderPicker = providersForService.length > 1;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) { toast.error('Please enter a valid amount'); return; }
-    if (!formData.description.trim()) { toast.error('Please enter a description'); return; }
-    setShowConfirm(true);
-  };
-
-  const handleConfirm = () => {
-    if (password !== EDIT_PASSWORD) { toast.error('Incorrect password'); return; }
+    if (!description.trim()) {
+      toast.error('Description cannot be empty');
+      return;
+    }
     if (!transaction) return;
-
-    onSubmit(transaction.id, {
-      type: formData.type,
-      amount: parseFloat(formData.amount),
-      description: formData.description,
-      service_type: formData.service_type,
-      provider_id: formData.provider_id || null,
-    });
-
-    setShowConfirm(false);
+    onSubmit(transaction.id, { description: description.trim() });
     onOpenChange(false);
   };
 
+  if (!transaction) return null;
+
+  const svc = ((transaction as any).service_type as string) || 'cable';
+  const typeLabel =
+    transaction.type === 'payment' ? 'Cash Received'
+    : transaction.type === 'refund' ? 'Refund'
+    : 'Bill';
+
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {showServicePicker && (
-              <div className="space-y-2">
-                <Label htmlFor="service">Service</Label>
-                <Select
-                  value={formData.service_type}
-                  onValueChange={(value: 'cable' | 'internet') => setFormData({ ...formData, service_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cable">
-                      <span className="flex items-center gap-2"><Tv className="h-3.5 w-3.5" /> Cable</span>
-                    </SelectItem>
-                    <SelectItem value="internet">
-                      <span className="flex items-center gap-2"><Wifi className="h-3.5 w-3.5" /> Internet</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Transaction Note</DialogTitle>
+          <DialogDescription>
+            Only the description can be edited. To change the amount, type, or
+            service, void this transaction and post a replacement.
+          </DialogDescription>
+        </DialogHeader>
 
-            {showProviderPicker && (
-              <div className="space-y-2">
-                <Label>Provider</Label>
-                <Select
-                  value={formData.provider_id}
-                  onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
-                  <SelectContent>
-                    {providersForService.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: 'payment' | 'charge') => setFormData({ ...formData, type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="payment">Cash Received</SelectItem>
-                  <SelectItem value="charge">Bill</SelectItem>
-                </SelectContent>
-              </Select>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Type</span>
+              <span className="font-medium">{typeLabel}</span>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (₹)</Label>
-              <Input
-                id="amount"
-                type="number"
-                inputMode="decimal"
-                min="0.01"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                placeholder="0.00"
-                required
-              />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Service</span>
+              <span className="font-medium capitalize">{svc}</span>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter transaction details..."
-                required
-              />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Amount</span>
+              <span className="font-semibold">₹{Number(transaction.amount).toFixed(2)}</span>
             </div>
+          </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1">
-                Update Transaction
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Transaction Edit</AlertDialogTitle>
-            <AlertDialogDescription>
-              Please enter the password to confirm editing this transaction.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4">
-            <Input
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter transaction details..."
+              required
             />
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPassword('')}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+
+          <div className="flex gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1">
+              Save Description
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
