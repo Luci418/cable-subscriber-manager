@@ -177,27 +177,16 @@ export const SubscriberDetail = ({
     return true;
   };
 
+  // Per ADR-011 (revised): only the description is editable. Financial fields
+  // (amount, type, service_type, subscriber, provider, date) are immutable.
+  // Corrections happen via Void + replacement.
   const handleUpdateTransaction = async (
     transactionId: string,
-    updates: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null },
+    updates: { description: string },
   ) => {
-    const old = transactions.find(t => t.id === transactionId) as any;
-    if (!old) return;
-
-    const oldSvc = (old.service_type || 'cable') as 'cable' | 'internet';
-    const oldType = old.type as 'payment' | 'charge' | 'refund';
-
-    const dbUpdates: any = {
-      type: updates.type,
-      amount: updates.amount,
-      description: updates.description,
-      service_type: updates.service_type,
-    };
-    if (updates.provider_id !== undefined) dbUpdates.provider_id = updates.provider_id;
-
     const { error } = await (supabase as any)
       .from('transactions')
-      .update(dbUpdates)
+      .update({ description: updates.description })
       .eq('id', transactionId);
 
     if (error) {
@@ -205,36 +194,40 @@ export const SubscriberDetail = ({
       return;
     }
 
-    // Reverse old impact on the old service, then apply new impact on the new service.
-    if (oldSvc === updates.service_type) {
-      const delta = balanceDelta(oldType, Number(old.amount), -1) + balanceDelta(updates.type, updates.amount, 1);
-      await applyBalanceChange(oldSvc, delta);
-    } else {
-      await applyBalanceChange(oldSvc, balanceDelta(oldType, Number(old.amount), -1));
-      await applyBalanceChange(updates.service_type, balanceDelta(updates.type, updates.amount, 1));
-    }
-
     setShowEditTransaction(false);
     setEditingTransaction(null);
-    toast.success('Transaction updated successfully!');
+    toast.success('Description updated');
     onReload?.();
   };
 
-  const handleDeleteTransaction = async (transaction: Transaction) => {
-    const svc = (((transaction as any).service_type as 'cable' | 'internet') || 'cable');
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', transaction.id);
-    if (error) {
-      toast.error(friendlyDbError(error, 'Failed to delete transaction'));
+  // Void via RPC. Inserts an offsetting reversal row and flips the original
+  // to status='voided'. Balance is recomputed automatically by the DB trigger.
+  const handleVoidTransaction = async (transaction: Transaction) => {
+    const reason = window.prompt(
+      `Void this ${transaction.type} of ₹${Number(transaction.amount).toFixed(2)}?\n\nEnter a reason (required) — this will be permanently recorded:`,
+      '',
+    );
+    if (reason === null) return; // cancelled
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      toast.error('A reason is required to void a transaction');
       return;
     }
-    // Reverse the deleted transaction's balance impact.
-    await applyBalanceChange(svc, balanceDelta(transaction.type as any, Number(transaction.amount), -1));
-    toast.success('Transaction deleted');
+
+    const { error } = await (supabase as any).rpc('void_transaction', {
+      p_transaction_id: transaction.id,
+      p_reason: trimmed,
+    });
+
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to void transaction'));
+      return;
+    }
+
+    toast.success('Transaction voided. An offsetting reversal has been posted.');
     onReload?.();
   };
+
 
   const handleCancelSubscription = async (refundAmount: number) => {
     // Service-aware cancellation. Reads the matching subscription/history/balance
