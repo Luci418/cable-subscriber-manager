@@ -1,6 +1,6 @@
 # Financial Record Lifecycle Review — June 2026
 
-> Status: **Philosophy adopted. Schema migrated. UI shipped. Grace window dropped (2026-06-08).**
+> Status: **Philosophy adopted. Schema migrated. UI shipped. Hardened 2026-06-08 (source enum, frozen description, blocked subscription voids, accountable voids, append-only notes).**
 > Companion to `LIFECYCLE_AUDIT_2026-06.md` and `REVIEW_RESPONSE_2026-06.md`.
 > Supersedes the ad-hoc "edit with password / hard delete" model documented
 > in earlier versions of `BUSINESS_RULES.md`.
@@ -26,6 +26,36 @@
 > the grace-window proposal; treat any references to "5-minute window" or
 > "grace-window delete" as historical. The current rule is **immutable on
 > save**.
+>
+> **Hardening (2026-06-08, second pass).** Operator review surfaced three
+> remaining gaps:
+>
+> 1. Editable `description` was still a quiet rewrite path, particularly on
+>    rows the system itself generated. **Description is now frozen** along
+>    with all financial fields; new context goes into an append-only
+>    `transaction_notes` table (per-row notes with author and timestamp;
+>    edits and deletes blocked at the DB level).
+> 2. Transaction behaviour was being inferred from description text
+>    ("Refund for cancelled...", "subscription charge: ..."). This is
+>    fragile and locale-sensitive. Every row now carries an explicit
+>    `source` (`manual_charge`, `manual_payment`, `subscription_charge`,
+>    `subscription_refund`, `reversal`, `adjustment`) set at insert time.
+> 3. Voiding a subscription's charge in isolation left the subscription
+>    active on the subscriber row — an inconsistent state, and a fraud
+>    vector. **The void RPC now rejects rows where source is
+>    subscription_charge / subscription_refund / reversal.** Corrections
+>    for subscription-generated ledger entries must go through the
+>    subscription lifecycle (cancel, refund), which already updates both
+>    the subscription and the ledger together.
+>
+> Voids also became more accountable: a structured
+> `void_reason_code` enum (data_entry_error, duplicate, wrong_subscriber,
+> wrong_amount, customer_dispute, other) is required, `voided_by` and
+> `voided_at` are stamped automatically, and a "Recent Voids" widget on
+> the Billing page lists every void from the last 7 days. Reversal rows
+> no longer include the original transaction's UUID in their description
+> — the audit link is the `reverses_transaction_id` FK, and the UI surfaces
+> human-readable badges instead.
 
 
 This review answers a single question the operator asked:
