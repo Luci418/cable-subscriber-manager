@@ -146,6 +146,7 @@ const Index = () => {
       description: data.description,
       service_type: svc,
       provider_id: providerId,
+      source: data.type === 'payment' ? 'manual_payment' : 'manual_charge',
       date: new Date().toISOString(),
     } as any);
 

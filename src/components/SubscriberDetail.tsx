@@ -236,9 +236,10 @@ export const SubscriberDetail = ({
         type: 'payment',
         amount: refundAmount,
         service_type: cancelService,
+        source: 'subscription_refund',
         description: `Refund for cancelled ${label.toLowerCase()} subscription: ${activeSub.packName}`,
         date: new Date().toISOString(),
-      });
+      } as any);
     }
 
     toast.success(refundAmount > 0
