@@ -431,12 +431,25 @@ export const SubscriberDetail = ({
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
+                    <p className="text-sm text-muted-foreground">Provider</p>
+                    <p className="font-medium">{providerNames.cable || 'Not assigned'}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">STB Number</p>
                     <p className="font-medium">{(subscriber as any).stb_number || subscriber.stbNumber || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Pack</p>
                     <p className="font-medium">{subscriber.pack || 'None'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Balance</p>
+                    <p className={`font-medium ${getBalanceColor(subscriber.cable_balance || 0)}`}>
+                      ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}{' '}
+                      <span className="text-xs text-muted-foreground">
+                        {(subscriber.cable_balance || 0) >= 0 ? 'dues' : 'advance'}
+                      </span>
+                    </p>
                   </div>
                 </div>
               </CardContent>
