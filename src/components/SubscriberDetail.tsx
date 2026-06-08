@@ -477,7 +477,6 @@ export const SubscriberDetail = ({
                         variant="destructive"
                         size="sm"
                         onClick={() => {
-                          setEditingTransaction(null);
                           setCancelService('cable');
                           setShowCancelDialog(true);
                         }}
@@ -634,7 +633,6 @@ export const SubscriberDetail = ({
                         variant="destructive"
                         size="sm"
                         onClick={() => {
-                          setEditingTransaction(null);
                           setCancelService('internet');
                           setShowCancelDialog(true);
                         }}
@@ -797,19 +795,19 @@ export const SubscriberDetail = ({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)} title="Edit description">
-                                <Pencil className="h-4 w-4" />
+                              <Button variant="ghost" size="sm" onClick={() => openNotes(transaction)} title="Notes">
+                                <FileText className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)} title="Download invoice">
                                 <Download className="h-4 w-4" />
                               </Button>
-                              {!isVoided && !isReversal && (
+                              {!isVoided && !isReversal && !isSubscriptionSourced && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="text-destructive hover:text-destructive"
                                   title="Void transaction"
-                                  onClick={() => handleVoidTransaction(transaction)}
+                                  onClick={() => openVoid(transaction)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
