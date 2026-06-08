@@ -33,6 +33,17 @@ export const friendlyDbError = (error: any, fallback: string): string => {
     if (text.includes("complaints_resolved_has_date")) return "A resolved complaint must have a resolution date.";
     if (text.includes("complaints_category_check")) return "Invalid complaint category.";
     if (text.includes("complaints_priority_check")) return "Invalid priority level.";
+    // Immutable ledger guards raised by triggers
+    if (text.includes("Transactions cannot be deleted"))
+      return "This subscriber has financial transactions on the immutable ledger, which cannot be deleted. Historical financial records must be preserved.";
+    if (text.includes("Transaction rows are immutable"))
+      return "Transactions are final once posted. Use Void + a replacement entry, or add a note for additional context.";
+    if (text.includes("Transaction notes are append-only"))
+      return "Notes cannot be edited or deleted. Add a new note instead.";
+    if (text.includes("Invalid transaction status transition"))
+      return "Transactions can only be voided through the Void action.";
+    if (text.includes("subscription_charge") || text.includes("subscription_refund"))
+      return "This charge was created by a subscription action. Undo it by cancelling or refunding the subscription instead of voiding the ledger row.";
     return "Value failed a validation check.";
   }
 

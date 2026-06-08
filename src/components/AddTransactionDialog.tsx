@@ -29,6 +29,16 @@ interface AddTransactionDialogProps {
   subscriber: Subscriber;
 }
 
+/**
+ * Manual transaction entry.
+ *
+ * Provider is intentionally NOT operator-selectable here: every transaction
+ * inherits the provider that's already linked to the subscriber's service
+ * (cable_provider_id / internet_provider_id). This keeps the provider as a
+ * property of the *service relationship*, not a per-transaction free choice,
+ * and prevents mismatched provider attribution. We surface the chosen
+ * provider read-only so the operator can confirm what will be recorded.
+ */
 export const AddTransactionDialog = ({
   open,
   onOpenChange,
@@ -44,40 +54,33 @@ export const AddTransactionDialog = ({
   const defaultService: 'cable' | 'internet' = hasCable ? 'cable' : 'internet';
 
   const { user } = useAuth();
-  const { getActiveProviders } = useProviders(user?.id);
+  const { providers } = useProviders(user?.id);
 
-  const subscriberProviderFor = (svc: 'cable' | 'internet') =>
+  const providerIdFor = (svc: 'cable' | 'internet') =>
     (svc === 'internet'
       ? (subscriber as any).internet_provider_id
-      : (subscriber as any).cable_provider_id) || '';
+      : (subscriber as any).cable_provider_id) || null;
+
+  const providerNameFor = (svc: 'cable' | 'internet') => {
+    const id = providerIdFor(svc);
+    return id ? providers.find(p => p.id === id)?.name || null : null;
+  };
 
   const [formData, setFormData] = useState({
     type: 'payment' as 'payment' | 'charge',
     amount: '',
     description: '',
     service_type: defaultService,
-    provider_id: subscriberProviderFor(defaultService),
   });
 
   useEffect(() => {
     if (open) {
-      setFormData(f => ({
-        ...f,
-        service_type: defaultService,
-        provider_id: subscriberProviderFor(defaultService),
-      }));
+      setFormData(f => ({ ...f, service_type: defaultService }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultService]);
 
-  // Keep provider in sync when user flips service
-  useEffect(() => {
-    setFormData(f => ({ ...f, provider_id: subscriberProviderFor(f.service_type) }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.service_type]);
-
-  const providersForService = getActiveProviders(formData.service_type);
-  const showProviderPicker = providersForService.length > 1;
+  const providerName = providerNameFor(formData.service_type);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +93,7 @@ export const AddTransactionDialog = ({
       amount,
       description: formData.description,
       service_type: formData.service_type,
-      provider_id: formData.provider_id || null,
+      provider_id: providerIdFor(formData.service_type),
     });
 
     setFormData({
@@ -98,7 +101,6 @@ export const AddTransactionDialog = ({
       amount: '',
       description: '',
       service_type: defaultService,
-      provider_id: subscriberProviderFor(defaultService),
     });
     onOpenChange(false);
   };
@@ -130,22 +132,12 @@ export const AddTransactionDialog = ({
             </div>
           )}
 
-          {showProviderPicker && (
-            <div className="space-y-2">
-              <Label>Provider</Label>
-              <Select
-                value={formData.provider_id}
-                onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
-              >
-                <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
-                <SelectContent>
-                  {providersForService.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Provider:{' '}
+            <span className="font-medium text-foreground">
+              {providerName || 'Not assigned for this service'}
+            </span>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>

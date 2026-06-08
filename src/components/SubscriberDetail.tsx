@@ -71,6 +71,9 @@ export const SubscriberDetail = ({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
   const [internetDevice, setInternetDevice] = useState<any>(null);
+  const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
+  const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
+  const [deleteChecking, setDeleteChecking] = useState(false);
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const subscriberServices = subscriber.services && subscriber.services.length > 0
@@ -97,6 +100,54 @@ export const SubscriberDetail = ({
     })();
     return () => { cancelled = true; };
   }, [subscriber.id, showInternetTab]);
+
+  // Resolve provider names linked to this subscriber's services so the
+  // operator can see WHO is delivering each service without leaving the page.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [
+      (subscriber as any).cable_provider_id,
+      (subscriber as any).internet_provider_id,
+    ].filter(Boolean) as string[];
+    if (ids.length === 0) {
+      setProviderNames({});
+      return;
+    }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('providers')
+        .select('id,name')
+        .in('id', ids);
+      if (cancelled || !data) return;
+      const lookup: Record<string, string> = {};
+      (data as any[]).forEach((p) => { lookup[p.id] = p.name; });
+      setProviderNames({
+        cable: lookup[(subscriber as any).cable_provider_id] || undefined,
+        internet: lookup[(subscriber as any).internet_provider_id] || undefined,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [subscriber.id, (subscriber as any).cable_provider_id, (subscriber as any).internet_provider_id]);
+
+  // Pre-flight check before opening the destructive delete dialog. The RPC
+  // returns a list of human-readable blockers (active subs, balance owed,
+  // assigned devices, immutable transactions) so operators don't see the
+  // generic "Validation check failed" that bubbles out of the ledger trigger.
+  const openDeleteDialog = async () => {
+    setDeleteChecking(true);
+    setShowDeleteDialog(true);
+    setDeleteBlockers(null);
+    const { data, error } = await (supabase as any).rpc('check_subscriber_deletable', {
+      p_subscriber_id: subscriber.id,
+    });
+    setDeleteChecking(false);
+    if (error) {
+      setDeleteBlockers(['Unable to check deletion eligibility. Please try again.']);
+      return;
+    }
+    const blockers = (data?.blockers as string[]) || [];
+    setDeleteBlockers(blockers);
+  };
 
   // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
   // RPC before every fetch, and an hourly pg_cron job runs the same function.
@@ -125,6 +176,16 @@ export const SubscriberDetail = ({
   const subscriptionStatus = getSubscriptionStatus(currentSub);
   const internetSub = (subscriber as any).internet_subscription as SubscriptionEntry | null;
   const internetStatus = getSubscriptionStatus(internetSub);
+
+  // Overall account status: green if any service is currently active,
+  // amber if the subscriber has services but none are currently active
+  // (lapsed), grey if they've onboarded with no services configured.
+  const anyActive = subscriptionStatus.isActive || internetStatus.isActive;
+  const accountStatus = anyActive
+    ? { label: 'Active', tone: 'bg-green-500/10 text-green-700 dark:text-green-400' }
+    : subscriberServices.length > 0
+      ? { label: 'Lapsed', tone: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' }
+      : { label: 'No services', tone: 'bg-muted text-muted-foreground' };
 
   // Per-tab transaction filtering. Legacy rows without service_type are
   // assumed to be cable so we don't lose history when the column was added.
@@ -261,7 +322,7 @@ export const SubscriberDetail = ({
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
+          <Button variant="destructive" size="sm" onClick={openDeleteDialog}>
             <Trash2 className="h-4 w-4 mr-2" />
             Delete
           </Button>
@@ -290,13 +351,18 @@ export const SubscriberDetail = ({
                   </p>
                   <p className="text-muted-foreground mt-2">{subscriber.mobile}</p>
                 </div>
-                <div className="flex flex-wrap gap-1.5 justify-end">
-                  {subscriberServices.includes('cable') && (
-                    <Badge variant="secondary" className="gap-1"><Tv className="h-3 w-3" />Cable</Badge>
-                  )}
-                  {subscriberServices.includes('internet') && (
-                    <Badge variant="secondary" className="gap-1"><Wifi className="h-3 w-3" />Internet</Badge>
-                  )}
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`text-xs px-2 py-1 rounded-full ${accountStatus.tone}`}>
+                    {accountStatus.label}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 justify-end">
+                    {subscriberServices.includes('cable') && (
+                      <Badge variant="secondary" className="gap-1"><Tv className="h-3 w-3" />Cable</Badge>
+                    )}
+                    {subscriberServices.includes('internet') && (
+                      <Badge variant="secondary" className="gap-1"><Wifi className="h-3 w-3" />Internet</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -365,12 +431,25 @@ export const SubscriberDetail = ({
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
+                    <p className="text-sm text-muted-foreground">Provider</p>
+                    <p className="font-medium">{providerNames.cable || 'Not assigned'}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">STB Number</p>
                     <p className="font-medium">{(subscriber as any).stb_number || subscriber.stbNumber || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Pack</p>
                     <p className="font-medium">{subscriber.pack || 'None'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Balance</p>
+                    <p className={`font-medium ${getBalanceColor(subscriber.cable_balance || 0)}`}>
+                      ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}{' '}
+                      <span className="text-xs text-muted-foreground">
+                        {(subscriber.cable_balance || 0) >= 0 ? 'dues' : 'advance'}
+                      </span>
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -550,7 +629,23 @@ export const SubscriberDetail = ({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5" />Internet Device</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Provider</p>
+                    <p className="font-medium">{providerNames.internet || 'Not assigned'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Balance</p>
+                    <p className={`font-medium ${getBalanceColor(subscriber.internet_balance || 0)}`}>
+                      ₹{Math.abs(subscriber.internet_balance || 0).toFixed(2)}{' '}
+                      <span className="text-xs text-muted-foreground">
+                        {(subscriber.internet_balance || 0) >= 0 ? 'dues' : 'advance'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <Separator />
                 {internetDevice ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -573,7 +668,7 @@ export const SubscriberDetail = ({
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-muted-foreground">
+                  <div className="text-center py-4 text-muted-foreground">
                     <Wifi className="h-8 w-8 mx-auto opacity-40 mb-2" />
                     <p>No ONU/Router assigned to this subscriber.</p>
                     <p className="text-sm mt-1">Assign one from the Inventory screen.</p>
@@ -890,13 +985,40 @@ export const SubscriberDetail = ({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Subscriber</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {subscriber.name}? This will also delete all associated transactions. This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {deleteChecking ? (
+                  <p>Checking whether {subscriber.name} can be deleted…</p>
+                ) : deleteBlockers && deleteBlockers.length > 0 ? (
+                  <>
+                    <p>
+                      {subscriber.name} cannot be deleted yet. Resolve the following first:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1 text-sm text-foreground">
+                      {deleteBlockers.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      Historical financial records are intentionally preserved on the immutable ledger.
+                      If this subscriber has ever transacted, deletion will be blocked permanently.
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    Are you sure you want to delete {subscriber.name}? This action cannot be undone.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={onDelete}
+              disabled={deleteChecking || (deleteBlockers?.length ?? 1) > 0}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
