@@ -10,7 +10,29 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
-### Added — Financial-record lifecycle (ADR-011)
+### Changed — ADR-011 simplified: full immutability, grace window removed
+- **Transactions are now immutable the moment they are saved.** The earlier
+  5-minute grace window for in-place edit/delete is gone. The void workflow
+  alone covers fat-finger fixes, with a permanent audit trail.
+- **DB enforcement**: new `transactions_enforce_immutability` BEFORE
+  UPDATE/DELETE trigger on `public.transactions`:
+  - `DELETE` is rejected unconditionally.
+  - Edits to `amount`, `type`, `service_type`, `subscriber_id`, `provider_id`,
+    `date`, and `reverses_transaction_id` are rejected.
+  - `status` may only move `posted → voided`, and only when `void_reason` is
+    set (the path used by `void_transaction`).
+  - `description` (and bookkeeping fields like `edited_at`/`edited_by`) remain
+    editable.
+- **UI**: `EditTransactionDialog` reduced to a description-only editor; the
+  password gate is gone. The row "Delete" button is replaced by **Void**,
+  which calls `void_transaction` after collecting a reason. Voided rows are
+  rendered struck-through with a "Voided" badge; the offsetting row carries
+  a "Reversal" badge.
+- **Receipts** are never blocked by timing logic anymore — every persisted
+  transaction is already final.
+- See ADR-011 (revised) and `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md`.
+
+### Added — Financial-record lifecycle (ADR-011, initial)
 - **Append-only ledger model** adopted for `transactions`. New columns:
   `status` (`posted` / `voided` / `reversal`), `reverses_transaction_id`
   (self-FK), `void_reason` (text). Existing rows backfilled to
@@ -21,13 +43,13 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
   re-void or to void rows the caller does not own.
 - **Balance trigger updated** to exclude `status = 'voided'` rows from
   the running balance sum.
-- See `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md` for the full
-  philosophy, void vs reversal analysis, and staged UI rollout.
 
 ### Documentation — Financial lifecycle
 - `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md` — new.
-- `ARCHITECTURE_DECISIONS.md` — ADR-011 added.
+- `ARCHITECTURE_DECISIONS.md` — ADR-011 added, then revised 2026-06-08 to
+  drop the grace window.
 - `docs/README.md` — index updated.
+
 
 
 ### Added — Tier 0 hardening (per `docs/REVIEW_RESPONSE_2026-06.md`)
