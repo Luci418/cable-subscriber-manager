@@ -766,8 +766,11 @@ export const SubscriberDetail = ({
                     {visibleTransactions.map(transaction => {
                       const svc = ((transaction as any).service_type || 'cable') as 'cable' | 'internet';
                       const status = ((transaction as any).status as string) || 'posted';
+                      const source = ((transaction as any).source as string) || 'manual_charge';
                       const isVoided = status === 'voided';
                       const isReversal = status === 'reversal';
+                      const isSubscriptionSourced =
+                        source === 'subscription_charge' || source === 'subscription_refund';
                       const rowMuted = isVoided ? 'opacity-60 line-through' : '';
                       return (
                         <TableRow key={transaction.id} className={rowMuted}>
@@ -779,10 +782,13 @@ export const SubscriberDetail = ({
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
                                 {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
                               </Badge>
+                              {isSubscriptionSourced && (
+                                <Badge variant="secondary" className="text-xs">Subscription</Badge>
+                              )}
                               {isVoided && <Badge variant="outline" className="text-xs">Voided</Badge>}
                               {isReversal && <Badge variant="outline" className="text-xs">Reversal</Badge>}
                             </div>
@@ -852,12 +858,17 @@ export const SubscriberDetail = ({
         }}
       />
 
-      <EditTransactionDialog
-        open={showEditTransaction}
-        onOpenChange={setShowEditTransaction}
-        transaction={editingTransaction}
-        availableServices={subscriberServices}
-        onSubmit={handleUpdateTransaction}
+      <VoidTransactionDialog
+        open={showVoidDialog}
+        onOpenChange={setShowVoidDialog}
+        transaction={voidingTransaction}
+        onVoided={() => { onReload?.(); }}
+      />
+
+      <TransactionNotesDialog
+        open={showNotesDialog}
+        onOpenChange={setShowNotesDialog}
+        transaction={notesTransaction}
       />
 
       {(() => {
