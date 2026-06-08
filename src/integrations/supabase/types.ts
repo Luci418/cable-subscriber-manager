@@ -347,6 +347,41 @@ export type Database = {
           },
         ]
       }
+      transaction_notes: {
+        Row: {
+          author_id: string
+          created_at: string
+          id: string
+          note: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          id?: string
+          note: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_notes_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
@@ -360,11 +395,17 @@ export type Database = {
           provider_id: string | null
           reverses_transaction_id: string | null
           service_type: string
+          source: Database["public"]["Enums"]["transaction_source"]
           status: Database["public"]["Enums"]["transaction_status"]
           subscriber_id: string
           type: string
           user_id: string
           void_reason: string | null
+          void_reason_code:
+            | Database["public"]["Enums"]["void_reason_code"]
+            | null
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
           amount: number
@@ -378,11 +419,17 @@ export type Database = {
           provider_id?: string | null
           reverses_transaction_id?: string | null
           service_type?: string
+          source?: Database["public"]["Enums"]["transaction_source"]
           status?: Database["public"]["Enums"]["transaction_status"]
           subscriber_id: string
           type: string
           user_id: string
           void_reason?: string | null
+          void_reason_code?:
+            | Database["public"]["Enums"]["void_reason_code"]
+            | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
           amount?: number
@@ -396,11 +443,17 @@ export type Database = {
           provider_id?: string | null
           reverses_transaction_id?: string | null
           service_type?: string
+          source?: Database["public"]["Enums"]["transaction_source"]
           status?: Database["public"]["Enums"]["transaction_status"]
           subscriber_id?: string
           type?: string
           user_id?: string
           void_reason?: string | null
+          void_reason_code?:
+            | Database["public"]["Enums"]["void_reason_code"]
+            | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
           {
@@ -444,13 +497,31 @@ export type Database = {
         Returns: undefined
       }
       void_transaction: {
-        Args: { p_reason: string; p_transaction_id: string }
+        Args: {
+          p_reason: string
+          p_reason_code: Database["public"]["Enums"]["void_reason_code"]
+          p_transaction_id: string
+        }
         Returns: string
       }
     }
     Enums: {
       stb_status: "available" | "assigned" | "faulty" | "decommissioned"
+      transaction_source:
+        | "manual_charge"
+        | "manual_payment"
+        | "subscription_charge"
+        | "subscription_refund"
+        | "reversal"
+        | "adjustment"
       transaction_status: "posted" | "voided" | "reversal"
+      void_reason_code:
+        | "data_entry_error"
+        | "duplicate"
+        | "wrong_subscriber"
+        | "wrong_amount"
+        | "customer_dispute"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -579,7 +650,23 @@ export const Constants = {
   public: {
     Enums: {
       stb_status: ["available", "assigned", "faulty", "decommissioned"],
+      transaction_source: [
+        "manual_charge",
+        "manual_payment",
+        "subscription_charge",
+        "subscription_refund",
+        "reversal",
+        "adjustment",
+      ],
       transaction_status: ["posted", "voided", "reversal"],
+      void_reason_code: [
+        "data_entry_error",
+        "duplicate",
+        "wrong_subscriber",
+        "wrong_amount",
+        "customer_dispute",
+        "other",
+      ],
     },
   },
 } as const

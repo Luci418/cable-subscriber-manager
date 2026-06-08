@@ -19,7 +19,8 @@ import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
-import { EditTransactionDialog } from './EditTransactionDialog';
+import { VoidTransactionDialog } from './VoidTransactionDialog';
+import { TransactionNotesDialog } from './TransactionNotesDialog';
 import { friendlyDbError } from '@/lib/dbErrors';
 import {
   AlertDialog,
@@ -63,8 +64,10 @@ export const SubscriberDetail = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddPackage, setShowAddPackage] = useState(false);
   const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
-  const [showEditTransaction, setShowEditTransaction] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
   const [internetDevice, setInternetDevice] = useState<any>(null);
@@ -147,9 +150,14 @@ export const SubscriberDetail = ({
     txFilter === 'internet' ? internetTransactions :
     sortedTransactions;
 
-  const handleEditTransaction = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setShowEditTransaction(true);
+  const openNotes = (transaction: Transaction) => {
+    setNotesTransaction(transaction);
+    setShowNotesDialog(true);
+  };
+
+  const openVoid = (transaction: Transaction) => {
+    setVoidingTransaction(transaction);
+    setShowVoidDialog(true);
   };
 
   // Apply or reverse a transaction's balance impact on the matching service column.
@@ -177,56 +185,11 @@ export const SubscriberDetail = ({
     return true;
   };
 
-  // Per ADR-011 (revised): only the description is editable. Financial fields
-  // (amount, type, service_type, subscriber, provider, date) are immutable.
-  // Corrections happen via Void + replacement.
-  const handleUpdateTransaction = async (
-    transactionId: string,
-    updates: { description: string },
-  ) => {
-    const { error } = await (supabase as any)
-      .from('transactions')
-      .update({ description: updates.description })
-      .eq('id', transactionId);
+  // Per ADR-011 (hardened, 2026-06-08): transaction rows are fully immutable.
+  // Description and source are frozen along with all financial fields. To add
+  // context after the fact, operators use transaction_notes (append-only).
+  // Voids are handled by VoidTransactionDialog via the void_transaction RPC.
 
-    if (error) {
-      toast.error(friendlyDbError(error, 'Failed to update transaction'));
-      return;
-    }
-
-    setShowEditTransaction(false);
-    setEditingTransaction(null);
-    toast.success('Description updated');
-    onReload?.();
-  };
-
-  // Void via RPC. Inserts an offsetting reversal row and flips the original
-  // to status='voided'. Balance is recomputed automatically by the DB trigger.
-  const handleVoidTransaction = async (transaction: Transaction) => {
-    const reason = window.prompt(
-      `Void this ${transaction.type} of ₹${Number(transaction.amount).toFixed(2)}?\n\nEnter a reason (required) — this will be permanently recorded:`,
-      '',
-    );
-    if (reason === null) return; // cancelled
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.error('A reason is required to void a transaction');
-      return;
-    }
-
-    const { error } = await (supabase as any).rpc('void_transaction', {
-      p_transaction_id: transaction.id,
-      p_reason: trimmed,
-    });
-
-    if (error) {
-      toast.error(friendlyDbError(error, 'Failed to void transaction'));
-      return;
-    }
-
-    toast.success('Transaction voided. An offsetting reversal has been posted.');
-    onReload?.();
-  };
 
 
   const handleCancelSubscription = async (refundAmount: number) => {
@@ -273,9 +236,10 @@ export const SubscriberDetail = ({
         type: 'payment',
         amount: refundAmount,
         service_type: cancelService,
+        source: 'subscription_refund',
         description: `Refund for cancelled ${label.toLowerCase()} subscription: ${activeSub.packName}`,
         date: new Date().toISOString(),
-      });
+      } as any);
     }
 
     toast.success(refundAmount > 0
@@ -514,7 +478,6 @@ export const SubscriberDetail = ({
                         variant="destructive"
                         size="sm"
                         onClick={() => {
-                          setEditingTransaction(null);
                           setCancelService('cable');
                           setShowCancelDialog(true);
                         }}
@@ -671,7 +634,6 @@ export const SubscriberDetail = ({
                         variant="destructive"
                         size="sm"
                         onClick={() => {
-                          setEditingTransaction(null);
                           setCancelService('internet');
                           setShowCancelDialog(true);
                         }}
@@ -805,8 +767,11 @@ export const SubscriberDetail = ({
                     {visibleTransactions.map(transaction => {
                       const svc = ((transaction as any).service_type || 'cable') as 'cable' | 'internet';
                       const status = ((transaction as any).status as string) || 'posted';
+                      const source = ((transaction as any).source as string) || 'manual_charge';
                       const isVoided = status === 'voided';
                       const isReversal = status === 'reversal';
+                      const isSubscriptionSourced =
+                        source === 'subscription_charge' || source === 'subscription_refund';
                       const rowMuted = isVoided ? 'opacity-60 line-through' : '';
                       return (
                         <TableRow key={transaction.id} className={rowMuted}>
@@ -818,10 +783,13 @@ export const SubscriberDetail = ({
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
                                 {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
                               </Badge>
+                              {isSubscriptionSourced && (
+                                <Badge variant="secondary" className="text-xs">Subscription</Badge>
+                              )}
                               {isVoided && <Badge variant="outline" className="text-xs">Voided</Badge>}
                               {isReversal && <Badge variant="outline" className="text-xs">Reversal</Badge>}
                             </div>
@@ -834,19 +802,19 @@ export const SubscriberDetail = ({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)} title="Edit description">
-                                <Pencil className="h-4 w-4" />
+                              <Button variant="ghost" size="sm" onClick={() => openNotes(transaction)} title="Notes">
+                                <FileText className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)} title="Download invoice">
                                 <Download className="h-4 w-4" />
                               </Button>
-                              {!isVoided && !isReversal && (
+                              {!isVoided && !isReversal && !isSubscriptionSourced && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="text-destructive hover:text-destructive"
                                   title="Void transaction"
-                                  onClick={() => handleVoidTransaction(transaction)}
+                                  onClick={() => openVoid(transaction)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -891,12 +859,17 @@ export const SubscriberDetail = ({
         }}
       />
 
-      <EditTransactionDialog
-        open={showEditTransaction}
-        onOpenChange={setShowEditTransaction}
-        transaction={editingTransaction}
-        availableServices={subscriberServices}
-        onSubmit={handleUpdateTransaction}
+      <VoidTransactionDialog
+        open={showVoidDialog}
+        onOpenChange={setShowVoidDialog}
+        transaction={voidingTransaction}
+        onVoided={() => { onReload?.(); }}
+      />
+
+      <TransactionNotesDialog
+        open={showNotesDialog}
+        onOpenChange={setShowNotesDialog}
+        transaction={notesTransaction}
       />
 
       {(() => {

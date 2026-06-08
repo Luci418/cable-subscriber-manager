@@ -10,6 +10,40 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Changed — ADR-011 hardened: explicit source, frozen rows, accountable voids
+- **Transaction `source` is now explicit, never inferred.** New `transaction_source`
+  enum on `public.transactions`: `manual_charge`, `manual_payment`,
+  `subscription_charge`, `subscription_refund`, `reversal`, `adjustment`.
+  Existing rows backfilled by inspecting description patterns; new code paths
+  set the source at insert time. Behaviour no longer depends on parsing
+  description text.
+- **`description` and `source` are now immutable** along with all financial
+  fields. The "edit description" workflow is gone — the `EditTransactionDialog`
+  component has been removed.
+- **Append-only `transaction_notes`** table replaces description edits: every
+  row carries a transaction FK, author, and timestamp; UPDATE/DELETE are
+  blocked at the DB level. Operators add as many notes as they need without
+  ever rewriting the ledger row. Surfaced via the new `TransactionNotesDialog`.
+- **Subscription-sourced rows cannot be voided directly.** `void_transaction`
+  rejects `source IN ('subscription_charge','subscription_refund','reversal')`
+  — those corrections must flow through the subscription lifecycle (cancel /
+  refund) so the subscription and its ledger row stay in sync. The Void
+  button is hidden in the UI for these rows.
+- **Void accountability**: new `voided_by` (uuid), `voided_at` (timestamptz),
+  and `void_reason_code` (`data_entry_error`, `duplicate`, `wrong_subscriber`,
+  `wrong_amount`, `customer_dispute`, `other`) enum columns. The new
+  `VoidTransactionDialog` requires a reason code and accepts an optional
+  free-text note; the RPC stamps both rows.
+- **Cleaner reversal descriptions** — operator-facing UUIDs are gone. The
+  reversal row reads `Reversal — wrong subscriber (note)`; the audit link is
+  the existing `reverses_transaction_id` FK, not text the cashier has to read.
+- **Recent Voids widget** added to the Billing page: lists every void from
+  the last 7 days with reason code, amount, subscriber, and note. Voids
+  become visible operational events rather than silent ledger actions.
+- See ADR-011 (hardened) and `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md`.
+
+
+
 ### Changed — ADR-011 simplified: full immutability, grace window removed
 - **Transactions are now immutable the moment they are saved.** The earlier
   5-minute grace window for in-place edit/delete is gone. The void workflow
