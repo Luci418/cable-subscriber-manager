@@ -358,10 +358,13 @@ export type Database = {
           edited_by: string | null
           id: string
           provider_id: string | null
+          reverses_transaction_id: string | null
           service_type: string
+          status: Database["public"]["Enums"]["transaction_status"]
           subscriber_id: string
           type: string
           user_id: string
+          void_reason: string | null
         }
         Insert: {
           amount: number
@@ -373,10 +376,13 @@ export type Database = {
           edited_by?: string | null
           id?: string
           provider_id?: string | null
+          reverses_transaction_id?: string | null
           service_type?: string
+          status?: Database["public"]["Enums"]["transaction_status"]
           subscriber_id: string
           type: string
           user_id: string
+          void_reason?: string | null
         }
         Update: {
           amount?: number
@@ -388,12 +394,22 @@ export type Database = {
           edited_by?: string | null
           id?: string
           provider_id?: string | null
+          reverses_transaction_id?: string | null
           service_type?: string
+          status?: Database["public"]["Enums"]["transaction_status"]
           subscriber_id?: string
           type?: string
           user_id?: string
+          void_reason?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_reverses_transaction_id_fkey"
+            columns: ["reverses_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_subscriber_id_fkey"
             columns: ["subscriber_id"]
@@ -427,9 +443,14 @@ export type Database = {
         Args: { p_service_type: string; p_subscriber_id: string }
         Returns: undefined
       }
+      void_transaction: {
+        Args: { p_reason: string; p_transaction_id: string }
+        Returns: string
+      }
     }
     Enums: {
       stb_status: "available" | "assigned" | "faulty" | "decommissioned"
+      transaction_status: "posted" | "voided" | "reversal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -558,6 +579,7 @@ export const Constants = {
   public: {
     Enums: {
       stb_status: ["available", "assigned", "faulty", "decommissioned"],
+      transaction_status: ["posted", "voided", "reversal"],
     },
   },
 } as const

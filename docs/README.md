@@ -19,6 +19,7 @@ of creating parallel versions.
 | [AUDIT_REPORT.md](./AUDIT_REPORT.md) | One-time documentation audit + recommended structure | Reviewers |
 | [LIFECYCLE_AUDIT_2026-06.md](./LIFECYCLE_AUDIT_2026-06.md) | Operational lifecycle integrity audit — states, transitions, deletion/archive rules, invalid states, A0 fixes | Reviewers, engineers |
 | [REVIEW_RESPONSE_2026-06.md](./REVIEW_RESPONSE_2026-06.md) | Response to external architecture review + revised roadmap | Reviewers |
+| [FINANCIAL_LIFECYCLE_REVIEW_2026-06.md](./FINANCIAL_LIFECYCLE_REVIEW_2026-06.md) | Financial-record philosophy: append-only ledger, void vs reversal, edit/delete rules (ADR-011) | Owner, reviewers, engineers |
 | [releases/](./releases/) | Per-version release notes | Operator |
 | [../CHANGELOG.md](../CHANGELOG.md) | Human-readable changelog | Everyone |
 
