@@ -10,6 +10,33 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Changed — Subscriber profile clarity & actionable validation
+- **Subscriber profile surfaces the full service relationship.** Each service
+  card (Cable / Internet) now shows the linked provider name alongside the
+  pack, device and per-service balance. The profile header carries an account
+  status badge (Active / Lapsed / No services) derived from current
+  subscriptions, so operators see the state of the account at a glance.
+- **Provider attribution stops being an operator choice.** The Add Transaction
+  dialog no longer asks operators to pick a provider when more than one is
+  configured — every manual transaction now inherits the provider already
+  linked to the subscriber's service (`cable_provider_id` /
+  `internet_provider_id`). The chosen provider is surfaced read-only in the
+  dialog. This eliminates accidental mis-attribution and matches how packs and
+  subscription charges already work.
+- **Delete validation is now explanatory.** Attempting to delete a subscriber
+  used to surface "Validation check failed" — actually the immutable-ledger
+  trigger fighting the cascading delete of transactions. Added the
+  `check_subscriber_deletable(uuid)` RPC, which returns a typed list of
+  blockers (active subscriptions, non-zero balance, transactions on file,
+  assigned devices). The Delete dialog now shows that list and disables the
+  destructive action until every blocker is resolved.
+- **`friendlyDbError` recognises ledger-trigger violations.** Errors raised by
+  `transactions_enforce_immutability`, `transaction_notes_enforce_immutability`
+  and the subscription-source guard are now translated into operator-facing
+  guidance instead of generic "Value failed a validation check".
+
+
+
 ### Changed — ADR-011 hardened: explicit source, frozen rows, accountable voids
 - **Transaction `source` is now explicit, never inferred.** New `transaction_source`
   enum on `public.transactions`: `manual_charge`, `manual_payment`,
