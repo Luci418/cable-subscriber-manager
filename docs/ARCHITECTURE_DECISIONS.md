@@ -103,3 +103,13 @@ new ADR superseding the old one and link both ways.
 - **Context**: Prior to this, only `DEVELOPER_GUIDE.md` existed and had drifted from the schema.
 - **Reasoning**: A coherent doc system reduces onboarding cost and keeps AI-assisted edits grounded.
 - **Revisit when**: The project splits into multiple repositories.
+
+## ADR-011 — Transactions are an append-only ledger; corrections via void/reversal
+
+- **Decision**: `public.transactions` is treated as an append-only ledger after a narrow grace window. Financial fields (`amount`, `type`, `service_type`, `subscriber_id`, `provider_id`, `date`) are immutable post-grace. Corrections happen by **voiding** (offsetting reversal row + `status = 'voided'` on the original) or **reversal** (a new opposite-type row linked via `reverses_transaction_id`). Hard delete is permitted only within a 5-minute grace window, by the original creator, on rows whose `status = 'posted'` and which have no later row referencing them. Operational metadata (`description`) remains freely editable.
+- **Context**: With the Tier-0 balance trigger, the ledger is now the single source of financial truth. A rewritable source of truth is not a source of truth. The previous "edit/delete with password `1234`" model destroyed history silently and left no audit trail. See `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md` for the full analysis.
+- **Alternatives**: (a) status quo mutable ledger; (b) pure immutable ledger with no grace window; (c) soft-delete via `deleted_at`; (d) split into separate `payments`/`charges`/`refunds` tables.
+- **Reasoning**: A hybrid model (option C in the review doc) preserves operator practicality for genuine fat-finger fixes while making every change after the grace window auditable. Void/reversal expresses *what happened*, not merely *that something was hidden*. Single-table `transactions` keeps the schema small; the discriminator `type` plus the new `status` and `reverses_transaction_id` columns are sufficient.
+- **Tradeoffs**: Description edits are still lossy (no per-field audit log yet). Operator UI must distinguish "grace-window delete" from "post-grace void"; some retraining required.
+- **Revisit when**: (a) compliance (GST audit, statutory invoice register) requires per-field history of metadata edits → introduce `transaction_audit_log`; (b) staff expansion demands reason-code taxonomy → promote `void_reason` to an enum; (c) the operator requests month-end period locks → add a `closed_periods` table and gate the grace window on it.
+

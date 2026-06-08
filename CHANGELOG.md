@@ -10,6 +10,26 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Added — Financial-record lifecycle (ADR-011)
+- **Append-only ledger model** adopted for `transactions`. New columns:
+  `status` (`posted` / `voided` / `reversal`), `reverses_transaction_id`
+  (self-FK), `void_reason` (text). Existing rows backfilled to
+  `status = 'posted'`.
+- **`void_transaction(p_transaction_id, p_reason)` RPC** —
+  SECURITY DEFINER, single-transaction. Inserts an offsetting reversal
+  row, marks the original `voided`, returns the reversal id. Refuses to
+  re-void or to void rows the caller does not own.
+- **Balance trigger updated** to exclude `status = 'voided'` rows from
+  the running balance sum.
+- See `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md` for the full
+  philosophy, void vs reversal analysis, and staged UI rollout.
+
+### Documentation — Financial lifecycle
+- `docs/FINANCIAL_LIFECYCLE_REVIEW_2026-06.md` — new.
+- `ARCHITECTURE_DECISIONS.md` — ADR-011 added.
+- `docs/README.md` — index updated.
+
+
 ### Added — Tier 0 hardening (per `docs/REVIEW_RESPONSE_2026-06.md`)
 - **A1 — Automatic balance recalculation**: `recalc_subscriber_balance()` plus
   AFTER INSERT/UPDATE/DELETE trigger on `transactions` keeps
