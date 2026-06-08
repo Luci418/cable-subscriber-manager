@@ -1,9 +1,32 @@
 # Financial Record Lifecycle Review — June 2026
 
-> Status: **Philosophy adopted. Schema migrated. UI rollout staged.**
+> Status: **Philosophy adopted. Schema migrated. UI shipped. Grace window dropped (2026-06-08).**
 > Companion to `LIFECYCLE_AUDIT_2026-06.md` and `REVIEW_RESPONSE_2026-06.md`.
 > Supersedes the ad-hoc "edit with password / hard delete" model documented
 > in earlier versions of `BUSINESS_RULES.md`.
+
+> **Revision note (2026-06-08).** The 5-minute grace window described in
+> sections 3–5 below has been **removed**. After implementing the void
+> workflow, we re-examined whether the grace window earned its complexity
+> and concluded it did not: void already covers fat-finger fixes cleanly,
+> the timer added UX surprises ("why can't I edit this anymore?"), and the
+> dual delete-vs-void path was a training burden. The operative rule is
+> now the simplest possible one:
+>
+> - Financial fields are immutable from the moment a transaction is saved.
+> - Transactions are never deleted.
+> - Corrections use **Void** (offsetting reversal row, audit-trailed) and,
+>   if needed, a fresh replacement transaction.
+> - Refunds remain a separate real-world event posted as `refund` rows.
+> - Receipt generation is never blocked by timing logic — every persisted
+>   row is already final.
+>
+> Enforcement is in the database (`transactions_enforce_immutability`
+> trigger). The text below preserves the original reasoning that led to
+> the grace-window proposal; treat any references to "5-minute window" or
+> "grace-window delete" as historical. The current rule is **immutable on
+> save**.
+
 
 This review answers a single question the operator asked:
 
