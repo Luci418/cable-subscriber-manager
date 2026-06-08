@@ -57,9 +57,10 @@ export const EditTransactionDialog = ({
   if (!transaction) return null;
 
   const svc = ((transaction as any).service_type as string) || 'cable';
+  const rawType = (transaction as any).type as string;
   const typeLabel =
-    transaction.type === 'payment' ? 'Cash Received'
-    : transaction.type === 'refund' ? 'Refund'
+    rawType === 'payment' ? 'Cash Received'
+    : rawType === 'refund' ? 'Refund'
     : 'Bill';
 
   return (
