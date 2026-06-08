@@ -177,6 +177,16 @@ export const SubscriberDetail = ({
   const internetSub = (subscriber as any).internet_subscription as SubscriptionEntry | null;
   const internetStatus = getSubscriptionStatus(internetSub);
 
+  // Overall account status: green if any service is currently active,
+  // amber if the subscriber has services but none are currently active
+  // (lapsed), grey if they've onboarded with no services configured.
+  const anyActive = subscriptionStatus.isActive || internetStatus.isActive;
+  const accountStatus = anyActive
+    ? { label: 'Active', tone: 'bg-green-500/10 text-green-700 dark:text-green-400' }
+    : subscriberServices.length > 0
+      ? { label: 'Lapsed', tone: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' }
+      : { label: 'No services', tone: 'bg-muted text-muted-foreground' };
+
   // Per-tab transaction filtering. Legacy rows without service_type are
   // assumed to be cable so we don't lose history when the column was added.
   const cableTransactions = sortedTransactions.filter(
