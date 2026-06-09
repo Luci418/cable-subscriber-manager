@@ -411,6 +411,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                       <TableHead>Last Pack</TableHead>
                       <TableHead>Region</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -430,6 +431,13 @@ export const Billing = ({ onBack }: BillingProps) => {
                             ₹{line.balance.toFixed(2)}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right">
+                          {line.balance > 0 ? (
+                            <Button size="sm" variant="outline" onClick={() => openRecordPayment(line)}>
+                              <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
+                            </Button>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -441,6 +449,45 @@ export const Billing = ({ onBack }: BillingProps) => {
       </Tabs>
 
       <RecentVoidsCard />
+
+      {/* Record Payment dialog — creates an immutable manual_payment ledger row. */}
+      <Dialog open={!!payLine} onOpenChange={(o) => { if (!o) setPayLine(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              {payLine && (
+                <>
+                  {payLine.subscriber.name} • {payLine.service === 'cable' ? 'Cable' : 'Internet'} •
+                  {' '}Outstanding: <span className="font-medium text-destructive">₹{payLine.balance.toFixed(2)}</span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="pay-amt">Amount received (₹)</Label>
+            <Input
+              id="pay-amt"
+              type="number"
+              min="0"
+              step="0.01"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Posts a payment to the immutable ledger. Use Void from the subscriber page if entered incorrectly.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayLine(null)} disabled={paySaving}>Cancel</Button>
+            <Button onClick={submitRecordPayment} disabled={paySaving}>
+              {paySaving ? 'Saving…' : 'Mark as Paid'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
