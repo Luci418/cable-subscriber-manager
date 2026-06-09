@@ -484,8 +484,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_subscription: {
+        Args: {
+          p_reason?: string
+          p_refund_amount?: number
+          p_service_type: string
+          p_subscriber_id: string
+        }
+        Returns: Json
+      }
       check_subscriber_deletable: {
         Args: { p_subscriber_id: string }
+        Returns: Json
+      }
+      create_subscription: {
+        Args: {
+          p_duration: number
+          p_pack_id: string
+          p_service_type: string
+          p_subscriber_id: string
+        }
         Returns: Json
       }
       expire_lapsed_subscriptions: { Args: never; Returns: number }
