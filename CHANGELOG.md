@@ -10,6 +10,17 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Changed — Invariants sprint Phase 2: hard constraints on Subscribers (2026-06-09)
+- **`services` column is now CHECK-constrained**: must be non-empty and a subset of `{cable, internet}`. Empty service lists or unknown service names are rejected at the database, not just by the UI.
+- **New BEFORE INSERT/UPDATE trigger `subscribers_enforce_invariants`** enforces three rules the UI used to enforce alone (and could be bypassed by any direct API call):
+  - If `cable` is in services, `stb_number` is required.
+  - While an active cable subscription exists: cannot drop `cable` from services, cannot change `stb_number`, cannot change `cable_provider_id`.
+  - While an active internet subscription exists: cannot drop `internet` from services, cannot change `internet_provider_id`.
+- **Edit Subscriber dialog now disables the STB and ONU/Router selects** while the corresponding subscription is active, with an inline explanation pointing the operator to Cancel first. Previously the UI only blocked *removal* of the service — swapping the device mid-subscription was possible.
+- **`dbErrors.ts` translates the new trigger messages** into operator-friendly errors ("Cannot change the STB while a cable subscription is active. Cancel the subscription first, then reassign the device.").
+
+
+
 ### Changed — Invariants sprint Phase 1: atomic lifecycle RPCs (2026-06-09)
 - **Subscription create is now atomic.** `AddPackageSubscriptionDialog` no longer writes the subscriber row and the ledger in two separate calls. Both run inside the new `create_subscription(subscriber_id, service_type, pack_id, duration)` SECURITY DEFINER RPC. If anything fails, nothing is persisted — eliminating the race where a network blip between the two writes left `cable_balance` permanently inflated with no matching ledger row.
 - **Subscription cancel is now atomic.** `SubscriberDetail.handleCancelSubscription` now calls the new `cancel_subscription(subscriber_id, service_type, refund_amount, reason)` RPC. The server clears the active subscription, marks history cancelled, and posts the refund payment in one transaction.
