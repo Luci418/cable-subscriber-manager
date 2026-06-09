@@ -385,6 +385,7 @@ export const EditSubscriberDialog = ({
                 onValueChange={(value) =>
                   setFormData({ ...formData, internetDeviceId: value })
                 }
+                disabled={hasActiveInternetSub}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select ONU/Router" />
@@ -404,8 +405,14 @@ export const EditSubscriberDialog = ({
                   )}
                 </SelectContent>
               </Select>
+              {hasActiveInternetSub && (
+                <p className="text-xs text-muted-foreground">
+                  Internet device is locked while an internet plan is active. Cancel the plan to reassign.
+                </p>
+              )}
             </div>
           )}
+
 
           <div className="space-y-2">
             <Label>Location Coordinates</Label>
