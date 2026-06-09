@@ -151,12 +151,10 @@ const Index = () => {
     } as any);
 
     if (success) {
-      // Positive balance = debt, negative = credit. Route to the matching
-      // service column so cable and internet ledgers stay independent.
-      const balCol = svc === 'internet' ? 'internet_balance' : 'cable_balance';
-      const currentBalance = Number((subscriber as any)[balCol] || 0);
-      const delta = data.type === 'charge' ? data.amount : -data.amount; // payment & refund both reduce debt
-      await updateSubscriber(selectedSubscriberId, { [balCol]: currentBalance + delta } as any);
+      // Phase 1 (ADR-012): the transactions_recalc_balance trigger is the
+      // sole writer of cable_balance / internet_balance. We used to do a
+      // second UPDATE here, which raced the trigger. Now we just reload.
+      reloadSubscribers();
       toast.success('Transaction added successfully!');
     }
   };
