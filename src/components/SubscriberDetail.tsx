@@ -224,86 +224,37 @@ export const SubscriberDetail = ({
     setShowVoidDialog(true);
   };
 
-  // Apply or reverse a transaction's balance impact on the matching service column.
-  // Payment & refund both reduce debt; charge increases debt.
-  const balanceDelta = (
-    type: 'payment' | 'charge' | 'refund',
-    amount: number,
-    sign: 1 | -1, // +1 to apply, -1 to reverse
-  ) => (type === 'charge' ? amount : -amount) * sign;
-
-  const applyBalanceChange = async (
-    service: 'cable' | 'internet',
-    delta: number,
-  ) => {
-    if (delta === 0) return true;
-    const balCol = service === 'internet' ? 'internet_balance' : 'cable_balance';
-    const current = Number((subscriber as any)[balCol] || 0);
-    const { error } = await (supabase.from('subscribers') as any)
-      .update({ [balCol]: current + delta })
-      .eq('id', subscriber.id);
-    if (error) {
-      toast.error(friendlyDbError(error, 'Failed to update subscriber balance'));
-      return false;
-    }
-    return true;
-  };
-
   // Per ADR-011 (hardened, 2026-06-08): transaction rows are fully immutable.
   // Description and source are frozen along with all financial fields. To add
   // context after the fact, operators use transaction_notes (append-only).
   // Voids are handled by VoidTransactionDialog via the void_transaction RPC.
+  //
+  // Per ADR-012 (Phase 1, 2026-06-09): cable_balance / internet_balance are
+  // never written from the client. The transactions_recalc_balance trigger
+  // recomputes them from the immutable ledger on every change.
 
 
 
   const handleCancelSubscription = async (refundAmount: number) => {
-    // Service-aware cancellation. Reads the matching subscription/history/balance
-    // columns based on which tab triggered the cancel.
+    // Phase 1 (ADR-012): cancellation goes through a single atomic RPC.
+    // The server clears current_subscription, marks history cancelled, and
+    // inserts the refund payment on the ledger in one transaction. The
+    // balance trigger recomputes cable_balance / internet_balance — we
+    // never write balance from the client.
     const isInternet = cancelService === 'internet';
-    const subCol = isInternet ? 'internet_subscription' : 'current_subscription';
-    const histCol = isInternet ? 'internet_subscription_history' : 'subscription_history';
-    const packCol = isInternet ? 'current_internet_pack' : 'current_pack';
-    const balCol = isInternet ? 'internet_balance' : 'cable_balance';
     const label = isInternet ? 'Internet' : 'Cable';
 
-    const activeSub = (subscriber as any)[subCol];
-    if (!activeSub) return;
-
-    const history = ((subscriber as any)[histCol] || []).map((sub: any) =>
-      sub.id === activeSub.id ? { ...sub, status: 'cancelled', endDate: new Date().toISOString() } : sub
-    );
-
-    const currentBalance = Number((subscriber as any)[balCol] || 0);
-    const newBalance = refundAmount > 0 ? currentBalance - refundAmount : currentBalance;
-
-    const updates: Record<string, any> = {
-      [subCol]: null,
-      [histCol]: history,
-      [packCol]: null,
-      [balCol]: newBalance,
-    };
-
-    const { error } = await (supabase.from('subscribers') as any)
-      .update(updates)
-      .eq('id', subscriber.id);
+    const { error } = await (supabase as any).rpc('cancel_subscription', {
+      p_subscriber_id: subscriber.id,
+      p_service_type: cancelService,
+      p_refund_amount: refundAmount || 0,
+      p_reason: null,
+    });
 
     if (error) {
-      toast.error(`Failed to cancel ${label.toLowerCase()} subscription`);
+      toast.error(error.message || `Failed to cancel ${label.toLowerCase()} subscription`);
       console.error(error);
       return;
-    }
-
-    if (refundAmount > 0) {
-      await supabase.from('transactions').insert({
-        subscriber_id: subscriber.id,
-        user_id: (subscriber as any).user_id,
-        type: 'payment',
-        amount: refundAmount,
-        service_type: cancelService,
-        source: 'subscription_refund',
-        description: `Refund for cancelled ${label.toLowerCase()} subscription: ${activeSub.packName}`,
-        date: new Date().toISOString(),
-      } as any);
     }
 
     toast.success(refundAmount > 0

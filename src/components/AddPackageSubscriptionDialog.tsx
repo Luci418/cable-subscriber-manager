@@ -106,68 +106,24 @@ export const AddPackageSubscriptionDialog = ({
       return;
     }
 
-    // Lookup provider name for receipts/analytics.
-    let providerName: string | null = null;
-    if (selectedPackData.provider_id) {
-      const { data: prov } = await (supabase as any)
-        .from('providers').select('name').eq('id', selectedPackData.provider_id).maybeSingle();
-      providerName = (prov?.name as string) || null;
-    }
-
-    const newSubscription = {
-      id: `sub-${Date.now()}`,
-      packName: selectedPackData.name,
-      packPrice: selectedPackData.price,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      duration,
-      status: 'active',
-      subscribedAt: new Date().toISOString(),
-      providerId: selectedPackData.provider_id || null,
-      providerName,
-    };
-
-    const subscriptionHistory = (currentSubscriber?.[historyCol] || []).map((sub: any) => ({
-      ...sub,
-      status: 'expired',
-    }));
-
-    const chargeAmount = Number(selectedPackData.price) * duration;
-    const newBalance = Number(currentSubscriber?.[balanceCol] || 0) + chargeAmount;
-
-    const providerCol = serviceType === 'internet' ? 'internet_provider_id' : 'cable_provider_id';
-    const updates: Record<string, any> = {
-      [packCol]: selectedPackData.name,
-      [subscriptionCol]: newSubscription,
-      [historyCol]: [...subscriptionHistory, newSubscription],
-      [balanceCol]: newBalance,
-    };
-    if (selectedPackData.provider_id) {
-      updates[providerCol] = selectedPackData.provider_id;
-    }
-    const { error } = await (supabase
-      .from('subscribers') as any)
-      .update(updates)
-      .eq('id', subscriberId);
+    // Phase 1 (ADR-012): subscription creation goes through a single atomic
+    // RPC. The server inserts the charge transaction AND updates the
+    // subscription/history/pack/provider in one transaction. The balance
+    // trigger then recomputes cable_balance / internet_balance from the
+    // ledger — we never write balance from the client.
+    const { error } = await (supabase as any).rpc('create_subscription', {
+      p_subscriber_id: subscriberId,
+      p_service_type: serviceType,
+      p_pack_id: selectedPackData.id,
+      p_duration: duration,
+    });
 
     if (error) {
-      toast.error('Failed to add subscription');
+      toast.error(error.message || `Failed to add ${serviceLabel.toLowerCase()} subscription`);
       console.error(error);
       setLoading(false);
       return;
     }
-
-    await (supabase.from('transactions') as any).insert({
-      subscriber_id: subscriberId,
-      user_id: currentSubscriber?.user_id,
-      type: 'charge',
-      amount: chargeAmount,
-      service_type: serviceType,
-      provider_id: selectedPackData.provider_id || null,
-      source: 'subscription_charge',
-      description: `${serviceLabel} ${isPrepaid ? 'recharge' : 'subscription charge'}: ${selectedPackData.name} (${duration} ${isPrepaid ? `× ${validityDays}d` : `month${duration > 1 ? 's' : ''}`})`,
-      date: new Date().toISOString(),
-    });
 
     setLoading(false);
     toast.success(`${serviceLabel} subscription added`);

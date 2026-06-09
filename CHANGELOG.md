@@ -10,6 +10,14 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Changed — Invariants sprint Phase 1: atomic lifecycle RPCs (2026-06-09)
+- **Subscription create is now atomic.** `AddPackageSubscriptionDialog` no longer writes the subscriber row and the ledger in two separate calls. Both run inside the new `create_subscription(subscriber_id, service_type, pack_id, duration)` SECURITY DEFINER RPC. If anything fails, nothing is persisted — eliminating the race where a network blip between the two writes left `cable_balance` permanently inflated with no matching ledger row.
+- **Subscription cancel is now atomic.** `SubscriberDetail.handleCancelSubscription` now calls the new `cancel_subscription(subscriber_id, service_type, refund_amount, reason)` RPC. The server clears the active subscription, marks history cancelled, and posts the refund payment in one transaction.
+- **Balance trigger is now the sole writer of `cable_balance` / `internet_balance`.** Three client paths used to mutate balance directly: `Index.tsx` (manual transactions), `AddPackageSubscriptionDialog` (subscription creation), and `SubscriberDetail` (cancellation). All three have been removed. The pre-existing `transactions_recalc_balance` trigger recomputes balances from the immutable ledger after every insert/update/delete.
+- **Refunds capped at the original charge in the server.** `cancel_subscription` rejects refund amounts greater than `packPrice × duration` — the UI's `max` attribute was the only check before.
+- See `docs/ARCHITECTURE_DECISIONS.md` ADR-012 for full context. Phases 2–4 (constraints/triggers on subscriber writes, referential integrity, transaction provider/service validation) are next.
+
+
 ### Fixed — Lifecycle integrity round 2 (2026-06-09)
 - **Inventory trigger attached.** The `sync_stb_inventory_on_subscriber_change`
   function existed but was never wired up as a trigger, so cable STB
