@@ -33,6 +33,21 @@ export const friendlyDbError = (error: any, fallback: string): string => {
     if (text.includes("complaints_resolved_has_date")) return "A resolved complaint must have a resolution date.";
     if (text.includes("complaints_category_check")) return "Invalid complaint category.";
     if (text.includes("complaints_priority_check")) return "Invalid priority level.";
+    if (text.includes("subscribers_services_valid"))
+      return "A subscriber must have at least one service (Cable or Internet).";
+    // Subscribers invariants trigger (Phase 2)
+    if (text.includes("An STB number is required when the Cable service is enabled"))
+      return "An STB is required for Cable. Select an STB before saving.";
+    if (text.includes("Cannot remove the Cable service while an active cable subscription"))
+      return "Cancel the active cable subscription before removing the Cable service.";
+    if (text.includes("Cannot remove the Internet service while an active internet plan"))
+      return "Cancel the active internet plan before removing the Internet service.";
+    if (text.includes("Cannot change the STB while an active cable subscription"))
+      return "Cannot change the STB while a cable subscription is active. Cancel the subscription first, then reassign the device.";
+    if (text.includes("Cannot change the Cable provider while an active cable subscription"))
+      return "Cannot change the Cable provider while a cable subscription is active.";
+    if (text.includes("Cannot change the Internet provider while an active internet plan"))
+      return "Cannot change the Internet provider while an internet plan is active.";
     // Immutable ledger guards raised by triggers
     if (text.includes("Transactions cannot be deleted"))
       return "This subscriber has financial transactions on the immutable ledger, which cannot be deleted. Historical financial records must be preserved.";
@@ -44,6 +59,7 @@ export const friendlyDbError = (error: any, fallback: string): string => {
       return "Transactions can only be voided through the Void action.";
     if (text.includes("subscription_charge") || text.includes("subscription_refund"))
       return "This charge was created by a subscription action. Undo it by cancelling or refunding the subscription instead of voiding the ledger row.";
+
     return "Value failed a validation check.";
   }
 
