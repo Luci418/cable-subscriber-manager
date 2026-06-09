@@ -142,12 +142,15 @@ export const SubscriberDetail = ({
     });
     setDeleteChecking(false);
     if (error) {
-      setDeleteBlockers(['Unable to check deletion eligibility. Please try again.']);
+      console.error('check_subscriber_deletable failed:', error);
+      const reason = error.message || error.details || error.hint || 'Unknown error';
+      setDeleteBlockers([`Unable to check deletion eligibility — ${reason}. Please try again.`]);
       return;
     }
     const blockers = (data?.blockers as string[]) || [];
     setDeleteBlockers(blockers);
   };
+
 
   // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
   // RPC before every fetch, and an hourly pg_cron job runs the same function.
