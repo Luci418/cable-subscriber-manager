@@ -348,6 +348,7 @@ export const EditSubscriberDialog = ({
               <Select
                 value={formData.stbNumber}
                 onValueChange={(value) => setFormData({ ...formData, stbNumber: value })}
+                disabled={hasActiveCableSub}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select STB" />
@@ -367,8 +368,14 @@ export const EditSubscriberDialog = ({
                   )}
                 </SelectContent>
               </Select>
+              {hasActiveCableSub && (
+                <p className="text-xs text-muted-foreground">
+                  STB is locked while a cable subscription is active. Cancel the subscription to reassign.
+                </p>
+              )}
             </div>
           )}
+
 
           {wantsInternet && (
             <div className="space-y-2">
@@ -378,6 +385,7 @@ export const EditSubscriberDialog = ({
                 onValueChange={(value) =>
                   setFormData({ ...formData, internetDeviceId: value })
                 }
+                disabled={hasActiveInternetSub}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select ONU/Router" />
@@ -397,8 +405,14 @@ export const EditSubscriberDialog = ({
                   )}
                 </SelectContent>
               </Select>
+              {hasActiveInternetSub && (
+                <p className="text-xs text-muted-foreground">
+                  Internet device is locked while an internet plan is active. Cancel the plan to reassign.
+                </p>
+              )}
             </div>
           )}
+
 
           <div className="space-y-2">
             <Label>Location Coordinates</Label>
