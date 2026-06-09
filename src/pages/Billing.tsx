@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Calendar, CreditCard, History, Settings as SettingsIcon, Tv, Wifi } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, History, Settings as SettingsIcon, Tv, Wifi, Wallet } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { usePacks } from '@/hooks/usePacks';
@@ -14,6 +17,7 @@ import { toast } from 'sonner';
 import { friendlyDbError } from '@/lib/dbErrors';
 import { RecentVoidsCard } from '@/components/RecentVoidsCard';
 import type { Database } from '@/integrations/supabase/types';
+
 
 type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
 
@@ -26,7 +30,7 @@ type ServiceFilter = 'all' | 'cable' | 'internet';
 export const Billing = ({ onBack }: BillingProps) => {
   const { user } = useAuth();
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
-  const { subscribers, loading: subscribersLoading } = useSubscribers(user?.id);
+  const { subscribers, loading: subscribersLoading, reloadSubscribers } = useSubscribers(user?.id);
   const { packs } = usePacks(user?.id);
   const loading = false;
 
@@ -35,6 +39,51 @@ export const Billing = ({ onBack }: BillingProps) => {
   const [serviceFilter, setServiceFilter] = useState<ServiceFilter>(() =>
     bothEnabled ? 'all' : internetEnabled && !cableEnabled ? 'internet' : 'cable'
   );
+
+  // "Record payment" flow — operator-facing alternative to manually opening
+  // a subscriber and adding a payment transaction. The ledger row created
+  // here is identical to a hand-entered manual payment (source=manual_payment),
+  // so the immutable ledger guarantees still apply.
+  const [payLine, setPayLine] = useState<ServiceLine | null>(null);
+  const [payAmount, setPayAmount] = useState<string>('');
+  const [paySaving, setPaySaving] = useState(false);
+
+  const openRecordPayment = (line: ServiceLine) => {
+    setPayLine(line);
+    setPayAmount(line.balance > 0 ? line.balance.toFixed(2) : '');
+  };
+
+  const submitRecordPayment = async () => {
+    if (!payLine || !user?.id) return;
+    const amount = Number(payAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Enter a positive amount.');
+      return;
+    }
+    setPaySaving(true);
+    const { error } = await (supabase.from('transactions') as any).insert({
+      user_id: user.id,
+      subscriber_id: payLine.subscriber.id,
+      type: 'payment',
+      amount,
+      service_type: payLine.service,
+      source: 'manual_payment',
+      provider_id: payLine.service === 'cable'
+        ? (payLine.subscriber as any).cable_provider_id
+        : (payLine.subscriber as any).internet_provider_id,
+      description: `Payment received — ${payLine.service === 'cable' ? 'Cable' : 'Internet'} dues`,
+      date: new Date().toISOString(),
+    });
+    setPaySaving(false);
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to record payment'));
+      return;
+    }
+    toast.success(`Payment of ₹${amount.toFixed(2)} recorded.`);
+    setPayLine(null);
+    await reloadSubscribers();
+  };
+
 
 
   // Per-subscriber view of one service line (cable or internet). We compute
@@ -303,6 +352,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                       <TableHead>End Date</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -326,10 +376,18 @@ export const Billing = ({ onBack }: BillingProps) => {
                             ₹{line.balance.toFixed(2)}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right">
+                          {line.balance > 0 ? (
+                            <Button size="sm" variant="outline" onClick={() => openRecordPayment(line)}>
+                              <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
+                            </Button>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
               )}
             </CardContent>
           </Card>
@@ -353,6 +411,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                       <TableHead>Last Pack</TableHead>
                       <TableHead>Region</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -372,6 +431,13 @@ export const Billing = ({ onBack }: BillingProps) => {
                             ₹{line.balance.toFixed(2)}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right">
+                          {line.balance > 0 ? (
+                            <Button size="sm" variant="outline" onClick={() => openRecordPayment(line)}>
+                              <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
+                            </Button>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -383,6 +449,45 @@ export const Billing = ({ onBack }: BillingProps) => {
       </Tabs>
 
       <RecentVoidsCard />
+
+      {/* Record Payment dialog — creates an immutable manual_payment ledger row. */}
+      <Dialog open={!!payLine} onOpenChange={(o) => { if (!o) setPayLine(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              {payLine && (
+                <>
+                  {payLine.subscriber.name} • {payLine.service === 'cable' ? 'Cable' : 'Internet'} •
+                  {' '}Outstanding: <span className="font-medium text-destructive">₹{payLine.balance.toFixed(2)}</span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="pay-amt">Amount received (₹)</Label>
+            <Input
+              id="pay-amt"
+              type="number"
+              min="0"
+              step="0.01"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Posts a payment to the immutable ledger. Use Void from the subscriber page if entered incorrectly.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayLine(null)} disabled={paySaving}>Cancel</Button>
+            <Button onClick={submitRecordPayment} disabled={paySaving}>
+              {paySaving ? 'Saving…' : 'Mark as Paid'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+

@@ -34,7 +34,10 @@ interface SubscriberRow {
   latitude?: number | null;
   longitude?: number | null;
   services?: string[] | null;
+  current_subscription?: any | null;
+  internet_subscription?: any | null;
 }
+
 
 interface EditSubscriberDialogProps {
   open: boolean;
@@ -122,7 +125,27 @@ export const EditSubscriberDialog = ({
       (s.status === 'available' || s.id === originalInternetDeviceId)
   );
 
+  // Service uncheck is blocked while there's an active subscription on that
+  // service. This prevents impossible states (subscription rows orphaned from
+  // their service line) — operator must Cancel the subscription first.
+  const hasActiveCableSub =
+    !!subscriber.current_subscription &&
+    new Date(subscriber.current_subscription?.endDate || 0).getTime() > Date.now();
+  const hasActiveInternetSub =
+    !!subscriber.internet_subscription &&
+    new Date(subscriber.internet_subscription?.endDate || 0).getTime() > Date.now();
+
   const toggleService = (svc: 'cable' | 'internet', checked: boolean) => {
+    if (!checked) {
+      if (svc === 'cable' && hasActiveCableSub) {
+        toast.error('Cancel the active Cable subscription before removing the service.');
+        return;
+      }
+      if (svc === 'internet' && hasActiveInternetSub) {
+        toast.error('Cancel the active Internet plan before removing the service.');
+        return;
+      }
+    }
     setFormData((prev) => ({
       ...prev,
       services: checked
@@ -132,6 +155,7 @@ export const EditSubscriberDialog = ({
       ...(svc === 'internet' && !checked ? { internetDeviceId: '' } : {}),
     }));
   };
+
 
   const getCoordinates = () => {
     if (!navigator.geolocation) {
@@ -290,28 +314,33 @@ export const EditSubscriberDialog = ({
             <div className="space-y-2">
               <Label>Services *</Label>
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
+                <label className={`flex items-center gap-2 rounded-md border p-3 ${hasActiveCableSub && wantsCable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-accent'}`}>
                   <Checkbox
                     checked={wantsCable}
                     onCheckedChange={(c) => toggleService('cable', !!c)}
+                    disabled={hasActiveCableSub && wantsCable}
                   />
                   <Tv className="h-4 w-4" />
                   <span className="text-sm font-medium">Cable</span>
                 </label>
-                <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
+                <label className={`flex items-center gap-2 rounded-md border p-3 ${hasActiveInternetSub && wantsInternet ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-accent'}`}>
                   <Checkbox
                     checked={wantsInternet}
                     onCheckedChange={(c) => toggleService('internet', !!c)}
+                    disabled={hasActiveInternetSub && wantsInternet}
                   />
                   <Wifi className="h-4 w-4" />
                   <span className="text-sm font-medium">Internet</span>
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Removing a service unassigns its device and clears the active plan. Balances are kept.
+                {(hasActiveCableSub || hasActiveInternetSub)
+                  ? 'Active subscriptions must be cancelled before removing their service.'
+                  : 'Removing a service unassigns its device and clears the active plan. Balances are kept.'}
               </p>
             </div>
           )}
+
 
           {wantsCable && (
             <div className="space-y-2">

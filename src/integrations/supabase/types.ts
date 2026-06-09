@@ -500,6 +500,7 @@ export type Database = {
         Args: { p_service_type: string; p_subscriber_id: string }
         Returns: undefined
       }
+      reconcile_stb_inventory: { Args: never; Returns: Json }
       void_transaction: {
         Args: {
           p_reason: string

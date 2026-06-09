@@ -84,10 +84,15 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   };
 
   const handleMarkFaulty = async (id: string) => {
+    // `prompt` returns null when the user clicks Cancel — abort entirely so
+    // we don't silently mark the device faulty. Empty string ("OK" with no
+    // text) is treated as "no reason provided" and proceeds.
     const reason = prompt('Reason (optional):');
+    if (reason === null) return;
     const ok = await markAsFaulty(id, reason || undefined);
     if (ok) toast.success('Marked as faulty');
   };
+
 
   const handleRepair = async (id: string) => {
     const ok = await markAsRepaired(id);
@@ -95,12 +100,13 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   };
 
   const handleDecommission = async (id: string) => {
-    if (confirm('Decommission this device?')) {
-      const reason = prompt('Reason (optional):');
-      const ok = await decommission(id, reason || undefined);
-      if (ok) toast.success('Decommissioned');
-    }
+    if (!confirm('Decommission this device?')) return;
+    const reason = prompt('Reason (optional):');
+    if (reason === null) return;
+    const ok = await decommission(id, reason || undefined);
+    if (ok) toast.success('Decommissioned');
   };
+
 
   // Filter inventory for the active service tab. Legacy rows without
   // service_type are treated as cable to preserve existing data.
