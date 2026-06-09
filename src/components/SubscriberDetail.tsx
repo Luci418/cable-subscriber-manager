@@ -257,53 +257,25 @@ export const SubscriberDetail = ({
 
 
   const handleCancelSubscription = async (refundAmount: number) => {
-    // Service-aware cancellation. Reads the matching subscription/history/balance
-    // columns based on which tab triggered the cancel.
+    // Phase 1 (ADR-012): cancellation goes through a single atomic RPC.
+    // The server clears current_subscription, marks history cancelled, and
+    // inserts the refund payment on the ledger in one transaction. The
+    // balance trigger recomputes cable_balance / internet_balance — we
+    // never write balance from the client.
     const isInternet = cancelService === 'internet';
-    const subCol = isInternet ? 'internet_subscription' : 'current_subscription';
-    const histCol = isInternet ? 'internet_subscription_history' : 'subscription_history';
-    const packCol = isInternet ? 'current_internet_pack' : 'current_pack';
-    const balCol = isInternet ? 'internet_balance' : 'cable_balance';
     const label = isInternet ? 'Internet' : 'Cable';
 
-    const activeSub = (subscriber as any)[subCol];
-    if (!activeSub) return;
-
-    const history = ((subscriber as any)[histCol] || []).map((sub: any) =>
-      sub.id === activeSub.id ? { ...sub, status: 'cancelled', endDate: new Date().toISOString() } : sub
-    );
-
-    const currentBalance = Number((subscriber as any)[balCol] || 0);
-    const newBalance = refundAmount > 0 ? currentBalance - refundAmount : currentBalance;
-
-    const updates: Record<string, any> = {
-      [subCol]: null,
-      [histCol]: history,
-      [packCol]: null,
-      [balCol]: newBalance,
-    };
-
-    const { error } = await (supabase.from('subscribers') as any)
-      .update(updates)
-      .eq('id', subscriber.id);
+    const { error } = await (supabase as any).rpc('cancel_subscription', {
+      p_subscriber_id: subscriber.id,
+      p_service_type: cancelService,
+      p_refund_amount: refundAmount || 0,
+      p_reason: null,
+    });
 
     if (error) {
-      toast.error(`Failed to cancel ${label.toLowerCase()} subscription`);
+      toast.error(error.message || `Failed to cancel ${label.toLowerCase()} subscription`);
       console.error(error);
       return;
-    }
-
-    if (refundAmount > 0) {
-      await supabase.from('transactions').insert({
-        subscriber_id: subscriber.id,
-        user_id: (subscriber as any).user_id,
-        type: 'payment',
-        amount: refundAmount,
-        service_type: cancelService,
-        source: 'subscription_refund',
-        description: `Refund for cancelled ${label.toLowerCase()} subscription: ${activeSub.packName}`,
-        date: new Date().toISOString(),
-      } as any);
     }
 
     toast.success(refundAmount > 0
