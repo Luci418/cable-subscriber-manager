@@ -395,31 +395,47 @@ export const SubscriberDetail = ({
 
               <Separator />
 
-              {/* Per-service balance summary */}
+              {/* Per-service balance summary — also surfaces provider + active pack
+                  so operators see WHO delivers each service at a glance. */}
               <div className={`grid gap-4 ${showCableTab && showInternetTab ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
                 {showCableTab && (
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center gap-2 mb-1 text-sm text-muted-foreground">
+                  <div className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Tv className="h-4 w-4" />
-                      <span>Cable {(subscriber.cable_balance || 0) >= 0 ? 'Dues' : 'Advance'}</span>
+                      <span>Cable</span>
+                      <span className="ml-auto text-xs">
+                        {(subscriber.cable_balance || 0) >= 0 ? 'Dues' : 'Advance'}
+                      </span>
                     </div>
                     <p className={`text-2xl font-bold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
                       ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}
                     </p>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p><span className="font-medium text-foreground">Provider:</span> {providerNames.cable || '—'}</p>
+                      <p><span className="font-medium text-foreground">Pack:</span> {currentSub?.packName || subscriber.pack || '—'}</p>
+                    </div>
                   </div>
                 )}
                 {showInternetTab && (
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center gap-2 mb-1 text-sm text-muted-foreground">
+                  <div className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Wifi className="h-4 w-4" />
-                      <span>Internet {(subscriber.internet_balance || 0) >= 0 ? 'Dues' : 'Advance'}</span>
+                      <span>Internet</span>
+                      <span className="ml-auto text-xs">
+                        {(subscriber.internet_balance || 0) >= 0 ? 'Dues' : 'Advance'}
+                      </span>
                     </div>
                     <p className={`text-2xl font-bold ${getBalanceColor(subscriber.internet_balance || 0)}`}>
                       ₹{Math.abs(subscriber.internet_balance || 0).toFixed(2)}
                     </p>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p><span className="font-medium text-foreground">Provider:</span> {providerNames.internet || '—'}</p>
+                      <p><span className="font-medium text-foreground">Plan:</span> {internetSub?.packName || (subscriber as any).current_internet_pack || '—'}</p>
+                    </div>
                   </div>
                 )}
               </div>
+
             </CardContent>
           </Card>
         </TabsContent>
