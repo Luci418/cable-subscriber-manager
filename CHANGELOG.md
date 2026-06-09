@@ -10,6 +10,35 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Fixed — Lifecycle integrity round 2 (2026-06-09)
+- **Inventory trigger attached.** The `sync_stb_inventory_on_subscriber_change`
+  function existed but was never wired up as a trigger, so cable STB
+  assignments could drift out of sync with `subscribers.stb_number` (STBs
+  showing as Available while clearly assigned). The trigger is now attached
+  to `subscribers`, and a one-time reconciliation migration heals existing
+  drift. A `reconcile_stb_inventory()` RPC is available for future use.
+- **Service uncheck blocked while a subscription is active.** Removing Cable or
+  Internet from a subscriber's services in Edit Subscriber is now disabled
+  when the corresponding subscription is still active. Operators must Cancel
+  the subscription first, eliminating the orphaned-subscription state where
+  re-enabling the service would resurrect the old pack.
+- **Mark Faulty / Decommission no longer apply on Cancel.** Cancelling the
+  reason prompt now aborts the operation instead of silently committing the
+  state change.
+- **Delete eligibility surfaces real errors.** When the
+  `check_subscriber_deletable` RPC fails, the dialog now shows the underlying
+  Postgres message instead of a generic "Please try again" string.
+- **Overview surfaces provider + pack per service.** The per-service balance
+  cards on the subscriber Overview now display the linked provider and the
+  active pack/plan name, making the full service relationship visible without
+  switching tabs.
+- **Billing → "Record Payment".** Lines with an outstanding balance now have a
+  Record Payment / Mark as Paid action that posts a `manual_payment` ledger
+  row in one step, removing the need to navigate into each subscriber. The
+  immutable-ledger guarantees still apply (use Void to undo).
+
+
+
 ### Changed — Subscriber profile clarity & actionable validation
 - **Subscriber profile surfaces the full service relationship.** Each service
   card (Cable / Internet) now shows the linked provider name alongside the
