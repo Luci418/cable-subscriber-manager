@@ -224,35 +224,14 @@ export const SubscriberDetail = ({
     setShowVoidDialog(true);
   };
 
-  // Apply or reverse a transaction's balance impact on the matching service column.
-  // Payment & refund both reduce debt; charge increases debt.
-  const balanceDelta = (
-    type: 'payment' | 'charge' | 'refund',
-    amount: number,
-    sign: 1 | -1, // +1 to apply, -1 to reverse
-  ) => (type === 'charge' ? amount : -amount) * sign;
-
-  const applyBalanceChange = async (
-    service: 'cable' | 'internet',
-    delta: number,
-  ) => {
-    if (delta === 0) return true;
-    const balCol = service === 'internet' ? 'internet_balance' : 'cable_balance';
-    const current = Number((subscriber as any)[balCol] || 0);
-    const { error } = await (supabase.from('subscribers') as any)
-      .update({ [balCol]: current + delta })
-      .eq('id', subscriber.id);
-    if (error) {
-      toast.error(friendlyDbError(error, 'Failed to update subscriber balance'));
-      return false;
-    }
-    return true;
-  };
-
   // Per ADR-011 (hardened, 2026-06-08): transaction rows are fully immutable.
   // Description and source are frozen along with all financial fields. To add
   // context after the fact, operators use transaction_notes (append-only).
   // Voids are handled by VoidTransactionDialog via the void_transaction RPC.
+  //
+  // Per ADR-012 (Phase 1, 2026-06-09): cable_balance / internet_balance are
+  // never written from the client. The transactions_recalc_balance trigger
+  // recomputes them from the immutable ledger on every change.
 
 
 
