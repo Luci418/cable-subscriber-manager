@@ -352,6 +352,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                       <TableHead>End Date</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -375,10 +376,18 @@ export const Billing = ({ onBack }: BillingProps) => {
                             ₹{line.balance.toFixed(2)}
                           </span>
                         </TableCell>
+                        <TableCell className="text-right">
+                          {line.balance > 0 ? (
+                            <Button size="sm" variant="outline" onClick={() => openRecordPayment(line)}>
+                              <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
+                            </Button>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
               )}
             </CardContent>
           </Card>
