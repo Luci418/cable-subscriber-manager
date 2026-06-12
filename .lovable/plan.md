@@ -19,8 +19,13 @@
 
 1. **Phase 1 — Atomic RPCs ✅ DONE**
 2. **Phase 2 — Subscriber hard constraints ✅ DONE** (revisit C4 portability per BUSINESS_MODEL §B/C — trigger over-restricts)
-3. **Phase 3 — Referential integrity (FK migration)** — region_id, pack_id,
-   internet_pack_id, providers.service_type, stb FK. Unblocks INV-28/30.
+3. **Phase 3 — Referential integrity (FK migration) ✅ DONE (2026-06-12)** —
+   FKs added for subscribers↔regions/packs/providers, packs↔providers,
+   transactions↔subscribers/providers/self, stb_inventory↔subscribers,
+   transaction_notes↔transactions (CASCADE), complaints↔subscribers.
+   New nullable `region_id`, `current_pack_id`, `current_internet_pack_id`
+   on subscribers; text columns retained for now (Phase 4 retires them).
+   No backfill — demo data reseed.
 4. **Phase 3.5 — Customer status & archive** — `customer_status` enum
    (active/prospect/archived); operator-set, never trigger-overwritten
    (INV-02 scope).
