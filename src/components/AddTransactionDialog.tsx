@@ -22,10 +22,12 @@ import { Tv, Wifi } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProviders } from '@/hooks/useProviders';
 
+type ManualTxnType = 'payment' | 'charge' | 'adjustment' | 'refund';
+
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null }) => void;
+  onSubmit: (data: { type: ManualTxnType; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null }) => void;
   subscriber: Subscriber;
 }
 
@@ -67,7 +69,7 @@ export const AddTransactionDialog = ({
   };
 
   const [formData, setFormData] = useState({
-    type: 'payment' as 'payment' | 'charge',
+    type: 'payment' as ManualTxnType,
     amount: '',
     description: '',
     service_type: defaultService,
@@ -143,14 +145,21 @@ export const AddTransactionDialog = ({
             <Label htmlFor="type">Type</Label>
             <Select
               value={formData.type}
-              onValueChange={(value: 'payment' | 'charge') => setFormData({ ...formData, type: value })}
+              onValueChange={(value: ManualTxnType) => setFormData({ ...formData, type: value })}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="payment">Cash Received</SelectItem>
-                <SelectItem value="charge">Bill</SelectItem>
+                <SelectItem value="charge">Bill / Charge</SelectItem>
+                <SelectItem value="adjustment">Adjustment (goodwill / non-cash credit)</SelectItem>
+                <SelectItem value="refund">Cash Refund</SelectItem>
               </SelectContent>
             </Select>
+            {formData.type === 'adjustment' && (
+              <p className="text-xs text-muted-foreground">
+                Non-cash credit. Reduces what the subscriber owes but stays separate from cash collected in reports.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
