@@ -31,7 +31,7 @@
    default `prospect`. Existing rows with any subscription history
    seeded as `active`. Operator-set only; no trigger ever overwrites it
    (INV-02). DB does not gate actions on archived yet — UI gate in Phase 5.
-5. **Phase 3.6 — Device assignment log + `replace_device` RPC.**
+5. **Phase 3.6 — Device assignment log + `replace_device` RPC ✅ DONE (2026-06-12).**
    - Retire the current `stb_number`-change block in
      `subscribers_enforce_invariants`. It guards the wrong thing.
    - Replace with an **inventory-agreement check**: if `stb_number` is being
