@@ -24,8 +24,29 @@
 4. **Phase 3.5 — Customer status & archive** — `customer_status` enum
    (active/prospect/archived); operator-set, never trigger-overwritten
    (INV-02 scope).
-5. **Phase 3.6 — Device assignment log + `replace_device` RPC** — relaxes
-   Phase 2 stb-change block; logs swaps with reason; enforces INV at DB.
+5. **Phase 3.6 — Device assignment log + `replace_device` RPC.**
+   - Retire the current `stb_number`-change block in
+     `subscribers_enforce_invariants`. It guards the wrong thing.
+   - Replace with an **inventory-agreement check**: if `stb_number` is being
+     set to a non-null value, a row must exist in `stb_inventory` with
+     `serial_number = NEW.stb_number`, `status = 'assigned'`,
+     `subscriber_id = NEW.id`. Inventory is the authority; the subscriber
+     row can only mirror what inventory already confirms.
+   - `replace_device(p_subscriber_id, p_old_serial, p_new_serial, p_reason)`
+     runs in one txn, in this order:
+     1. verify old device is assigned to this subscriber
+     2. verify new device exists, `status='available'`, service_type matches
+     3. set old → `faulty`, `subscriber_id = NULL`
+     4. set new → `assigned`, `subscriber_id = subscriber`
+     5. write `device_assignment_log` (close old, open new, reason)
+     6. update active subscription blob's device reference
+     7. update `subscribers.stb_number` → trigger sees inventory agrees → pass
+   - No session flag, no SECURITY DEFINER bypass, no caller awareness.
+     Ordering inside the RPC + the data-consistency trigger = workflow gate.
+     Any other path (UI, console, raw SQL) fails the trigger because
+     inventory wasn't updated first.
+   - Add `device_assignment_log` table here (subscriber_id, device serial,
+     opened_at, closed_at, close_reason enum, opened_by, closed_by).
 6. **Phase 3.7 — `adjustment` transaction type** — first-class, separated
    from cash payments in reports; tracks credit origin (D3/D4).
 7. **Phase 4 — Normalize `subscriptions` table** — informed by §1.1 immutability;
