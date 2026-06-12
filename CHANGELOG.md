@@ -10,6 +10,13 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Phase 3.7 — First-class `adjustment` transaction type (2026-06-12)
+- Extended `transactions.type` CHECK to accept `adjustment` alongside `payment` / `charge` / `refund` (per BUSINESS_MODEL §D7 / INV-D7).
+- `recalc_subscriber_balance` now treats `adjustment` as a credit (`-amount`), so it reduces what the subscriber owes — but it is **not** counted as cash. Daily cash reports continue to be `SUM(type='payment')` only; balance impact uses all non-voided rows. The two are never conflated.
+- `void_transaction` now maps `adjustment → charge` for the reversal row, mirroring the `payment → charge` mapping. Voiding an adjustment credit cleanly returns the balance to its pre-adjustment state.
+- UI: `AddTransactionDialog` now offers **Adjustment (goodwill / non-cash credit)** as a third type alongside Cash Received and Bill. `Index.handleAddTransaction` routes it to `source = 'adjustment'`.
+- Tested: end-to-end SQL test of T1 (adjustment credit reduces balance) and T2 (void returns balance to baseline) — both pass.
+
 ### Phase 3.6 — Device assignment log + `replace_device` RPC (2026-06-12)
 - Added `device_assignment_log` table: every device assignment open/close (subscriber, serial, device_type, service_type, reason, opened/closed timestamps and actors). Append-style history of which device served which subscriber.
 - Retired the old "block STB change while an active cable subscription exists" rule in `subscribers_enforce_invariants`. It guarded the wrong thing.
