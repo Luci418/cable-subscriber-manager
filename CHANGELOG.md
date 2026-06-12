@@ -10,6 +10,13 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Phase 3.5 — Customer status enum (2026-06-12)
+- Added `customer_status` enum on `subscribers` (`prospect` / `active` / `archived`), default `prospect`, per BUSINESS_MODEL §A1–A3 / INV-02.
+- One-time seed: any subscriber with current or historical subscription data flipped to `active`; everyone else remains `prospect`. Archive must be operator-set.
+- **Operator-set only** — no trigger ever overwrites this field. DB-level gating of actions on archived subscribers is deferred to Phase 5 UI work.
+- Added `(user_id, customer_status)` index for list filtering.
+
+
 ### Phase 3 — Referential integrity / FK migration (2026-06-12)
 - Added foreign keys across the schema so orphan references are no longer possible (INV-28/30):
   - `subscribers` → `regions`, `packs` (cable + internet), `providers` (cable + internet)
