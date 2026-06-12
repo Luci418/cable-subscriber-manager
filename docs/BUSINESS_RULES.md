@@ -1,8 +1,26 @@
 # Business Rules
 
+> **Authoritative source:** [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) (v3.0) is
+> the single source of truth for business semantics, lifecycle rules, and the
+> full invariant matrix (INV-01 … INV-33). This file is a plain-language
+> summary; where the two disagree, BUSINESS_MODEL.md wins.
+>
+> Quick map:
+> - Subscription mental model (DTH/recharge, immutable history) → §1.1
+> - The Five Separations → §1.2
+> - Subscriber lifecycle, statuses, archive → Part 2 (A1–A3)
+> - Subscription lifecycle, mid-cycle change, suspend → Part 3 (B1–B5)
+> - Device assignment, swap, faulty workflow → Part 4 (C1–C4)
+> - Money/ledger, refunds, adjustments, credit origin → Part 5 (D1–D7)
+> - Provider re-tagging and portability → Part 6 (E1–E2)
+> - Backdating window → Part 7 (F1–F4)
+> - Operator communicability (next-action, passbook) → Part 8 (G1–G5)
+> - Full invariant matrix → Part 12
+> - Revised build order (Phase 3 FK → status → device log → adjustments → UI) → Part 13
+
 This document describes *what the system does* in plain language. It should be
 readable by the owner or office staff without opening any code. When behavior
-changes, update this file *and* the CHANGELOG.
+changes, update BUSINESS_MODEL.md first, then this file *and* the CHANGELOG.
 
 > Terminology note: this document uses the generic business concepts —
 > **Subscriber**, **Service Type**, **Provider**, **Pack**, **Subscription**,
