@@ -54,8 +54,10 @@
      inventory wasn't updated first.
    - Add `device_assignment_log` table here (subscriber_id, device serial,
      opened_at, closed_at, close_reason enum, opened_by, closed_by).
-6. **Phase 3.7 — `adjustment` transaction type** — first-class, separated
-   from cash payments in reports; tracks credit origin (D3/D4).
+6. **Phase 3.7 — `adjustment` transaction type ✅ DONE (2026-06-12)** —
+   first-class, separated from cash payments in reports; balance trigger
+   treats adjustment as credit; void maps it to an offsetting charge;
+   UI now exposes it in `AddTransactionDialog`.
 7. **Phase 4 — Normalize `subscriptions` table** — informed by §1.1 immutability;
    columns shaped by Part 8 (statement view, next-action chip).
 8. **Phase 5 — Transaction validation triggers + passbook UI + next-action chip.**
