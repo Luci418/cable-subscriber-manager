@@ -10,6 +10,19 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Phase 3 — Referential integrity / FK migration (2026-06-12)
+- Added foreign keys across the schema so orphan references are no longer possible (INV-28/30):
+  - `subscribers` → `regions`, `packs` (cable + internet), `providers` (cable + internet)
+  - `packs` → `providers`
+  - `transactions` → `subscribers` (RESTRICT), `providers` (SET NULL), self (`reverses_transaction_id`)
+  - `stb_inventory` → `subscribers` (SET NULL — releases device on subscriber delete)
+  - `transaction_notes` → `transactions` (CASCADE — notes are children)
+  - `complaints` → `subscribers` (RESTRICT)
+- Added new nullable FK columns on `subscribers`: `region_id`, `current_pack_id`, `current_internet_pack_id`. Existing text columns (`region`, `current_pack`, `current_internet_pack`) remain in place; Phase 4 normalization will retire them and the JSONB subscription blobs.
+- Added supporting indexes on every new FK column.
+- No data backfill — demo data will be reseeded per user direction.
+
+
 ### Docs — BUSINESS_MODEL.md v3.0 committed as authoritative spec (2026-06-12)
 - Added `docs/BUSINESS_MODEL.md` (v3.0) as the single source of truth for business semantics, lifecycle rules, and the invariant matrix (INV-01 … INV-33). All 7 Lovable refinements applied; OQ-1 (outage = adjustment credit) and OQ-2 (7-day configurable backdating window) closed.
 - Retired `docs/INVARIANT_WORKSHEET.md` (stub now points at BUSINESS_MODEL.md).

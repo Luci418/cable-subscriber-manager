@@ -113,6 +113,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "packs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "packs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -267,7 +274,9 @@ export type Database = {
           cable_provider_id: string | null
           created_at: string
           current_internet_pack: string | null
+          current_internet_pack_id: string | null
           current_pack: string | null
+          current_pack_id: string | null
           current_subscription: Json | null
           id: string
           internet_balance: number
@@ -280,6 +289,7 @@ export type Database = {
           mobile: string
           name: string
           region: string | null
+          region_id: string | null
           services: string[]
           stb_number: string | null
           subscriber_id: string
@@ -292,7 +302,9 @@ export type Database = {
           cable_provider_id?: string | null
           created_at?: string
           current_internet_pack?: string | null
+          current_internet_pack_id?: string | null
           current_pack?: string | null
+          current_pack_id?: string | null
           current_subscription?: Json | null
           id?: string
           internet_balance?: number
@@ -305,6 +317,7 @@ export type Database = {
           mobile: string
           name: string
           region?: string | null
+          region_id?: string | null
           services?: string[]
           stb_number?: string | null
           subscriber_id: string
@@ -317,7 +330,9 @@ export type Database = {
           cable_provider_id?: string | null
           created_at?: string
           current_internet_pack?: string | null
+          current_internet_pack_id?: string | null
           current_pack?: string | null
+          current_pack_id?: string | null
           current_subscription?: Json | null
           id?: string
           internet_balance?: number
@@ -330,6 +345,7 @@ export type Database = {
           mobile?: string
           name?: string
           region?: string | null
+          region_id?: string | null
           services?: string[]
           stb_number?: string | null
           subscriber_id?: string
@@ -338,6 +354,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subscribers_cable_provider_id_fkey"
+            columns: ["cable_provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscribers_current_internet_pack_id_fkey"
+            columns: ["current_internet_pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscribers_current_pack_id_fkey"
+            columns: ["current_pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscribers_internet_provider_id_fkey"
+            columns: ["internet_provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscribers_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subscribers_user_id_fkey"
             columns: ["user_id"]
@@ -456,6 +507,13 @@ export type Database = {
           voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_reverses_transaction_id_fkey"
             columns: ["reverses_transaction_id"]
