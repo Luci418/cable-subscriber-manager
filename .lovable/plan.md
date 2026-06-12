@@ -26,9 +26,11 @@
    New nullable `region_id`, `current_pack_id`, `current_internet_pack_id`
    on subscribers; text columns retained for now (Phase 4 retires them).
    No backfill — demo data reseed.
-4. **Phase 3.5 — Customer status & archive** — `customer_status` enum
-   (active/prospect/archived); operator-set, never trigger-overwritten
-   (INV-02 scope).
+4. **Phase 3.5 — Customer status & archive ✅ DONE (2026-06-12)** —
+   `customer_status` enum (prospect/active/archived) on subscribers,
+   default `prospect`. Existing rows with any subscription history
+   seeded as `active`. Operator-set only; no trigger ever overwrites it
+   (INV-02). DB does not gate actions on archived yet — UI gate in Phase 5.
 5. **Phase 3.6 — Device assignment log + `replace_device` RPC.**
    - Retire the current `stb_number`-change block in
      `subscribers_enforce_invariants`. It guards the wrong thing.

@@ -278,6 +278,7 @@ export type Database = {
           current_pack: string | null
           current_pack_id: string | null
           current_subscription: Json | null
+          customer_status: Database["public"]["Enums"]["customer_status"]
           id: string
           internet_balance: number
           internet_provider_id: string | null
@@ -306,6 +307,7 @@ export type Database = {
           current_pack?: string | null
           current_pack_id?: string | null
           current_subscription?: Json | null
+          customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
           internet_balance?: number
           internet_provider_id?: string | null
@@ -334,6 +336,7 @@ export type Database = {
           current_pack?: string | null
           current_pack_id?: string | null
           current_subscription?: Json | null
+          customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
           internet_balance?: number
           internet_provider_id?: string | null
@@ -587,6 +590,7 @@ export type Database = {
       }
     }
     Enums: {
+      customer_status: "prospect" | "active" | "archived"
       stb_status: "available" | "assigned" | "faulty" | "decommissioned"
       transaction_source:
         | "manual_charge"
@@ -730,6 +734,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      customer_status: ["prospect", "active", "archived"],
       stb_status: ["available", "assigned", "faulty", "decommissioned"],
       transaction_source: [
         "manual_charge",
