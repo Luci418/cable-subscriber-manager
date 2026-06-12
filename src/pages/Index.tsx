@@ -123,21 +123,26 @@ const Index = () => {
     setView('detail');
   };
 
-  const handleAddTransaction = async (data: { type: 'payment' | 'charge' | 'refund'; amount: number; description: string; service_type?: 'cable' | 'internet'; provider_id?: string | null }) => {
+  const handleAddTransaction = async (data: { type: 'payment' | 'charge' | 'refund' | 'adjustment'; amount: number; description: string; service_type?: 'cable' | 'internet'; provider_id?: string | null }) => {
     if (!selectedSubscriberId) return;
 
     const subscriber = subscribers.find(s => s.id === selectedSubscriberId);
     if (!subscriber) return;
 
-    // Route to the correct service. Default to cable for back-compat with
-    // subscribers that only have the cable service.
     const svc: 'cable' | 'internet' = data.service_type
       ?? ((subscriber as any).services?.includes('internet') && !(subscriber as any).services?.includes('cable') ? 'internet' : 'cable');
 
-    // Provider: explicit > subscriber's per-service default
     const providerId = data.provider_id
       ?? (svc === 'internet' ? (subscriber as any).internet_provider_id : (subscriber as any).cable_provider_id)
       ?? null;
+
+    // Source enum: manual_charge | manual_payment | subscription_charge |
+    // subscription_refund | reversal | adjustment. Manual entries route to
+    // the matching source so reports can split cash vs non-cash cleanly (D7).
+    const source =
+      data.type === 'payment'    ? 'manual_payment' :
+      data.type === 'adjustment' ? 'adjustment'     :
+                                   'manual_charge';
 
     const success = await createTransaction({
       subscriber_id: selectedSubscriberId,
@@ -146,7 +151,7 @@ const Index = () => {
       description: data.description,
       service_type: svc,
       provider_id: providerId,
-      source: data.type === 'payment' ? 'manual_payment' : 'manual_charge',
+      source,
       date: new Date().toISOString(),
     } as any);
 
