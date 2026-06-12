@@ -10,6 +10,14 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Phase 3.6 — Device assignment log + `replace_device` RPC (2026-06-12)
+- Added `device_assignment_log` table: every device assignment open/close (subscriber, serial, device_type, service_type, reason, opened/closed timestamps and actors). Append-style history of which device served which subscriber.
+- Retired the old "block STB change while an active cable subscription exists" rule in `subscribers_enforce_invariants`. It guarded the wrong thing.
+- Replaced it with an **inventory-agreement check** (J1 pattern fix): when `subscribers.stb_number` is being set to a non-null value, an `stb_inventory` row with matching `serial_number`, `status='assigned'`, and `subscriber_id` must already exist. Inventory is the authority; the subscriber row can only mirror it.
+- New `replace_device(p_subscriber_id, p_old_serial, p_new_serial, p_reason)` RPC. Runs in one transaction in the exact order: verify old assignment → verify new device available + same service type → flip old to `faulty`/unassigned → flip new to `assigned`/this subscriber → close old `device_assignment_log` row + open new one → patch active subscription blob's device reference (cable) → mirror onto `subscribers.stb_number`. The trigger passes because inventory already agrees. No session flag, no SECURITY DEFINER bypass, no caller awareness — any other path (UI tweak, raw SQL) fails the trigger safely.
+
+
+
 ### Phase 3.5 — Customer status enum (2026-06-12)
 - Added `customer_status` enum on `subscribers` (`prospect` / `active` / `archived`), default `prospect`, per BUSINESS_MODEL §A1–A3 / INV-02.
 - One-time seed: any subscriber with current or historical subscription data flipped to `active`; everyone else remains `prospect`. Archive must be operator-set.

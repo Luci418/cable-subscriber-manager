@@ -71,6 +71,68 @@ export type Database = {
           },
         ]
       }
+      device_assignment_log: {
+        Row: {
+          close_reason: string | null
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          device_serial: string
+          device_type: string
+          id: string
+          notes: string | null
+          open_reason: string | null
+          opened_at: string
+          opened_by: string | null
+          service_type: string
+          subscriber_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          close_reason?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          device_serial: string
+          device_type: string
+          id?: string
+          notes?: string | null
+          open_reason?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          service_type: string
+          subscriber_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          close_reason?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          device_serial?: string
+          device_type?: string
+          id?: string
+          notes?: string | null
+          open_reason?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          service_type?: string
+          subscriber_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_assignment_log_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       packs: {
         Row: {
           billing_type: string
@@ -580,6 +642,15 @@ export type Database = {
         Returns: undefined
       }
       reconcile_stb_inventory: { Args: never; Returns: Json }
+      replace_device: {
+        Args: {
+          p_new_serial: string
+          p_old_serial: string
+          p_reason?: string
+          p_subscriber_id: string
+        }
+        Returns: Json
+      }
       void_transaction: {
         Args: {
           p_reason: string
