@@ -22,7 +22,7 @@ import { Tv, Wifi } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProviders } from '@/hooks/useProviders';
 
-type ManualTxnType = 'payment' | 'charge' | 'adjustment' | 'refund';
+type ManualTxnType = 'payment' | 'charge' | 'adjustment';
 
 interface AddTransactionDialogProps {
   open: boolean;
@@ -152,7 +152,6 @@ export const AddTransactionDialog = ({
                 <SelectItem value="payment">Cash Received</SelectItem>
                 <SelectItem value="charge">Bill / Charge</SelectItem>
                 <SelectItem value="adjustment">Adjustment (goodwill / non-cash credit)</SelectItem>
-                <SelectItem value="refund">Cash Refund</SelectItem>
               </SelectContent>
             </Select>
             {formData.type === 'adjustment' && (
