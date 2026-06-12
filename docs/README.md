@@ -10,7 +10,8 @@ of creating parallel versions.
 |---|---|---|
 | [PROJECT_VISION.md](./PROJECT_VISION.md) | Why this system exists, who it serves, what it is *not* | Everyone |
 | [ARCHITECTURE_DECISIONS.md](./ARCHITECTURE_DECISIONS.md) | ADR log: every significant design decision, context, and revisit conditions | Engineers, reviewers |
-| [BUSINESS_RULES.md](./BUSINESS_RULES.md) | Domain behavior described in plain language (no code required) | Owner, staff, engineers |
+| [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) | **Authoritative** business model, lifecycle decisions, and invariant matrix (INV-01…INV-33). Read before any Phase 3/4/5 work. | Everyone |
+| [BUSINESS_RULES.md](./BUSINESS_RULES.md) | Plain-language summary of domain behavior. Cross-refs BUSINESS_MODEL.md. | Owner, staff, engineers |
 | [ANALYTICS_STRATEGY.md](./ANALYTICS_STRATEGY.md) | Every metric, why it exists, who uses it | Owner, product |
 | [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) | Code-level reference: components, hooks, schema, patterns | Engineers |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | How to deploy and operate the system on a low-cost stack | Operator, on-call |
