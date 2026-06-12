@@ -1,44 +1,46 @@
-# Invariants Sprint — revised plan
+# Invariants Sprint — revised plan (post BUSINESS_MODEL v3.0)
 
-User decisions:
-- Phase 3 FK migration: **YES** (region_id, pack_id, internet_pack_id, stb FK, providers.service_type).
-- Phase 4 normalize `subscriptions` table: **YES**.
-- Backfill: **SKIP** — demo data, start fresh. Drop & recreate is acceptable.
+**Authoritative spec:** [docs/BUSINESS_MODEL.md](../docs/BUSINESS_MODEL.md)
+**Invariant matrix:** Part 12 (INV-01 … INV-33)
+**Build order:** Part 13
 
-## Phases
+## Guiding principle (the J1 pattern)
+
+> Every bug that triggered this audit shares one root cause:
+> **a business object changed state through one workflow but a related
+> object didn't, because the invariant wasn't enforced at the lowest level.**
+>
+> Therefore: enforce at the **database** (constraints, triggers, RPCs as the
+> sole write path), not at the UI. UI guards are a UX nicety, not a
+> correctness boundary. Every invariant in Part 12 must have a DB-level
+> enforcement point before its UI is built.
+
+## Revised phase order
 
 1. **Phase 1 — Atomic RPCs ✅ DONE**
-   - `create_subscription`, `cancel_subscription`, balance trigger is sole writer.
+2. **Phase 2 — Subscriber hard constraints ✅ DONE** (revisit C4 portability per BUSINESS_MODEL §B/C — trigger over-restricts)
+3. **Phase 3 — Referential integrity (FK migration)** — region_id, pack_id,
+   internet_pack_id, providers.service_type, stb FK. Unblocks INV-28/30.
+4. **Phase 3.5 — Customer status & archive** — `customer_status` enum
+   (active/prospect/archived); operator-set, never trigger-overwritten
+   (INV-02 scope).
+5. **Phase 3.6 — Device assignment log + `replace_device` RPC** — relaxes
+   Phase 2 stb-change block; logs swaps with reason; enforces INV at DB.
+6. **Phase 3.7 — `adjustment` transaction type** — first-class, separated
+   from cash payments in reports; tracks credit origin (D3/D4).
+7. **Phase 4 — Normalize `subscriptions` table** — informed by §1.1 immutability;
+   columns shaped by Part 8 (statement view, next-action chip).
+8. **Phase 5 — Transaction validation triggers + passbook UI + next-action chip.**
 
-2. **Phase 2 — Hard constraints on `subscribers` (in progress)**
-   - CHECK: `services` non-empty, subset of `{cable, internet}`.
-   - CHECK: `mobile` format.
-   - BEFORE UPDATE trigger blocks while corresponding subscription is active:
-     - dropping `cable`/`internet` from `services`
-     - changing `stb_number` (cable) / internet device fields
-     - changing `cable_provider_id` / `internet_provider_id`
-   - BEFORE INSERT/UPDATE: if `cable` ∈ services → `stb_number` required.
-   - Map new errors in `dbErrors.ts`.
-   - Fix `EditSubscriberDialog` to disable locked fields with clear reasons.
+## Open items confirmed closed in v3.0
 
-3. **Phase 3 — Referential integrity**
-   - `regions.id`, `packs.id` already exist. Add columns `region_id`, `pack_id`, `internet_pack_id` to `subscribers` as FKs.
-   - Drop old text columns `region`, `current_pack`, `current_internet_pack` (no backfill — demo reset).
-   - Add `providers.service_type` enum; constrain `cable_provider_id` to cable providers, `internet_provider_id` to internet providers.
-   - `subscribers.stb_number` validated via trigger against `stb_inventory.serial_number` (per-user).
-   - `stb_inventory` CHECK: cannot transition to `assigned` from `faulty`/`decommissioned`.
-
-4. **Phase 4 — Normalize `subscriptions` table**
-   - New table `subscriptions(id, subscriber_id, service_type, pack_id, status enum, start_date, end_date, duration, price, provider_id, created_at, cancelled_at, cancel_reason)`.
-   - RPCs rewritten to insert/update rows here instead of JSONB.
-   - `subscribers.active_cable_subscription_id`, `active_internet_subscription_id` FK (denormalized for read locality).
-   - Drop JSONB columns `current_subscription`, `internet_subscription`, history arrays (no backfill).
-   - Read-path updates: `useSubscriptions` hook, all components consuming JSONB.
-
-5. **Phase 5 — Transaction validation triggers**
-   - INSERT trigger: `service_type` ∈ subscriber `services`; `provider_id` matches per-service provider.
-   - Cumulative refunds ≤ cumulative charges per subscription_id.
+- OQ-1 outage compensation → **adjustment credit only**, never end_date extension.
+- OQ-2 backdating window → **7 days, configurable setting**.
+- INV-16 / B3 → suspend deferred; end_date mutable only via one named RPC.
+- INV-23 → refund ≤ **net** charged on this subscription.
+- INV-32 concurrency, INV-33 idempotency → added to matrix.
 
 ## Approach
 
-Each phase = one migration + client refactor + CHANGELOG + ADR update. Test in preview between phases.
+One migration per phase + client refactor + CHANGELOG + ADR. Test in preview
+between phases. No phase ships without DB-level enforcement for its invariants.

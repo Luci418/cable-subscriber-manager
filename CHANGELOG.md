@@ -10,6 +10,15 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Docs — BUSINESS_MODEL.md v3.0 committed as authoritative spec (2026-06-12)
+- Added `docs/BUSINESS_MODEL.md` (v3.0) as the single source of truth for business semantics, lifecycle rules, and the invariant matrix (INV-01 … INV-33). All 7 Lovable refinements applied; OQ-1 (outage = adjustment credit) and OQ-2 (7-day configurable backdating window) closed.
+- Retired `docs/INVARIANT_WORKSHEET.md` (stub now points at BUSINESS_MODEL.md).
+- Updated `docs/BUSINESS_RULES.md` to cross-reference BUSINESS_MODEL.md instead of duplicating rules.
+- Updated `docs/README.md` index.
+- Revised `.lovable/plan.md` build order: Phase 3 FK → 3.5 customer status → 3.6 device assignment log + `replace_device` → 3.7 `adjustment` type → Phase 4 normalize subscriptions → Phase 5 validation + passbook + next-action chip.
+- Captured the **J1 root-cause framing** in the plan: every audit-trigger bug came from enforcing invariants at the UI instead of the DB. All Part 12 invariants must land DB-level enforcement before UI work.
+
+
 ### Changed — Invariants sprint Phase 2: hard constraints on Subscribers (2026-06-09)
 - **`services` column is now CHECK-constrained**: must be non-empty and a subset of `{cable, internet}`. Empty service lists or unknown service names are rejected at the database, not just by the UI.
 - **New BEFORE INSERT/UPDATE trigger `subscribers_enforce_invariants`** enforces three rules the UI used to enforce alone (and could be bypassed by any direct API call):
