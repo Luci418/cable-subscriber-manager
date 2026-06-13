@@ -1,6 +1,6 @@
 # Business Model & Invariant Handoff
 ## Subscriber Management System — Complete Implementation Brief for Lovable
-### Version 3.0 — Lovable Refinements Applied, All Questions Closed
+### Version 3.2 — Phase 4 Schema Final (device-level uniqueness, transaction ownership model)
 
 > **Authority:** This document is the single authoritative source for business
 > rules, lifecycle decisions, and invariants for this system.
@@ -25,6 +25,23 @@
 >   region editability rules added; INV-02 scope restriction added;
 >   INV-16 corrected; INV-23 corrected; INV-32/INV-33 added;
 >   revised build order confirmed; OQ-1 and OQ-2 closed.
+> - v3.1: Phase 4 schema finalised. `subscriptions` table confirmed with
+>   four amendments to Lovable's proposal. `payment_allocations` table
+>   added as the authoritative source for payment-to-subscription linkage.
+>   `cash_paid` and `adjustment_credit_applied` removed from subscriptions.
+>   Refund formula simplified to cash-only pro-rata. `device_serial_snapshot`
+>   mutability corrected to inventory-agreement pattern. `end_date` session-flag
+>   bypass rejected; trigger blocks all direct updates in v1. Suspend columns
+>   added as nullable for v2 readiness. INV-39 through INV-44 added.
+> - v3.2: Two final corrections before Phase 4 migration is written.
+>   Uniqueness constraint corrected from (subscriber_id, service_type) to
+>   (device_id) — multi-device model requires device-level uniqueness.
+>   Transaction ownership model formalised: transactions are subscriber-owned
+>   and service-scoped; device_id is NOT added to transactions; subscription_id
+>   added as nullable FK for display context on charge/refund rows only.
+>   Transaction ownership reference table added. INV-39 reworded. INV-45 added.
+>   Phase 4 build sequence updated to 11 steps including subscription_id
+>   column addition to transactions.
 
 ---
 
@@ -1602,13 +1619,468 @@ resolved first.
 
 ---
 
+---
+
+# PART FIFTEEN — PHASE 4 SCHEMA SPECIFICATION
+
+---
+
+This part is the authoritative schema spec for Phase 4. It supersedes
+Lovable's proposed schema from the Phase 4 pre-migration review.
+Write the migration from this spec exactly. Do not carry forward any
+column or constraint from the earlier proposal that conflicts with
+what is written here.
+
+---
+
+## The Two New Tables
+
+Phase 4 introduces two tables. They must be created together in a single
+migration. Neither is useful without the other.
+
+---
+
+## Table 1 — `public.subscriptions`
+
+Replaces `current_subscription`, `subscription_history`,
+`internet_subscription`, `internet_subscription_history`,
+`current_pack`, and `current_internet_pack` JSONB blobs and columns
+on the `subscribers` row.
+
+### Column Specification
+
+| Column | Type | Null | Default | Notes |
+|--------|------|------|---------|-------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `user_id` | `uuid` | NO | — | FK → `auth.users`. RLS scope. |
+| `subscriber_id` | `uuid` | NO | — | FK → `subscribers(id)` ON DELETE RESTRICT. INV-01. |
+| `service_type` | `text` | NO | — | CHECK IN ('cable','internet'). |
+| `device_id` | `uuid` | YES | — | FK → `stb_inventory(id)` ON DELETE RESTRICT. Nullable for historical rows where device was decommissioned. |
+| `device_serial_snapshot` | `text` | YES | — | Serial at time of subscription creation. Mutable only via `replace_device` RPC using inventory-agreement check (see constraint below). Cable subs primarily; nullable for internet where ONU serial is less operationally significant. |
+| `pack_id` | `uuid` | YES | — | FK → `packs(id)` ON DELETE RESTRICT. Nullable so pack retirement doesn't break history. Snapshot columns are the truth. |
+| `provider_id` | `uuid` | YES | — | FK → `providers(id)` ON DELETE RESTRICT. |
+| `pack_name_snapshot` | `text` | NO | — | Pack name at creation time. Never updated. |
+| `pack_price_snapshot` | `numeric(12,2)` | NO | — | Pack price at creation time. Never updated. Base for refund calculation. |
+| `billing_type_snapshot` | `text` | NO | — | CHECK IN ('prepaid','postpaid'). Never updated. |
+| `validity_days_snapshot` | `int` | NO | — | Days validity at creation time. Never updated. |
+| `total_days` | `int` | NO | — | Computed and stored at creation: `validity_days_snapshot × duration`. Never updated. |
+| `total_charged` | `numeric(12,2)` | NO | — | `pack_price_snapshot × duration`. Stored for passbook reads. Never updated. |
+| `duration` | `int` | NO | — | Multiplier (number of validity blocks purchased). |
+| `start_date` | `date` | NO | `CURRENT_DATE` | Explicit because late-renewal start differs from created_at. Never updated after creation. |
+| `end_date` | `date` | NO | — | Computed at creation: `start_date + total_days`. Mutable in v1 only via `replace_device` (device swap does not change end_date — this column is effectively immutable in v1 outside of that). In v2, mutable only via `suspend_subscription` / `resume_subscription` RPCs. |
+| `status` | `text` | NO | `'active'` | CHECK IN ('active','expired','cancelled','superseded'). |
+| `cancel_reason_code` | `text` | YES | — | Required when status = 'cancelled'. CHECK IN ('customer_request','operator_error','provider_migration','non_payment','other'). |
+| `cancel_reason_note` | `text` | YES | — | Free-text supplement to cancel_reason_code. |
+| `cancelled_at` | `timestamptz` | YES | — | Timestamp of cancellation action. |
+| `refund_amount` | `numeric(12,2)` | YES | — | Operator-confirmed refund amount. 0 ≤ refund_amount ≤ cash_paid_at_cancel (enforced by trigger at cancel time). Stored for passbook rendering without re-querying payment_allocations. |
+| `previous_subscription_id` | `uuid` | YES | — | FK → `subscriptions(id)` ON DELETE SET NULL. Renewal lineage. Set when this subscription is a renewal of a prior one. |
+| `suspended_at` | `timestamptz` | YES | — | v2 suspend model. Null in v1. |
+| `days_remaining_at_suspend` | `int` | YES | — | v2 suspend model. Frozen at suspension time. Null in v1. |
+| `resumed_at` | `timestamptz` | YES | — | v2 suspend model. Null in v1. |
+| `auto_resume_by` | `timestamptz` | YES | — | v2 suspend model. Deadline for auto-resume. Null in v1. |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | Maintained by trigger. |
+| `created_by` | `uuid` | YES | `auth.uid()` | Audit trail. |
+
+### Columns Explicitly Excluded
+
+`cash_paid` — removed. Derived from `payment_allocations` at query time.
+`adjustment_credit_applied` — removed. Derived from `payment_allocations`
+at query time. Neither column is stored on the subscription row.
+
+### Indexes
+
+```sql
+-- next-action chip: expiring soon, expired + balance, active + balance
+CREATE INDEX idx_subscriptions_subscriber_status_end
+  ON subscriptions (subscriber_id, status, end_date);
+
+-- operator-wide renewal dashboard
+CREATE INDEX idx_subscriptions_user_status_end
+  ON subscriptions (user_id, status, end_date);
+
+-- per-service subscription history and analytics
+CREATE INDEX idx_subscriptions_subscriber_service_status
+  ON subscriptions (subscriber_id, service_type, status);
+
+-- walking renewal lineage backward
+CREATE INDEX idx_subscriptions_previous
+  ON subscriptions (previous_subscription_id);
+
+-- FK lookups + provider/pack revenue reports
+CREATE INDEX idx_subscriptions_pack ON subscriptions (pack_id);
+CREATE INDEX idx_subscriptions_provider ON subscriptions (provider_id);
+```
+
+### DB-Level Constraints and Triggers
+
+**One active subscription per device:**
+```sql
+CREATE UNIQUE INDEX idx_subscriptions_one_active_per_device
+  ON subscriptions (device_id)
+  WHERE status = 'active';
+```
+
+The uniqueness rule is at the device level, not the service level. A
+subscriber with two STBs has two device_ids and may hold two simultaneous
+active cable subscriptions — one per device. Any constraint scoped to
+`(subscriber_id, service_type)` would incorrectly block this and must
+not be used.
+
+The `create_subscription` RPC active-check must validate:
+```sql
+-- Correct: check this specific device
+SELECT 1 FROM subscriptions
+WHERE device_id = :device_id AND status = 'active';
+
+-- Wrong — do not use:
+-- SELECT 1 FROM subscriptions
+-- WHERE subscriber_id = :subscriber_id
+--   AND service_type = :service_type
+--   AND status = 'active';
+```
+
+**Snapshot immutability trigger** — blocks UPDATE of:
+`pack_name_snapshot`, `pack_price_snapshot`, `billing_type_snapshot`,
+`validity_days_snapshot`, `total_days`, `total_charged`, `start_date`,
+`duration`, `previous_subscription_id`, `created_by`.
+These columns are write-once. Any UPDATE attempt raises an exception.
+
+**`device_serial_snapshot` mutability** — not in the snapshot immutability
+trigger. Governed by a separate constraint: if `device_serial_snapshot` is
+being updated, the new serial must exist in `stb_inventory` with
+`status = 'assigned'` AND `subscriber_id = this subscription's subscriber_id`.
+This is the same inventory-agreement pattern from Phase 3.6. No session flag.
+The `replace_device` RPC satisfies this automatically because it updates
+inventory before the subscription row, within the same transaction.
+
+**`end_date` mutability — v1:** Trigger blocks all direct UPDATE of
+`end_date`. Nothing in v1 legitimately changes `end_date` after creation.
+
+**`end_date` mutability — v2 suspend (when built):** The trigger is relaxed
+to permit `end_date` updates only when the same UPDATE statement also sets
+`resumed_at IS NOT NULL` (resume operation) or `suspended_at IS NOT NULL`
+(if suspension affects end_date). No session flag. The data state is the
+guard.
+
+**Status transition trigger** — permits only:
+- `active` → `expired`
+- `active` → `cancelled`
+- `active` → `superseded`
+- `active` → `suspended` (v2)
+- `suspended` → `active` (v2, resume)
+- `suspended` → `cancelled` (v2, cancel while suspended)
+
+No reverse transitions. No deletes. Immutable history per §1.1.
+
+**Refund cap trigger** — on update where `refund_amount IS NOT NULL`:
+```sql
+ASSERT refund_amount BETWEEN 0 AND (
+  SELECT COALESCE(SUM(pa.amount), 0)
+  FROM payment_allocations pa
+  JOIN transactions t ON t.id = pa.transaction_id
+  WHERE pa.subscription_id = NEW.id
+    AND t.type = 'payment'
+);
+```
+This reads from `payment_allocations` directly. No stored cash_paid needed.
+
+---
+
+## Table 2 — `public.payment_allocations`
+
+This table is the authoritative source for how each payment or adjustment
+transaction is distributed across subscriptions.
+
+It is the answer to: "which subscription did this payment fund?" and
+"how much cash has been received toward this subscription?"
+
+### Why This Table Exists
+
+Once subscriptions are first-class entities, the naive approach of computing
+"cash paid toward a subscription" by querying transactions filtered by
+subscriber + service + date range becomes ambiguous across renewals, partial
+payments, historical subscriptions, and future multi-device scenarios.
+
+A payment posted on Jan 28 (before expiry) might fund the February renewal,
+not the expiring January subscription. A ₹700 payment might clear ₹400 of
+February debt and ₹300 toward March. A date-range query cannot resolve these
+cases correctly.
+
+`payment_allocations` makes the linkage explicit at the time the payment is
+posted, rather than reconstructing it by inference at cancellation time.
+It is the join table between `transactions` and `subscriptions`.
+
+### Column Specification
+
+| Column | Type | Null | Default | Notes |
+|--------|------|------|---------|-------|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `user_id` | `uuid` | NO | — | FK → `auth.users`. RLS scope. |
+| `transaction_id` | `uuid` | NO | — | FK → `transactions(id)` ON DELETE RESTRICT. The payment or adjustment row. |
+| `subscription_id` | `uuid` | NO | — | FK → `subscriptions(id)` ON DELETE RESTRICT. Which subscription this allocation funds. |
+| `amount` | `numeric(12,2)` | NO | — | How much of this transaction is allocated to this subscription. CHECK > 0. |
+| `allocated_at` | `timestamptz` | NO | `now()` | |
+| `allocated_by` | `text` | NO | — | CHECK IN ('fifo_trigger','manual','opening_balance'). Who/what wrote this row. |
+| `created_by` | `uuid` | YES | `auth.uid()` | Audit. |
+
+### Allocation Rules
+
+**One payment may produce multiple allocation rows** if it spans
+subscriptions (partial payment clearing old debt, remainder toward new).
+
+**One subscription accumulates multiple allocation rows** as payments
+arrive incrementally over its lifetime.
+
+**The sum of all allocation rows for a subscription where the linked
+transaction type is 'payment' = cash received toward that subscription.**
+This is the refund cap source of truth.
+
+**The sum of all allocation rows for a subscription where the linked
+transaction type is 'adjustment' = adjustment credit applied to that
+subscription.** This is consumed first under the simplified refund formula
+but is never itself refundable in cash.
+
+### The FIFO Allocation Trigger
+
+Fires on INSERT into `transactions` where `type IN ('payment', 'adjustment')`.
+
+**Algorithm:**
+
+```
+1. Find all subscriptions for this subscriber and service_type where
+   the total allocated (from payment_allocations) is less than
+   total_charged, ordered by start_date ASC (oldest first = FIFO).
+
+2. Allocate the incoming transaction amount across those subscriptions
+   in order until the amount is exhausted.
+
+3. Insert one payment_allocations row per subscription touched.
+
+4. If the amount exceeds all outstanding subscription charges
+   (overpayment / pure advance credit), no allocation rows are
+   written for the excess. The excess sits as a credit on the balance.
+   When the next subscription is created, the allocation trigger will
+   consume the unallocated credit balance against it at that time
+   (or the operator applies it manually at renewal).
+```
+
+**Service scoping:** A cable payment allocates only to cable subscriptions.
+An internet payment allocates only to internet subscriptions. No automatic
+cross-service allocation. Cross-service transfer is manual and
+operator-initiated (INV-28).
+
+**The FIFO trigger is the only writer of `payment_allocations`** with
+`allocated_by = 'fifo_trigger'`. No application code writes directly to
+this table except via the trigger. Manual reallocation (v1.x feature) writes
+with `allocated_by = 'manual'` and requires operator confirmation.
+
+### Indexes
+
+```sql
+-- refund cap query: all allocations for a subscription
+CREATE INDEX idx_payment_alloc_subscription
+  ON payment_allocations (subscription_id);
+
+-- passbook: all subscriptions funded by a transaction
+CREATE INDEX idx_payment_alloc_transaction
+  ON payment_allocations (transaction_id);
+
+-- subscriber-level allocation history
+CREATE INDEX idx_payment_alloc_user
+  ON payment_allocations (user_id);
+```
+
+### Immutability
+
+`payment_allocations` rows are immutable once written by the FIFO trigger.
+Corrections are made by inserting reversal rows (negative amount,
+`allocated_by = 'manual'`) and replacement rows, not by updating existing
+rows. This preserves a full audit trail of all allocation decisions.
+
+---
+
+## The Refund Formula — Final Version
+
+This replaces Method B from §D5. Method B is retired.
+
+**The simplified formula:**
+
+```
+daily_rate       = pack_price_snapshot / total_days
+days_used        = total_days - days_remaining
+cash_paid        = SUM(pa.amount) WHERE transaction.type = 'payment'
+                   (queried from payment_allocations at cancel time)
+
+suggested_refund = floor(cash_paid × days_remaining / total_days)
+```
+
+**What this means:**
+
+- The refund is pro-rated against cash paid only, not against total charged.
+- Adjustment credit applied to this subscription is always forfeited on
+  cancellation. It funded service that was consumed or is being consumed.
+  It is never refunded in cash.
+- The operator sees: cash paid, days used, days remaining, suggested refund.
+- The operator confirms or overrides to any amount between ₹0 and cash_paid.
+- The refund cap trigger enforces ₹0 ≤ refund_amount ≤ cash_paid.
+
+**Why Method B was simplified:**
+
+Method B's `adjustment_days` calculation was an optimisation for a rare edge
+case — a cancellation where adjustment credits were significant relative to
+the subscription price. In practice, adjustment credits are exceptional
+workflow events. The simplified formula produces results that are correct,
+easier to explain to an operator, and implementable without storing
+adjustment credit amounts on the subscription row.
+
+---
+
+## Transaction Ownership Model
+
+Transactions belong to the **customer ledger**, not to devices or
+subscriptions. This is the authoritative ownership model.
+
+A transaction answers: "what financial event happened in this customer's
+account?" It is scoped to a subscriber and a service type. Nothing more
+is required for correctness.
+
+**`device_id` is NOT added to transactions.** A single payment can fund
+multiple subscriptions on multiple devices — making device_id on the
+transaction row either ambiguous (which device?) or redundant (the
+allocation already knows). Device context is derivable through
+`subscription_id → subscriptions.device_id` when needed for display.
+
+**`subscription_id` is added to transactions as a nullable FK.** Set only
+for `subscription_charge` and `subscription_refund` rows by the relevant
+RPCs. Null for all other transaction types (payments, adjustments,
+opening balances, goodwill credits, reversals). This is a display
+convenience for the passbook — it allows a charge row to show which
+subscription it belongs to without traversing the allocation table.
+It is not used for financial calculations.
+
+**Transaction ownership by type — complete reference:**
+
+| type | source | subscriber_id | service_type | subscription_id |
+|------|--------|--------------|--------------|-----------------|
+| charge | subscription_charge | ✓ | ✓ | ✓ set by RPC |
+| charge | manual_charge | ✓ | ✓ | null |
+| payment | manual_payment | ✓ | ✓ | null |
+| refund | subscription_refund | ✓ | ✓ | ✓ set by RPC |
+| refund | manual_refund | ✓ | ✓ | null |
+| adjustment | adjustment | ✓ | ✓ | null |
+| reversal | reversal | ✓ | ✓ | null |
+| opening_balance | opening_balance | ✓ | ✓ | null |
+
+The `payment_allocations` table provides all payment-to-subscription-to-device
+traceability. The transaction row itself remains subscriber-owned and
+service-scoped.
+
+**Schema change to `transactions` table required in Phase 4:**
+
+```sql
+ALTER TABLE transactions
+  ADD COLUMN subscription_id uuid REFERENCES subscriptions(id) ON DELETE SET NULL;
+```
+
+Nullable. No backfill required for existing rows. Set going forward by
+`create_subscription` and `cancel_subscription` RPCs only.
+
+---
+
+## JSONB Column Retirement Plan
+
+The following columns on `subscribers` are retired by Phase 4:
+
+```
+current_subscription          → rows in subscriptions WHERE service_type='cable'
+subscription_history          → rows in subscriptions WHERE service_type='cable'
+internet_subscription         → rows in subscriptions WHERE service_type='internet'
+internet_subscription_history → rows in subscriptions WHERE service_type='internet'
+current_pack                  → pack_name_snapshot on active cable subscription
+current_internet_pack         → pack_name_snapshot on active internet subscription
+```
+
+**Two-phase retirement:**
+
+Phase 4a (this migration):
+- Create `subscriptions` and `payment_allocations` tables
+- Add `subscription_id` column to `transactions`
+- Backfill all existing JSONB data into subscription rows
+- Keep JSONB columns in place as read-only (trigger blocks writes)
+- All RPCs rewritten to read from `subscriptions` table
+- UI updated to read from `subscriptions` table
+- Demo data is wiped so backfill is a clean slate operation
+
+Phase 4b (follow-up migration, after Phase 4a is stable in production):
+- Drop the retired JSONB columns
+- Remove the read-only trigger
+
+---
+
+## Additional Invariants — INV-39 through INV-45
+
+Added to the invariant matrix in Part 12.
+
+| ID | Object | Invariant | Enforcement |
+|----|--------|-----------|-------------|
+| INV-39 | Subscription | One active subscription per device. Multiple active subscriptions per subscriber per service type are permitted when the subscriber has multiple devices | DB: `UNIQUE(device_id) WHERE status='active'`. The `create_subscription` RPC checks device_id only, never subscriber_id + service_type |
+| INV-40 | Subscription | `device_serial_snapshot` may only be updated when the new serial exists in inventory with status='assigned' and subscriber_id matching this subscription's subscriber | Trigger: inventory-agreement check, same pattern as Phase 3.6 |
+| INV-41 | Subscription | `end_date` cannot be updated directly in v1. In v2, only permitted when the same transaction also sets `resumed_at` or `suspended_at` | Trigger: blocks direct end_date UPDATE; relaxed for suspend RPCs in v2 |
+| INV-42 | Subscription | `refund_amount` cannot exceed the sum of payment-type allocations for this subscription in `payment_allocations` | Trigger: reads payment_allocations at cancel time to enforce cap |
+| INV-43 | Subscription | No hard deletes. Status transitions are one-directional. Immutable history | Trigger: blocks DELETE; blocks invalid status transitions |
+| INV-44 | Payment allocations | `payment_allocations` rows are immutable after insert. Corrections use reversal rows with negative amounts | Trigger: blocks UPDATE and DELETE on payment_allocations |
+| INV-45 | Payment allocations | The FIFO trigger is the only writer of allocation rows with allocated_by='fifo_trigger'. No direct INSERT from application code | Code constraint: enforced by code review; no direct INSERT in application layer |
+
+---
+
+## What to Build in Phase 4 — Confirmed Scope
+
+In sequence within Phase 4:
+
+1. Create `payment_allocations` table with indexes and immutability trigger
+2. Create `subscriptions` table with all columns, indexes, and triggers
+   listed above — uniqueness at device level, not service level
+3. Add `subscription_id` nullable FK column to `transactions` table
+4. Backfill demo data (clean slate — no legacy data to migrate)
+5. Rewrite `create_subscription` RPC:
+   - Insert into `subscriptions`
+   - Active-check validates `device_id` only
+   - Sets `subscription_id` on the generated charge transaction
+6. Rewrite `cancel_subscription` RPC:
+   - Updates `subscriptions` status, cancel fields, refund_amount
+   - Queries `payment_allocations` for refund cap
+   - Sets `subscription_id` on the generated refund transaction
+7. Rewrite `expire_lapsed_subscriptions`:
+   - Updates `subscriptions.status` to 'expired'
+   - Works at device level — all devices, regardless of service count
+8. Update `replace_device` RPC:
+   - Updates `subscriptions.device_serial_snapshot` using inventory-agreement check
+9. Add FIFO allocation trigger on `transactions`:
+   - Fires on INSERT where type IN ('payment', 'adjustment')
+   - Allocates within service_type, FIFO by subscription start_date
+   - Writes to `payment_allocations`
+10. Update all UI reads from JSONB blobs to query `subscriptions` table
+11. Set JSONB columns to read-only (Phase 4a column retirement trigger)
+
+Phase 4b (separate deployment after Phase 4a is confirmed stable):
+- Drop retired JSONB columns and the read-only trigger
+
+---
+
 *End of document.*
 
 *Compiled from: Architecture Review (May 2026), Lifecycle Audit (June 2026),*
 *Financial Lifecycle Review (June 2026), Business Invariant Worksheet*
 *Sections A–J — operator-confirmed answers (June 2026), Lovable refinement*
-*review and operator sign-off (June 2026).*
+*review and operator sign-off (June 2026), Phase 4 schema review (June 2026).*
 
-*Version 3.0 — authoritative. All prior versions superseded.*
+*Version 3.2 — authoritative. All prior versions superseded.*
+*Changes from v3.1: uniqueness constraint corrected to device level;*
+*transaction ownership model formalised; device_id excluded from transactions;*
+*subscription_id added to transactions as nullable display reference;*
+*INV-39 reworded to reflect multi-device model; INV-45 added.*
 *Any change to a business rule, invariant, or workflow decision must be*
 *reflected here before implementation begins.*
+
+
