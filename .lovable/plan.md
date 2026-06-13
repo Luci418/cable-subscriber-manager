@@ -58,9 +58,23 @@
    first-class, separated from cash payments in reports; balance trigger
    treats adjustment as credit; void maps it to an offsetting charge;
    UI now exposes it in `AddTransactionDialog`.
-7. **Phase 4 — Normalize `subscriptions` table** — informed by §1.1 immutability;
-   columns shaped by Part 8 (statement view, next-action chip).
-8. **Phase 5 — Transaction validation triggers + passbook UI + next-action chip.**
+7. **Phase 4a — Normalize `subscriptions` + `payment_allocations` ✅ DONE (2026-06-13)** —
+   per BUSINESS_MODEL v3.2. `subscriptions` table with snapshot columns,
+   device-level uniqueness (INV-39), inventory-agreement on serial swaps
+   (INV-40), v1 end_date hard immutability (INV-41), refund cap from
+   `payment_allocations` (INV-42), forward-only status transitions (INV-43).
+   `payment_allocations` append-only ledger (INV-44) populated by a FIFO
+   trigger on `transactions` (INV-45). `transactions.subscription_id` added
+   as nullable display reference; set by the subscription RPCs only. All
+   four RPCs (create/cancel/expire/replace_device) rewritten as dual-write
+   so the UI keeps working. Demo data wiped. End-to-end verified.
+8. **Phase 4b — UI cutover + JSONB lock (NEXT)** —
+   migrate UI reads from `subscribers.current_subscription` /
+   `subscription_history` (and internet equivalents) to the `subscriptions`
+   table. Once stable, install a read-only trigger on the JSONB columns,
+   then drop them in a follow-up migration.
+9. **Phase 5 — Transaction validation triggers + passbook UI + next-action chip.**
+
 
 ## Open items confirmed closed in v3.0
 
