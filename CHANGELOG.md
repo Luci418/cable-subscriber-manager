@@ -10,7 +10,31 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Phase 4a — Normalized `subscriptions` + `payment_allocations` (2026-06-13)
+- Adopted BUSINESS_MODEL v3.2 (uploaded as the new authoritative spec). Doc replaces all prior versions; key v3.2 changes: device-level uniqueness, separate `payment_allocations` table, simplified cash-only refund formula, `subscription_id` added to `transactions`, hard end_date immutability in v1.
+- New `public.subscriptions` table — first-class subscription rows with immutable snapshots (`pack_name_snapshot`, `pack_price_snapshot`, `billing_type_snapshot`, `validity_days_snapshot`, `total_days`, `total_charged`, `start_date`, `duration`, `previous_subscription_id`), `device_id` + `device_serial_snapshot` device pointer, renewal lineage via `previous_subscription_id`, cancel fields, refund_amount, v2-ready suspend columns (nullable). Indexes for next-action chip and operator dashboards. RLS scoped to `auth.uid()`.
+- Invariants enforced by trigger:
+  - INV-39: one active subscription per device (`UNIQUE(device_id) WHERE status='active'`).
+  - INV-40: `device_serial_snapshot` updates require inventory-agreement (same J1 pattern as Phase 3.6).
+  - INV-41: direct `end_date` UPDATE blocked in v1.
+  - INV-42: `refund_amount` ≤ sum of `payment_allocations` for this subscription where the source transaction is a non-voided payment.
+  - INV-43: no DELETE; status transitions forward-only (`active → expired|cancelled|superseded|suspended`, `suspended → active|cancelled`).
+  - Snapshot/identity columns immutable after creation.
+- New `public.payment_allocations` table — append-only ledger linking payment / adjustment transactions to the specific subscription(s) they fund. INV-44: UPDATE and DELETE blocked; corrections require reversal rows.
+- New FIFO allocation trigger on `transactions` — fires AFTER INSERT for `type IN ('payment','adjustment')`. Walks the subscriber's subscriptions of the same service line ordered by `start_date ASC`, allocating against unsatisfied `total_charged - already_allocated`. Excess remains unallocated (sits as credit on the balance until the next subscription consumes it).
+- `transactions.subscription_id` (nullable FK) added — set only by `create_subscription` (on the charge row) and `cancel_subscription` (on the refund row). Display convenience for the passbook; not used in financial calculations. Added to the transactions immutability trigger (set-once at insert).
+- RPCs rewritten as **dual-write** (new tables + existing JSONB mirrors) so the UI keeps working unchanged in this step:
+  - `create_subscription` — derives `device_id` from the subscriber's assigned device of the target service line, checks one-active-per-device, inserts the subscriptions row with all snapshots and renewal lineage, stamps the generated `charge` transaction with `subscription_id`, mirrors the JSONB blob.
+  - `cancel_subscription` — updates the active row to `cancelled` + cancel fields + `refund_amount`, queries `payment_allocations` for the cash cap, inserts the refund transaction stamped with `subscription_id`, mirrors the JSONB blob.
+  - `expire_lapsed_subscriptions` — sweeps the subscriptions table to `expired` (`end_date <= CURRENT_DATE`) in addition to the JSONB cleanup.
+  - `replace_device` — additionally repoints active subscriptions to the new `device_id` and updates `device_serial_snapshot` (inventory-agreement satisfied because the RPC updates inventory first).
+- Demo-data wipe: cleared transactions, transaction_notes, device_assignment_log, JSONB subscription blobs, balances, and pack pointers on subscribers (per spec "Phase 4a — clean slate"). Subscribers, regions, packs, providers, and inventory rows retained.
+- Verified end-to-end via SQL: create → partial payment (FIFO allocates ₹199 of ₹200, ₹1 sits unallocated) → refund cap rejects ₹999 → cancel with ₹150 (within cap) → snapshot/end_date/allocation/delete writes all blocked.
+- Deferred: UI cutover to read from `subscriptions` (item 10) and the read-only JSONB lock (item 11) follow as separate steps once the UI is migrated.
+
 ### Phase 3.7 — First-class `adjustment` transaction type (2026-06-12)
+- Extended `transactions.type` CHECK to accept `adjustment` alongside `payment` / `charge` / `refund` (per BUSINESS_MODEL §D7 / INV-D7).
+
 - Extended `transactions.type` CHECK to accept `adjustment` alongside `payment` / `charge` / `refund` (per BUSINESS_MODEL §D7 / INV-D7).
 - `recalc_subscriber_balance` now treats `adjustment` as a credit (`-amount`), so it reduces what the subscriber owes — but it is **not** counted as cash. Daily cash reports continue to be `SUM(type='payment')` only; balance impact uses all non-voided rows. The two are never conflated.
 - `void_transaction` now maps `adjustment → charge` for the reversal row, mirroring the `payment → charge` mapping. Voiding an adjustment credit cleanly returns the balance to its pre-adjustment state.
