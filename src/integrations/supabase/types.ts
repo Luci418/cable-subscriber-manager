@@ -190,6 +190,54 @@ export type Database = {
           },
         ]
       }
+      payment_allocations: {
+        Row: {
+          allocated_at: string
+          allocated_by: string
+          amount: number
+          created_by: string | null
+          id: string
+          subscription_id: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          allocated_at?: string
+          allocated_by: string
+          amount: number
+          created_by?: string | null
+          id?: string
+          subscription_id: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          allocated_at?: string
+          allocated_by?: string
+          amount?: number
+          created_by?: string | null
+          id?: string
+          subscription_id?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_allocations_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -463,6 +511,141 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          auto_resume_by: string | null
+          billing_type_snapshot: string
+          cancel_reason_code: string | null
+          cancel_reason_note: string | null
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          days_remaining_at_suspend: number | null
+          device_id: string | null
+          device_serial_snapshot: string | null
+          duration: number
+          end_date: string
+          id: string
+          pack_id: string | null
+          pack_name_snapshot: string
+          pack_price_snapshot: number
+          previous_subscription_id: string | null
+          provider_id: string | null
+          refund_amount: number | null
+          resumed_at: string | null
+          service_type: string
+          start_date: string
+          status: string
+          subscriber_id: string
+          suspended_at: string | null
+          total_charged: number
+          total_days: number
+          updated_at: string
+          user_id: string
+          validity_days_snapshot: number
+        }
+        Insert: {
+          auto_resume_by?: string | null
+          billing_type_snapshot: string
+          cancel_reason_code?: string | null
+          cancel_reason_note?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          days_remaining_at_suspend?: number | null
+          device_id?: string | null
+          device_serial_snapshot?: string | null
+          duration: number
+          end_date: string
+          id?: string
+          pack_id?: string | null
+          pack_name_snapshot: string
+          pack_price_snapshot: number
+          previous_subscription_id?: string | null
+          provider_id?: string | null
+          refund_amount?: number | null
+          resumed_at?: string | null
+          service_type: string
+          start_date?: string
+          status?: string
+          subscriber_id: string
+          suspended_at?: string | null
+          total_charged: number
+          total_days: number
+          updated_at?: string
+          user_id: string
+          validity_days_snapshot: number
+        }
+        Update: {
+          auto_resume_by?: string | null
+          billing_type_snapshot?: string
+          cancel_reason_code?: string | null
+          cancel_reason_note?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          days_remaining_at_suspend?: number | null
+          device_id?: string | null
+          device_serial_snapshot?: string | null
+          duration?: number
+          end_date?: string
+          id?: string
+          pack_id?: string | null
+          pack_name_snapshot?: string
+          pack_price_snapshot?: number
+          previous_subscription_id?: string | null
+          provider_id?: string | null
+          refund_amount?: number | null
+          resumed_at?: string | null
+          service_type?: string
+          start_date?: string
+          status?: string
+          subscriber_id?: string
+          suspended_at?: string | null
+          total_charged?: number
+          total_days?: number
+          updated_at?: string
+          user_id?: string
+          validity_days_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "stb_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_notes: {
         Row: {
           author_id: string
@@ -514,6 +697,7 @@ export type Database = {
           source: Database["public"]["Enums"]["transaction_source"]
           status: Database["public"]["Enums"]["transaction_status"]
           subscriber_id: string
+          subscription_id: string | null
           type: string
           user_id: string
           void_reason: string | null
@@ -538,6 +722,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["transaction_source"]
           status?: Database["public"]["Enums"]["transaction_status"]
           subscriber_id: string
+          subscription_id?: string | null
           type: string
           user_id: string
           void_reason?: string | null
@@ -562,6 +747,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["transaction_source"]
           status?: Database["public"]["Enums"]["transaction_status"]
           subscriber_id?: string
+          subscription_id?: string | null
           type?: string
           user_id?: string
           void_reason?: string | null
@@ -591,6 +777,13 @@ export type Database = {
             columns: ["subscriber_id"]
             isOneToOne: false
             referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
           {
