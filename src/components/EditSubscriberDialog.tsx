@@ -259,15 +259,14 @@ export const EditSubscriberDialog = ({
       stb_number: wantsCable ? formData.stbNumber : null,
     };
 
-    // If cable was removed, clear its plan/subscription (balance retained).
+    // If cable was removed, clear its plan label (active subscription rows
+    // are gone via Cancel — this just drops the cached pack name on the row).
     if (!wantsCable) {
       updates.current_pack = null;
-      updates.current_subscription = null;
     }
-    // If internet was removed, clear its plan/subscription (balance retained).
+    // If internet was removed, clear its plan label.
     if (!wantsInternet) {
       updates.current_internet_pack = null;
-      updates.internet_subscription = null;
     }
 
     onSubmit(updates);
