@@ -662,8 +662,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
                   });
                   subsScoped.forEach(s => {
                     const hs: any[] = [];
-                    if (service !== 'internet') hs.push(...((s.subscription_history as any[]) || []));
-                    if (service !== 'cable') hs.push(...((s as any).internet_subscription_history || []));
+                    if (service !== 'internet') hs.push(...((s as any)._timelineCable || []));
+                    if (service !== 'cable') hs.push(...((s as any)._timelineInternet || []));
                     hs.forEach(h => {
                       if (h?.status === 'expired' && h?.endDate) {
                         const k = isoDay(new Date(h.endDate));
