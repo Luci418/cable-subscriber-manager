@@ -394,7 +394,7 @@ export const SubscriberDetail = ({
                     </p>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p><span className="font-medium text-foreground">Provider:</span> {providerNames.internet || '—'}</p>
-                      <p><span className="font-medium text-foreground">Plan:</span> {internetSub?.packName || (subscriber as any).current_internet_pack || '—'}</p>
+                      <p><span className="font-medium text-foreground">Plan:</span> {primaryInternet?.packName || (subscriber as any).current_internet_pack || '—'}{internetActives.length > 1 && <span className="ml-1 text-muted-foreground">(+{internetActives.length - 1} more)</span>}</p>
                     </div>
                   </div>
                 )}
