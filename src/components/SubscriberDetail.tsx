@@ -175,16 +175,28 @@ export const SubscriberDetail = ({
     });
   };
 
-  // Active subscription accessors per service.
-  const currentSub = (subscriber as any).current_subscription as SubscriptionEntry | null;
-  const subscriptionStatus = getSubscriptionStatus(currentSub);
-  const internetSub = (subscriber as any).internet_subscription as SubscriptionEntry | null;
-  const internetStatus = getSubscriptionStatus(internetSub);
+  // Phase 4b: active subscriptions are ARRAYS (one entry per active sub).
+  // A subscriber may have multiple active subscriptions on the same service
+  // when they have multiple devices. We render each as its own card; today
+  // the arrays are length 0 or 1 in most flows.
+  const cableActives = getActives(subscriber, 'cable');
+  const internetActives = getActives(subscriber, 'internet');
+  const cableHistory = getHistory(subscriber, 'cable');
+  const internetHistory = getHistory(subscriber, 'internet');
+
+  const anyCableActive = hasAnyActive(subscriber, 'cable');
+  const anyInternetActive = hasAnyActive(subscriber, 'internet');
+
+  // Primary subscriptions used for the overview "Pack" label and provider name.
+  // For a single-device subscriber this is the only active sub; for a
+  // multi-device subscriber this is the most recent active one.
+  const primaryCable = cableActives[0] || null;
+  const primaryInternet = internetActives[0] || null;
 
   // Overall account status: green if any service is currently active,
   // amber if the subscriber has services but none are currently active
   // (lapsed), grey if they've onboarded with no services configured.
-  const anyActive = subscriptionStatus.isActive || internetStatus.isActive;
+  const anyActive = anyCableActive || anyInternetActive;
   const accountStatus = anyActive
     ? { label: 'Active', tone: 'bg-green-500/10 text-green-700 dark:text-green-400' }
     : subscriberServices.length > 0
