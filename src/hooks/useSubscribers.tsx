@@ -3,10 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { friendlyDbError } from "@/lib/dbErrors";
 import type { Database } from "@/integrations/supabase/types";
+import type { EnrichedSubscriber, SubscriptionBlob } from "@/lib/activeSubs";
 
-type Subscriber = Database["public"]["Tables"]["subscribers"]["Row"];
+type SubscriberRow = Database["public"]["Tables"]["subscribers"]["Row"];
 type SubscriberInsert = Database["public"]["Tables"]["subscribers"]["Insert"];
 type SubscriberUpdate = Database["public"]["Tables"]["subscribers"]["Update"];
+
+// What components see: the DB row + the four normalised subscription arrays.
+export type Subscriber = SubscriberRow & EnrichedSubscriber;
 
 export const useSubscribers = (userId: string | undefined) => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -14,29 +18,78 @@ export const useSubscribers = (userId: string | undefined) => {
 
   const loadSubscribers = async () => {
     if (!userId) return;
-    
+
     setLoading(true);
     // Eagerly expire any lapsed subscriptions server-side BEFORE fetching,
     // so the UI always reflects authoritative server state (no client-side lazy cleanup).
-    // Safe to ignore errors: cron also runs hourly, and stale rows just look like the prior render.
     try {
       await supabase.rpc("expire_lapsed_subscriptions");
     } catch (e) {
       console.warn("expire_lapsed_subscriptions RPC failed (non-fatal):", e);
     }
 
-    const { data, error } = await supabase
-      .from("subscribers")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+    // Three reads in parallel:
+    //   1. subscribers — base row
+    //   2. v_subscriber_active_subscription — one row PER ACTIVE subscription
+    //      (multi-device subscribers may have multiple rows per service)
+    //   3. v_subscriber_subscription_timeline — every subscription (active + history)
+    //
+    // Both views return a `blob` jsonb column shaped exactly like the legacy
+    // `current_subscription` JSON so components can keep reading `.packName`,
+    // `.endDate`, `.subscriptionId`, etc. without translation.
+    const [subsRes, activesRes, timelineRes] = await Promise.all([
+      supabase
+        .from("subscribers")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      (supabase as any)
+        .from("v_subscriber_active_subscription")
+        .select("subscriber_id, service_type, blob")
+        .eq("user_id", userId),
+      (supabase as any)
+        .from("v_subscriber_subscription_timeline")
+        .select("subscriber_id, service_type, blob")
+        .eq("user_id", userId),
+    ]);
 
-    if (error) {
+    if (subsRes.error) {
       toast.error("Failed to load subscribers");
-      console.error(error);
-    } else {
-      setSubscribers(data || []);
+      console.error(subsRes.error);
+      setLoading(false);
+      return;
     }
+    if (activesRes.error) console.warn("active subs view read failed:", activesRes.error);
+    if (timelineRes.error) console.warn("timeline view read failed:", timelineRes.error);
+
+    // Group by (subscriber_id, service_type) → array of blobs.
+    const groupBy = (rows: any[] | null) => {
+      const out: Record<string, { cable: SubscriptionBlob[]; internet: SubscriptionBlob[] }> = {};
+      (rows || []).forEach((r) => {
+        const bucket = (out[r.subscriber_id] ??= { cable: [], internet: [] });
+        const blob = r.blob as SubscriptionBlob;
+        if (r.service_type === "internet") bucket.internet.push(blob);
+        else bucket.cable.push(blob);
+      });
+      return out;
+    };
+
+    const actives = groupBy(activesRes.data as any[] | null);
+    const timeline = groupBy(timelineRes.data as any[] | null);
+
+    const enriched: Subscriber[] = (subsRes.data || []).map((s) => {
+      const a = actives[s.id] ?? { cable: [], internet: [] };
+      const t = timeline[s.id] ?? { cable: [], internet: [] };
+      return {
+        ...s,
+        _activeCable: a.cable,
+        _activeInternet: a.internet,
+        _timelineCable: t.cable,
+        _timelineInternet: t.internet,
+      } as Subscriber;
+    });
+
+    setSubscribers(enriched);
     setLoading(false);
   };
 
@@ -59,7 +112,18 @@ export const useSubscribers = (userId: string | undefined) => {
       return false;
     }
 
-    if (data) setSubscribers((prev) => [data, ...prev]);
+    if (data) {
+      // New subscriber has no subscriptions yet — attach empty arrays so
+      // downstream consumers don't have to null-check.
+      const enriched: Subscriber = {
+        ...(data as any),
+        _activeCable: [],
+        _activeInternet: [],
+        _timelineCable: [],
+        _timelineInternet: [],
+      };
+      setSubscribers((prev) => [enriched, ...prev]);
+    }
     return true;
   };
 
@@ -77,7 +141,24 @@ export const useSubscribers = (userId: string | undefined) => {
       return false;
     }
 
-    if (data) setSubscribers((prev) => prev.map((s) => (s.id === id ? { ...s, ...data } : s)));
+    if (data) {
+      setSubscribers((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                ...data,
+                // Preserve the normalised arrays — they aren't returned by
+                // an UPDATE on the subscribers table.
+                _activeCable: s._activeCable,
+                _activeInternet: s._activeInternet,
+                _timelineCable: s._timelineCable,
+                _timelineInternet: s._timelineInternet,
+              }
+            : s
+        )
+      );
+    }
     return true;
   };
 
