@@ -305,7 +305,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                   </TableHeader>
                   <TableBody>
                     {upcomingLines.map(line => (
-                      <TableRow key={`${line.subscriber.id}-${line.service}`}>
+                      <TableRow key={line.key}>
                         <TableCell>
                           <div>
                             <p className="font-medium">{line.subscriber.name}</p>
@@ -359,7 +359,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                   </TableHeader>
                   <TableBody>
                     {activeLines.map(line => (
-                      <TableRow key={`${line.subscriber.id}-${line.service}`}>
+                      <TableRow key={line.key}>
                         <TableCell>
                           <div>
                             <p className="font-medium">{line.subscriber.name}</p>
@@ -418,7 +418,7 @@ export const Billing = ({ onBack }: BillingProps) => {
                   </TableHeader>
                   <TableBody>
                     {inactiveLines.map(line => (
-                      <TableRow key={`${line.subscriber.id}-${line.service}`}>
+                      <TableRow key={line.key}>
                         <TableCell>
                           <div>
                             <p className="font-medium">{line.subscriber.name}</p>
