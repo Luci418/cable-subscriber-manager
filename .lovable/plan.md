@@ -92,15 +92,47 @@
    - Imported review doc as `docs/OPERATOR_WORKFLOW_UI_REVIEW.md`.
 
 9. **Phase 5 — Operator workflows + profile + ledger rendering.**
-   The 9 workflows in review doc Part 2, the 2 new RPCs (`pair_device`,
-   `unpair_device` — Part 4), profile redesign (Part 3), ledger rendering
-   rules (Part 5: void-pair collapse, adjustment visual language,
-   per-subscription context, expandable allocation breakdown), and
-   Workflow 4 Collect Payment (Cash/UPI tabs, Option B allocation).
-   Built on top of Phase 4b's data layer.
+   See **[docs/PHASE_5_IMPLEMENTATION_PLAN.md](../docs/PHASE_5_IMPLEMENTATION_PLAN.md)** for
+   the sequenced 8-item build order (5.0 regression gate → 5.1 service card →
+   5.2 `pair_device` RPC → 5.3 `unpair_device` RPC → 5.4 pair/unpair/replace
+   UI → 5.5 Collect Payment → 5.6 ledger rendering → 5.7 profile redesign →
+   5.8 edit-subscriber form fix). Industry benchmarking that shaped this
+   scope is in **[docs/INDUSTRY_BENCHMARKING_ADDENDUM.md](../docs/INDUSTRY_BENCHMARKING_ADDENDUM.md)**.
 
+   **Bugs reported 2026-06-14 (folded into Phase 5):**
+   - Edit Subscriber → adding Cable to an Internet-only subscriber leaves the
+     ONU dropdown disabled even though an ONU is already assigned. → **5.8**.
+   - No way to pair a fresh ONU after the old ONU was marked faulty. →
+     **5.2 (`pair_device` RPC) + 5.4 UI**.
+   - No UI for multiple active subscriptions of the same service type on
+     one subscriber, even though the data layer supports it. → **5.1 + 5.7**.
+   - Pair/Unpair inventory model not implemented. → **5.2 + 5.3 + 5.4**.
+   - Subscriber profile still feels naive. → **5.7**.
 
+10. **Phase 6 — Roles + collection-agent app + TRAI compliance (planning only).**
+    Three roles via existing `user_roles` pattern (memory):
+    - **Owner** — full access (current behaviour).
+    - **Admin office** — everything except role management, destructive
+      data ops, and operator-wide settings.
+    - **Collection agent** — read-only on subscribers + write-only on
+      payments / complaints. Cannot edit subscriber profile, cannot
+      create/cancel subscriptions, cannot manage inventory.
 
+    Collection-agent app (separate route, mobile-first):
+    - Map view of subscribers using existing `latitude`/`longitude`,
+      filterable by outstanding balance, open complaint, area.
+    - Tap a pin → mini-card with name, mobile (tap-to-call), outstanding,
+      residence photo, "Navigate" (deeplinks to Google Maps), "Collect
+      Payment" (reuses 5.5 dialog).
+    - Daily route view: today's collection list grouped by area with
+      running collected total.
+
+    TRAI / DOT compliance work (Phase 6 same epic):
+    - KYC fields (ID type, ID number, ID photo) on subscriber.
+    - Structured address block.
+    - Subscriber edit audit log.
+    - Itemised monthly statement export (NTO-2 format).
+    - Complaint SLA timers in UI.
 
 ## Open items confirmed closed in v3.0
 
@@ -114,3 +146,4 @@
 
 One migration per phase + client refactor + CHANGELOG + ADR. Test in preview
 between phases. No phase ships without DB-level enforcement for its invariants.
+
