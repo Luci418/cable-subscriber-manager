@@ -449,107 +449,119 @@ export const SubscriberDetail = ({
                 </div>
               </CardHeader>
               <CardContent>
-                {currentSub && subscriptionStatus.isActive ? (
+                {cableActives.length > 0 ? (
                   <div className="space-y-4">
-                    <div className="rounded-lg border bg-primary/5 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                            Active
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            subscriptionStatus.statusColor === 'yellow'
-                              ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                          }`}>
-                            {subscriptionStatus.statusText}
-                          </span>
+                    {/* One active card per active subscription. Multi-device
+                        subscribers get multiple cards, one per device. */}
+                    {cableActives.map((sub) => {
+                      const status = getSubscriptionStatus(sub as unknown as SubscriptionEntry);
+                      return (
+                        <div key={sub.subscriptionId} className="rounded-lg border bg-primary/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
+                              {sub.stbNumber && (
+                                <span className="text-xs text-muted-foreground">Device: <span className="font-mono">{sub.stbNumber}</span></span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                                Active
+                              </span>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                status.statusColor === 'yellow'
+                                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                              }`}>
+                                {status.statusText}
+                              </span>
+                            </div>
+                          </div>
+                          <h4 className="text-xl font-bold mb-3">{sub.packName}</h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div>
+                              <p className="text-muted-foreground">Start Date</p>
+                              <p className="font-medium">{new Date(sub.startDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Expiry Date</p>
+                              <p className="font-medium">{new Date(sub.endDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Duration</p>
+                              <p className="font-medium">{sub.duration || 1} months</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Monthly Price</p>
+                              <p className="font-medium">₹{(sub.packPrice || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mb-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                generateThermalReceipt({
+                                  subscriberName: subscriber.name,
+                                  subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                                  mobile: subscriber.mobile,
+                                  stbNumber: sub.stbNumber || subscriber.stbNumber,
+                                  region: subscriber.region,
+                                  packName: sub.packName,
+                                  packPrice: sub.packPrice || 0,
+                                  duration: sub.duration || 1,
+                                  startDate: sub.startDate,
+                                  endDate: sub.endDate,
+                                  totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                                  balance: subscriber.cable_balance || 0,
+                                });
+                              }}
+                            >
+                              <Printer className="h-4 w-4 mr-1" />
+                              Thermal
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                generateSubscriptionInvoice({
+                                  subscriberName: subscriber.name,
+                                  subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                                  mobile: subscriber.mobile,
+                                  stbNumber: sub.stbNumber || subscriber.stbNumber,
+                                  region: subscriber.region,
+                                  packName: sub.packName,
+                                  packPrice: sub.packPrice || 0,
+                                  duration: sub.duration || 1,
+                                  startDate: sub.startDate,
+                                  endDate: sub.endDate,
+                                  totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                                  balance: subscriber.cable_balance || 0,
+                                });
+                              }}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              A4 Invoice
+                            </Button>
+                          </div>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setCancelService('cable');
+                              setShowCancelDialog(true);
+                            }}
+                            className="w-full"
+                          >
+                            Cancel Subscription
+                          </Button>
                         </div>
-                      </div>
-                      <h4 className="text-xl font-bold mb-3">{currentSub.packName}</h4>
-                      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                        <div>
-                          <p className="text-muted-foreground">Start Date</p>
-                          <p className="font-medium">{new Date(currentSub.startDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Expiry Date</p>
-                          <p className="font-medium">{new Date(currentSub.endDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Duration</p>
-                          <p className="font-medium">{currentSub.duration || 1} months</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Monthly Price</p>
-                          <p className="font-medium">₹{(currentSub.packPrice || 0).toFixed(2)}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mb-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            generateThermalReceipt({
-                              subscriberName: subscriber.name,
-                              subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                              mobile: subscriber.mobile,
-                              stbNumber: subscriber.stbNumber,
-                              region: subscriber.region,
-                              packName: currentSub.packName,
-                              packPrice: currentSub.packPrice || 0,
-                              duration: currentSub.duration || 1,
-                              startDate: currentSub.startDate,
-                              endDate: currentSub.endDate,
-                              totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                              balance: subscriber.cable_balance || 0,
-                            });
-                          }}
-                        >
-                          <Printer className="h-4 w-4 mr-1" />
-                          Thermal
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            generateSubscriptionInvoice({
-                              subscriberName: subscriber.name,
-                              subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                              mobile: subscriber.mobile,
-                              stbNumber: subscriber.stbNumber,
-                              region: subscriber.region,
-                              packName: currentSub.packName,
-                              packPrice: currentSub.packPrice || 0,
-                              duration: currentSub.duration || 1,
-                              startDate: currentSub.startDate,
-                              endDate: currentSub.endDate,
-                              totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                              balance: subscriber.cable_balance || 0,
-                            });
-                          }}
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          A4 Invoice
-                        </Button>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          setCancelService('cable');
-                          setShowCancelDialog(true);
-                        }}
-                        className="w-full"
-                      >
-                        Cancel Subscription
-                      </Button>
-                    </div>
+                      );
+                    })}
 
-                    {(subscriber as any).subscription_history && (subscriber as any).subscription_history.length > 0 && (
+                    {cableHistory.length > 0 && (
                       <>
                         <Separator />
                         <div>
@@ -558,11 +570,11 @@ export const SubscriberDetail = ({
                             <h4 className="font-semibold">Subscription History</h4>
                           </div>
                           <div className="space-y-2">
-                            {(subscriber as any).subscription_history
-                              .filter((s: any) => s.id !== (subscriber as any).current_subscription?.id)
-                              .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                              .map((sub: any) => (
-                                <div key={sub.id} className="rounded-lg border p-3 text-sm">
+                            {cableHistory
+                              .slice()
+                              .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                              .map((sub) => (
+                                <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="font-medium">{sub.packName}</span>
                                     <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
