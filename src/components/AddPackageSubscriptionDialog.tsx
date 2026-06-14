@@ -39,11 +39,6 @@ export const AddPackageSubscriptionDialog = ({
   const [loading, setLoading] = useState(false);
   const [subscriberLoading, setSubscriberLoading] = useState(false);
 
-  // Service-aware column names so the same dialog works for cable + internet.
-  const subscriptionCol = serviceType === 'internet' ? 'internet_subscription' : 'current_subscription';
-  const historyCol = serviceType === 'internet' ? 'internet_subscription_history' : 'subscription_history';
-  const packCol = serviceType === 'internet' ? 'current_internet_pack' : 'current_pack';
-  const balanceCol = serviceType === 'internet' ? 'internet_balance' : 'cable_balance';
   const serviceLabel = serviceType === 'internet' ? 'Internet' : 'Cable';
 
   // Pull the live pack metadata to determine billing model + validity.
@@ -68,22 +63,24 @@ export const AddPackageSubscriptionDialog = ({
     }
   }, [open, user?.id]);
 
+  // We read from the relational `v_subscriber_active_subscription` view
+  // (Phase 4b) rather than the legacy JSONB columns. The view returns one
+  // row per active subscription, so multi-device subscribers can have
+  // multiple cable or internet rows — `hasActiveSubscription` is true when
+  // there is at least one row for this service.
   const loadSubscriber = async () => {
     if (!subscriberId) return;
     setSubscriberLoading(true);
-    const { data } = await supabase
-      .from('subscribers')
-      .select('*')
-      .eq('id', subscriberId)
-      .single();
-
-    if (data) setCurrentSubscriber(data);
+    const { data } = await (supabase as any)
+      .from('v_subscriber_active_subscription')
+      .select('subscription_id')
+      .eq('subscriber_id', subscriberId)
+      .eq('service_type', serviceType);
+    setCurrentSubscriber({ activeCount: (data as any[] | null)?.length || 0 });
     setSubscriberLoading(false);
   };
 
-  const hasActiveSubscription = currentSubscriber?.[subscriptionCol]
-    ? isSubscriptionActive(currentSubscriber[subscriptionCol])
-    : false;
+  const hasActiveSubscription = (currentSubscriber?.activeCount || 0) > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
