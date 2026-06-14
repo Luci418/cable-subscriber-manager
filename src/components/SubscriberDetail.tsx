@@ -973,14 +973,17 @@ export const SubscriberDetail = ({
       />
 
       {(() => {
-        const subForCancel = cancelService === 'internet'
-          ? (subscriber as any).internet_subscription
-          : (subscriber as any).current_subscription;
+        // Cancel dialog operates on the primary active subscription for the
+        // chosen service. Today the cancel_subscription RPC works at the
+        // (subscriber, service) grain, so passing the primary blob is
+        // sufficient. When multi-device cancel ships in Phase 5 the dialog
+        // will need a per-subscription selector.
+        const subForCancel = cancelService === 'internet' ? primaryInternet : primaryCable;
         return subForCancel ? (
           <CancelSubscriptionDialog
             open={showCancelDialog}
             onOpenChange={setShowCancelDialog}
-            subscription={subForCancel}
+            subscription={subForCancel as any}
             onConfirm={handleCancelSubscription}
           />
         ) : null;
