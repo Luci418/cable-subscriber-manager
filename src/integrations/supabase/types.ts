@@ -324,6 +324,30 @@ export type Database = {
           },
         ]
       }
+      settings: {
+        Row: {
+          backdating_window_days: number
+          created_at: string
+          operator_upi_vpa: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backdating_window_days?: number
+          created_at?: string
+          operator_upi_vpa?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backdating_window_days?: number
+          created_at?: string
+          operator_upi_vpa?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stb_inventory: {
         Row: {
           created_at: string
@@ -691,6 +715,7 @@ export type Database = {
           edited_at: string | null
           edited_by: string | null
           id: string
+          payment_method: string | null
           provider_id: string | null
           reverses_transaction_id: string | null
           service_type: string
@@ -716,6 +741,7 @@ export type Database = {
           edited_at?: string | null
           edited_by?: string | null
           id?: string
+          payment_method?: string | null
           provider_id?: string | null
           reverses_transaction_id?: string | null
           service_type?: string
@@ -741,6 +767,7 @@ export type Database = {
           edited_at?: string | null
           edited_by?: string | null
           id?: string
+          payment_method?: string | null
           provider_id?: string | null
           reverses_transaction_id?: string | null
           service_type?: string
