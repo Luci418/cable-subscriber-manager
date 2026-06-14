@@ -1,0 +1,1 @@
+ALTER TYPE public.transaction_source ADD VALUE IF NOT EXISTS 'subscription_payment';

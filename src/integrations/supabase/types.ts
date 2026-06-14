@@ -230,6 +230,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payment_allocations_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_active_subscription"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_subscription_timeline"
+            referencedColumns: ["subscription_id"]
+          },
+          {
             foreignKeyName: "payment_allocations_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
@@ -323,6 +337,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      settings: {
+        Row: {
+          backdating_window_days: number
+          created_at: string
+          operator_upi_vpa: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backdating_window_days?: number
+          created_at?: string
+          operator_upi_vpa?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backdating_window_days?: number
+          created_at?: string
+          operator_upi_vpa?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       stb_inventory: {
         Row: {
@@ -631,6 +669,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_active_subscription"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_subscription_timeline"
+            referencedColumns: ["subscription_id"]
+          },
+          {
             foreignKeyName: "subscriptions_provider_id_fkey"
             columns: ["provider_id"]
             isOneToOne: false
@@ -691,6 +743,7 @@ export type Database = {
           edited_at: string | null
           edited_by: string | null
           id: string
+          payment_method: string | null
           provider_id: string | null
           reverses_transaction_id: string | null
           service_type: string
@@ -716,6 +769,7 @@ export type Database = {
           edited_at?: string | null
           edited_by?: string | null
           id?: string
+          payment_method?: string | null
           provider_id?: string | null
           reverses_transaction_id?: string | null
           service_type?: string
@@ -741,6 +795,7 @@ export type Database = {
           edited_at?: string | null
           edited_by?: string | null
           id?: string
+          payment_method?: string | null
           provider_id?: string | null
           reverses_transaction_id?: string | null
           service_type?: string
@@ -787,6 +842,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_active_subscription"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_subscription_timeline"
+            referencedColumns: ["subscription_id"]
+          },
+          {
             foreignKeyName: "transactions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -797,7 +866,104 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_subscriber_active_subscription: {
+        Row: {
+          billing_type_snapshot: string | null
+          blob: Json | null
+          created_at: string | null
+          device_id: string | null
+          device_serial_snapshot: string | null
+          duration: number | null
+          end_date: string | null
+          pack_id: string | null
+          pack_name: string | null
+          pack_price: number | null
+          provider_id: string | null
+          service_type: string | null
+          start_date: string | null
+          status: string | null
+          subscriber_id: string | null
+          subscription_id: string | null
+          total_charged: number | null
+          total_days: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "stb_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_subscriber_subscription_timeline: {
+        Row: {
+          blob: Json | null
+          cancelled_at: string | null
+          end_date: string | null
+          previous_subscription_id: string | null
+          refund_amount: number | null
+          service_type: string | null
+          start_date: string | null
+          status: string | null
+          subscriber_id: string | null
+          subscription_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_active_subscription"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_subscription_timeline"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cancel_subscription: {
@@ -863,6 +1029,7 @@ export type Database = {
         | "subscription_refund"
         | "reversal"
         | "adjustment"
+        | "subscription_payment"
       transaction_status: "posted" | "voided" | "reversal"
       void_reason_code:
         | "data_entry_error"
@@ -1007,6 +1174,7 @@ export const Constants = {
         "subscription_refund",
         "reversal",
         "adjustment",
+        "subscription_payment",
       ],
       transaction_status: ["posted", "voided", "reversal"],
       void_reason_code: [
