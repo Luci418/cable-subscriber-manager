@@ -68,12 +68,38 @@
    as nullable display reference; set by the subscription RPCs only. All
    four RPCs (create/cancel/expire/replace_device) rewritten as dual-write
    so the UI keeps working. Demo data wiped. End-to-end verified.
-8. **Phase 4b — UI cutover + JSONB lock (NEXT)** —
-   migrate UI reads from `subscribers.current_subscription` /
-   `subscription_history` (and internet equivalents) to the `subscriptions`
-   table. Once stable, install a read-only trigger on the JSONB columns,
-   then drop them in a follow-up migration.
-9. **Phase 5 — Transaction validation triggers + passbook UI + next-action chip.**
+8. **Phase 4b — Mechanical cutover + JSONB lock (NEXT, narrowed scope).**
+   Per [docs/OPERATOR_WORKFLOW_UI_REVIEW.md](../docs/OPERATOR_WORKFLOW_UI_REVIEW.md)
+   Part 7, Phase 4b is now **strictly mechanical**: swap UI reads from
+   `subscribers.current_subscription` / `subscription_history` (and
+   internet equivalents) to the `subscriptions` table. **Same UI, new data
+   source.** No workflow redesign. Once stable, install a read-only
+   trigger on the JSONB columns, then drop them in a follow-up migration.
+
+   **Fold three small schema additions into the same Phase 4b migration**
+   (per review doc Part 8) so Phase 5's Collect Payment workflow doesn't
+   need a follow-up migration:
+   - `transactions.source` CHECK: add `'subscription_payment'` enum value
+   - `transactions.payment_method` text, CHECK IN `('cash','upi','other')`,
+     nullable (legacy rows = NULL)
+   - `settings.operator_upi_vpa` text (single per-user setting for
+     client-side UPI QR generation in Workflow 4)
+
+   ✅ Pre-4b correctness work landed (2026-06-14):
+   - Analytics revenue/charge aggregations now exclude `status IN
+     ('voided','reversal')`. Fixes the ₹2,200 phantom-revenue bug
+     (voided payments + their reversal rows were both double-counted).
+   - Imported review doc as `docs/OPERATOR_WORKFLOW_UI_REVIEW.md`.
+
+9. **Phase 5 — Operator workflows + profile + ledger rendering.**
+   The 9 workflows in review doc Part 2, the 2 new RPCs (`pair_device`,
+   `unpair_device` — Part 4), profile redesign (Part 3), ledger rendering
+   rules (Part 5: void-pair collapse, adjustment visual language,
+   per-subscription context, expandable allocation breakdown), and
+   Workflow 4 Collect Payment (Cash/UPI tabs, Option B allocation).
+   Built on top of Phase 4b's data layer.
+
+
 
 
 ## Open items confirmed closed in v3.0

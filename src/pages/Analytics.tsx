@@ -124,13 +124,22 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   }), [subscribers, service]);
 
   // ---------- KPI metrics ----------
+  // Exclude voided originals and reversal counter-entries from every revenue /
+  // charges aggregation. This mirrors the DB balance trigger
+  // (recalc_subscriber_balance, which filters `status NOT IN ('voided','reversal')`).
+  // Without this filter, a voided ₹1,000 payment + its ₹1,000 reversal row
+  // double-counted as ₹2,200 in analytics (review doc Part 6).
+  const isLive = (t: typeof transactions[number]) =>
+    (t as any).status !== 'voided' && (t as any).status !== 'reversal';
+
   const sum = (arr: typeof transactions, type: 'payment' | 'charge') =>
-    arr.filter(t => t.type === type).reduce((s, t) => s + Number(t.amount || 0), 0);
+    arr.filter(t => t.type === type && isLive(t)).reduce((s, t) => s + Number(t.amount || 0), 0);
 
   const revenue = sum(txnsInRange, 'payment');
   const revenuePrev = sum(txnsPrev, 'payment');
   const charges = sum(txnsInRange, 'charge');
   const chargesPrev = sum(txnsPrev, 'charge');
+
   const net = revenue - charges;
   const netPrev = revenuePrev - chargesPrev;
   const collectionEff = charges > 0 ? (revenue / charges) * 100 : revenue > 0 ? 100 : 0;
@@ -187,18 +196,19 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     days.forEach(d => map.set(isoDay(d), { payments: 0, charges: 0, prev: 0 }));
 
     txnsInRange.forEach(t => {
+      if (!isLive(t)) return;
       const k = isoDay(new Date(t.date));
       const e = map.get(k);
       if (!e) return;
       if (t.type === 'payment') e.payments += Number(t.amount || 0);
-      else e.charges += Number(t.amount || 0);
+      else if (t.type === 'charge') e.charges += Number(t.amount || 0);
     });
 
     if (compare) {
       const span = days.length;
       txnsPrev.forEach(t => {
         const d = new Date(t.date);
-        if (t.type !== 'payment') return;
+        if (t.type !== 'payment' || !isLive(t)) return;
         const offset = differenceInDays(d, prevRange.from);
         if (offset < 0 || offset >= span) return;
         const k = isoDay(days[offset]);
@@ -206,6 +216,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         if (e) e.prev += Number(t.amount || 0);
       });
     }
+
 
     return days.map(d => {
       const k = isoDay(d);
@@ -226,7 +237,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     const map = new Map<string, { cable: number; internet: number }>();
     days.forEach(d => map.set(isoDay(d), { cable: 0, internet: 0 }));
     txnsInRange.forEach(t => {
-      if (t.type !== 'payment') return;
+      if (t.type !== 'payment' || !isLive(t)) return;
       const k = isoDay(new Date(t.date));
       const e = map.get(k);
       if (!e) return;
@@ -234,6 +245,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
       if (svc === 'internet') e.internet += Number(t.amount || 0);
       else e.cable += Number(t.amount || 0);
     });
+
     return days.map(d => ({ date: format(d, 'd MMM'), ...map.get(isoDay(d))! }));
   }, [range, txnsInRange]);
 
@@ -246,7 +258,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
 
   const topSubscribers = useMemo(() => {
     const agg = new Map<string, { revenue: number; txns: number }>();
-    txnsInRange.filter(t => t.type === 'payment').forEach(t => {
+    txnsInRange.filter(t => t.type === 'payment' && isLive(t)).forEach(t => {
+
       const cur = agg.get(t.subscriber_id) || { revenue: 0, txns: 0 };
       cur.revenue += Number(t.amount || 0);
       cur.txns += 1;
@@ -290,7 +303,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     });
     // attribute revenue by pack via transaction descriptions when possible isn't reliable;
     // approximate revenue per pack by spreading payments to subscribers' current pack.
-    txnsInRange.filter(t => t.type === 'payment').forEach(t => {
+    txnsInRange.filter(t => t.type === 'payment' && isLive(t)).forEach(t => {
+
       const s = subsById.get(t.subscriber_id);
       if (!s) return;
       const svc = (t as any).service_type || 'cable';
@@ -319,7 +333,8 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
       if (bal > 0) cur.outstanding += bal;
       map.set(k, cur);
     });
-    txnsInRange.filter(t => t.type === 'payment').forEach(t => {
+    txnsInRange.filter(t => t.type === 'payment' && isLive(t)).forEach(t => {
+
       const s = subsById.get(t.subscriber_id);
       if (!s) return;
       const k = s.region || 'Unassigned';
@@ -363,7 +378,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
       }
     });
 
-    txnsInRange.filter(t => t.type === 'payment').forEach(t => {
+    txnsInRange.filter(t => t.type === 'payment' && isLive(t)).forEach(t => {
       const svc = (t as any).service_type || 'cable';
       const e = ensure((t as any).provider_id, svc);
       e.revenue += Number(t.amount || 0);
@@ -376,7 +391,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   // ---------- aging buckets ----------
   const aging = useMemo(() => {
     const lastPay = new Map<string, number>();
-    transactions.filter(t => t.type === 'payment').forEach(t => {
+    transactions.filter(t => t.type === 'payment' && isLive(t)).forEach(t => {
       const cur = lastPay.get(t.subscriber_id) || 0;
       const d = +new Date(t.date);
       if (d > cur) lastPay.set(t.subscriber_id, d);
