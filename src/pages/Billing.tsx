@@ -86,17 +86,23 @@ export const Billing = ({ onBack }: BillingProps) => {
 
 
 
-  // Per-subscriber view of one service line (cable or internet). We compute
-  // this so all downstream metrics/tables share a single shape and the
-  // "All" filter can simply concatenate both arrays.
+  // Per-subscriber view of one service line. Phase 4b: a subscriber can have
+  // multiple active subscriptions on the same service (one per device), so
+  // we emit ONE ServiceLine per active subscription. For subscribers with
+  // no active subscription on a service they're enabled for, we still emit
+  // a single placeholder line (sub=null) so they appear in the "Inactive"
+  // tab.
   type ServiceLine = {
     subscriber: Subscriber;
     service: 'cable' | 'internet';
-    sub: any | null;        // current_subscription / internet_subscription
-    pack: string | null;    // current_pack / current_internet_pack
-    balance: number;        // cable_balance / internet_balance
+    sub: any | null;        // one active-subscription blob from the view, or null
+    pack: string | null;    // current_pack / current_internet_pack (cached label)
+    balance: number;        // service balance is per-subscriber, not per-subscription
     daysUntil: number | null;
     isActive: boolean;
+    // Stable React key. Includes subscription_id when present so multi-device
+    // subscribers render as distinct rows.
+    key: string;
   };
 
   const allLines: ServiceLine[] = useMemo(() => {
@@ -105,36 +111,33 @@ export const Billing = ({ onBack }: BillingProps) => {
     const daysLeft = (endDate: string) =>
       Math.ceil((new Date(endDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
+    const emitFor = (s: any, service: 'cable' | 'internet') => {
+      const actives: any[] = (service === 'cable' ? s._activeCable : s._activeInternet) || [];
+      const balance = Number(service === 'cable' ? s.cable_balance || 0 : s.internet_balance || 0);
+      const pack = service === 'cable' ? s.current_pack : s.current_internet_pack;
+      if (actives.length === 0) {
+        out.push({
+          subscriber: s, service, sub: null, pack, balance,
+          daysUntil: null, isActive: false,
+          key: `${s.id}-${service}-none`,
+        });
+        return;
+      }
+      for (const sub of actives) {
+        const du = sub?.endDate ? daysLeft(sub.endDate) : null;
+        out.push({
+          subscriber: s, service, sub, pack, balance,
+          daysUntil: du,
+          isActive: du !== null && du > 0,
+          key: `${s.id}-${service}-${sub.subscriptionId}`,
+        });
+      }
+    };
+
     for (const s of subscribers) {
       const services = (s as any).services?.length ? (s as any).services : ['cable'];
-
-      if (cableEnabled && services.includes('cable')) {
-        const sub = s.current_subscription as any;
-        const du = sub?.endDate ? daysLeft(sub.endDate) : null;
-        out.push({
-          subscriber: s,
-          service: 'cable',
-          sub,
-          pack: s.current_pack,
-          balance: Number(s.cable_balance || 0),
-          daysUntil: du,
-          isActive: du !== null && du > 0,
-        });
-      }
-
-      if (internetEnabled && services.includes('internet')) {
-        const sub = (s as any).internet_subscription;
-        const du = sub?.endDate ? daysLeft(sub.endDate) : null;
-        out.push({
-          subscriber: s,
-          service: 'internet',
-          sub,
-          pack: (s as any).current_internet_pack,
-          balance: Number((s as any).internet_balance || 0),
-          daysUntil: du,
-          isActive: du !== null && du > 0,
-        });
-      }
+      if (cableEnabled && services.includes('cable')) emitFor(s, 'cable');
+      if (internetEnabled && services.includes('internet')) emitFor(s, 'internet');
     }
     return out;
   }, [subscribers, cableEnabled, internetEnabled]);
