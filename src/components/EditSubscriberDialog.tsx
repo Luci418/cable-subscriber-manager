@@ -24,7 +24,8 @@ import { useRegions } from '@/hooks/useRegions';
 import { useStbInventory } from '@/hooks/useStbInventory';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 
-// Accepts the raw subscribers DB row shape (snake_case).
+// Accepts the raw subscribers DB row shape (snake_case) enriched with the
+// normalised subscription arrays produced by `useSubscribers`.
 interface SubscriberRow {
   id: string;
   name: string;
@@ -34,8 +35,8 @@ interface SubscriberRow {
   latitude?: number | null;
   longitude?: number | null;
   services?: string[] | null;
-  current_subscription?: any | null;
-  internet_subscription?: any | null;
+  _activeCable?: any[];
+  _activeInternet?: any[];
 }
 
 
