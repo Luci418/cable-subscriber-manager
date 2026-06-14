@@ -81,8 +81,8 @@ const Index = () => {
       internet_balance: 0,
       services,
       join_date: new Date().toISOString(),
-      current_subscription: null,
-      subscription_history: [],
+      // Phase 4b: subscriptions live in the normalised `subscriptions` table.
+      // We no longer initialise the legacy JSONB columns from the client.
     } as any);
 
     if (success) {
