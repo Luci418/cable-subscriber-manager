@@ -124,13 +124,22 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   }), [subscribers, service]);
 
   // ---------- KPI metrics ----------
+  // Exclude voided originals and reversal counter-entries from every revenue /
+  // charges aggregation. This mirrors the DB balance trigger
+  // (recalc_subscriber_balance, which filters `status NOT IN ('voided','reversal')`).
+  // Without this filter, a voided ₹1,000 payment + its ₹1,000 reversal row
+  // double-counted as ₹2,200 in analytics (review doc Part 6).
+  const isLive = (t: typeof transactions[number]) =>
+    (t as any).status !== 'voided' && (t as any).status !== 'reversal';
+
   const sum = (arr: typeof transactions, type: 'payment' | 'charge') =>
-    arr.filter(t => t.type === type).reduce((s, t) => s + Number(t.amount || 0), 0);
+    arr.filter(t => t.type === type && isLive(t)).reduce((s, t) => s + Number(t.amount || 0), 0);
 
   const revenue = sum(txnsInRange, 'payment');
   const revenuePrev = sum(txnsPrev, 'payment');
   const charges = sum(txnsInRange, 'charge');
   const chargesPrev = sum(txnsPrev, 'charge');
+
   const net = revenue - charges;
   const netPrev = revenuePrev - chargesPrev;
   const collectionEff = charges > 0 ? (revenue / charges) * 100 : revenue > 0 ? 100 : 0;
