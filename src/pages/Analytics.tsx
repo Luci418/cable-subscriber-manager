@@ -160,13 +160,16 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     return d >= +prevRange.from && d <= +prevRange.to;
   }).length;
 
-  // Expired/churned: subscribers with expired subs in range from history
+  // Expired/churned: subscribers with expired subs in range.
+  // Reads from the normalised timeline arrays (Phase 4b). The active arrays
+  // exclude expired/cancelled subs, so we can derive history = timeline
+  // entries with status !== 'active'.
   const churned = useMemo(() => {
     let count = 0;
     subsScoped.forEach(s => {
       const histories: any[] = [];
-      if (service !== 'internet') histories.push(...((s.subscription_history as any[]) || []));
-      if (service !== 'cable') histories.push(...((s as any).internet_subscription_history || []));
+      if (service !== 'internet') histories.push(...((s as any)._timelineCable || []));
+      if (service !== 'cable') histories.push(...((s as any)._timelineInternet || []));
       histories.forEach(h => {
         if (h?.status === 'expired' && h?.endDate) {
           const d = +new Date(h.endDate);
@@ -178,9 +181,11 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   }, [subsScoped, service, range]);
 
   const activeSubs = subsScoped.filter(s => {
-    if (service === 'cable') return !!s.current_subscription;
-    if (service === 'internet') return !!(s as any).internet_subscription;
-    return !!s.current_subscription || !!(s as any).internet_subscription;
+    const cableLen = ((s as any)._activeCable || []).length;
+    const internetLen = ((s as any)._activeInternet || []).length;
+    if (service === 'cable') return cableLen > 0;
+    if (service === 'internet') return internetLen > 0;
+    return cableLen > 0 || internetLen > 0;
   }).length;
 
   const arpu = activeSubs > 0 ? revenue / activeSubs : 0;
