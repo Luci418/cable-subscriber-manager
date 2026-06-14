@@ -212,8 +212,16 @@ export const SubscriberList = ({
             const stbNum = sAny.stb_number || subscriber.stbNumber || '';
             const cablePack = sAny.current_pack || subscriber.pack || '';
             const internetPack = sAny.current_internet_pack || '';
-            const cableSub = sAny.current_subscription;
-            const internetSub = sAny.internet_subscription;
+            // Active subscriptions are arrays (Phase 4b). Multi-device
+            // subscribers can have more than one entry per service. We
+            // display the most-recent one as the primary expiry indicator
+            // and append a "+N more" badge when there are additional ones.
+            const cableActives = (sAny._activeCable as any[]) || [];
+            const internetActives = (sAny._activeInternet as any[]) || [];
+            const cableSub = cableActives[0] || null;
+            const internetSub = internetActives[0] || null;
+            const cableExtra = Math.max(0, cableActives.length - 1);
+            const internetExtra = Math.max(0, internetActives.length - 1);
             const services: string[] = sAny.services || ['cable'];
             const hasCable = cableEnabled && services.includes('cable');
             const hasInternet = internetEnabled && services.includes('internet');
