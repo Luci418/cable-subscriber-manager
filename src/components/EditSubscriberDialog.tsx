@@ -129,12 +129,11 @@ export const EditSubscriberDialog = ({
   // Service uncheck is blocked while there's an active subscription on that
   // service. This prevents impossible states (subscription rows orphaned from
   // their service line) — operator must Cancel the subscription first.
-  const hasActiveCableSub =
-    !!subscriber.current_subscription &&
-    new Date(subscriber.current_subscription?.endDate || 0).getTime() > Date.now();
-  const hasActiveInternetSub =
-    !!subscriber.internet_subscription &&
-    new Date(subscriber.internet_subscription?.endDate || 0).getTime() > Date.now();
+  // Reads from the normalised active arrays (Phase 4b) — true when any
+  // device on that service has an active subscription, supporting future
+  // multi-device subscribers.
+  const hasActiveCableSub = (subscriber._activeCable?.length || 0) > 0;
+  const hasActiveInternetSub = (subscriber._activeInternet?.length || 0) > 0;
 
   const toggleService = (svc: 'cable' | 'internet', checked: boolean) => {
     if (!checked) {
