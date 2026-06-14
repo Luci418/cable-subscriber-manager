@@ -9,7 +9,7 @@ import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { isSubscriptionActive } from '@/lib/subscriptionUtils';
+import { hasAnyActive } from '@/lib/activeSubs';
 
 type ServiceType = 'cable' | 'internet';
 
