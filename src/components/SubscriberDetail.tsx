@@ -376,7 +376,7 @@ export const SubscriberDetail = ({
                     </p>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p><span className="font-medium text-foreground">Provider:</span> {providerNames.cable || '—'}</p>
-                      <p><span className="font-medium text-foreground">Pack:</span> {currentSub?.packName || subscriber.pack || '—'}</p>
+                      <p><span className="font-medium text-foreground">Pack:</span> {primaryCable?.packName || subscriber.pack || '—'}{cableActives.length > 1 && <span className="ml-1 text-muted-foreground">(+{cableActives.length - 1} more)</span>}</p>
                     </div>
                   </div>
                 )}
