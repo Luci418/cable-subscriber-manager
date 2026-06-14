@@ -49,62 +49,14 @@ export const validateSubscription = (sub: any): sub is SubscriptionEntry => {
   );
 };
 
-/**
- * Process subscriber data to auto-cleanup expired subscriptions
- * Returns updated subscriber data with expired subscriptions moved to history
- */
-export const processSubscriberData = (subscriber: any): {
-  needsUpdate: boolean;
-  updates: {
-    current_subscription: SubscriptionEntry | null;
-    subscription_history: SubscriptionEntry[];
-  };
-} => {
-  const currentSub = subscriber.current_subscription as SubscriptionEntry | null;
-  const history = (subscriber.subscription_history || []) as SubscriptionEntry[];
-  
-  // If no current subscription, nothing to process
-  if (!currentSub) {
-    return {
-      needsUpdate: false,
-      updates: {
-        current_subscription: null,
-        subscription_history: history
-      }
-    };
-  }
-  
-  // Check if current subscription is expired
-  if (!isSubscriptionActive(currentSub)) {
-    // Move expired subscription to history with 'expired' status
-    const expiredSub = {
-      ...currentSub,
-      status: 'expired' as const
-    };
-    
-    // Check if already in history
-    const existsInHistory = history.some(h => h.id === currentSub.id);
-    const updatedHistory = existsInHistory 
-      ? history.map(h => h.id === currentSub.id ? expiredSub : h)
-      : [...history, expiredSub];
-    
-    return {
-      needsUpdate: true,
-      updates: {
-        current_subscription: null,
-        subscription_history: updatedHistory
-      }
-    };
-  }
-  
-  return {
-    needsUpdate: false,
-    updates: {
-      current_subscription: currentSub,
-      subscription_history: history
-    }
-  };
-};
+// NOTE: `processSubscriberData` (a legacy client-side expiry cleanup helper
+// that mutated the JSONB `current_subscription` / `subscription_history`
+// columns) was removed in Phase 4b. Expiry is now handled exclusively by
+// the server-side `expire_lapsed_subscriptions` RPC and the normalised
+// `subscriptions` table — the client no longer writes to the legacy JSONB
+// columns. See docs/BUSINESS_MODEL.md "Phase 4b".
+
+
 
 /**
  * Get subscription status info for display

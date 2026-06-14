@@ -24,7 +24,8 @@ import { useRegions } from '@/hooks/useRegions';
 import { useStbInventory } from '@/hooks/useStbInventory';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 
-// Accepts the raw subscribers DB row shape (snake_case).
+// Accepts the raw subscribers DB row shape (snake_case) enriched with the
+// normalised subscription arrays produced by `useSubscribers`.
 interface SubscriberRow {
   id: string;
   name: string;
@@ -34,8 +35,8 @@ interface SubscriberRow {
   latitude?: number | null;
   longitude?: number | null;
   services?: string[] | null;
-  current_subscription?: any | null;
-  internet_subscription?: any | null;
+  _activeCable?: any[];
+  _activeInternet?: any[];
 }
 
 
@@ -128,12 +129,11 @@ export const EditSubscriberDialog = ({
   // Service uncheck is blocked while there's an active subscription on that
   // service. This prevents impossible states (subscription rows orphaned from
   // their service line) — operator must Cancel the subscription first.
-  const hasActiveCableSub =
-    !!subscriber.current_subscription &&
-    new Date(subscriber.current_subscription?.endDate || 0).getTime() > Date.now();
-  const hasActiveInternetSub =
-    !!subscriber.internet_subscription &&
-    new Date(subscriber.internet_subscription?.endDate || 0).getTime() > Date.now();
+  // Reads from the normalised active arrays (Phase 4b) — true when any
+  // device on that service has an active subscription, supporting future
+  // multi-device subscribers.
+  const hasActiveCableSub = (subscriber._activeCable?.length || 0) > 0;
+  const hasActiveInternetSub = (subscriber._activeInternet?.length || 0) > 0;
 
   const toggleService = (svc: 'cable' | 'internet', checked: boolean) => {
     if (!checked) {
@@ -259,15 +259,14 @@ export const EditSubscriberDialog = ({
       stb_number: wantsCable ? formData.stbNumber : null,
     };
 
-    // If cable was removed, clear its plan/subscription (balance retained).
+    // If cable was removed, clear its plan label (active subscription rows
+    // are gone via Cancel — this just drops the cached pack name on the row).
     if (!wantsCable) {
       updates.current_pack = null;
-      updates.current_subscription = null;
     }
-    // If internet was removed, clear its plan/subscription (balance retained).
+    // If internet was removed, clear its plan label.
     if (!wantsInternet) {
       updates.current_internet_pack = null;
-      updates.internet_subscription = null;
     }
 
     onSubmit(updates);

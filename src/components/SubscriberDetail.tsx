@@ -35,10 +35,11 @@ import {
 import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
+import {
   getSubscriptionStatus,
-  SubscriptionEntry 
+  SubscriptionEntry
 } from '@/lib/subscriptionUtils';
+import { getActives, getHistory, hasAnyActive, type SubscriptionBlob } from '@/lib/activeSubs';
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
@@ -174,16 +175,28 @@ export const SubscriberDetail = ({
     });
   };
 
-  // Active subscription accessors per service.
-  const currentSub = (subscriber as any).current_subscription as SubscriptionEntry | null;
-  const subscriptionStatus = getSubscriptionStatus(currentSub);
-  const internetSub = (subscriber as any).internet_subscription as SubscriptionEntry | null;
-  const internetStatus = getSubscriptionStatus(internetSub);
+  // Phase 4b: active subscriptions are ARRAYS (one entry per active sub).
+  // A subscriber may have multiple active subscriptions on the same service
+  // when they have multiple devices. We render each as its own card; today
+  // the arrays are length 0 or 1 in most flows.
+  const cableActives = getActives(subscriber, 'cable');
+  const internetActives = getActives(subscriber, 'internet');
+  const cableHistory = getHistory(subscriber, 'cable');
+  const internetHistory = getHistory(subscriber, 'internet');
+
+  const anyCableActive = hasAnyActive(subscriber, 'cable');
+  const anyInternetActive = hasAnyActive(subscriber, 'internet');
+
+  // Primary subscriptions used for the overview "Pack" label and provider name.
+  // For a single-device subscriber this is the only active sub; for a
+  // multi-device subscriber this is the most recent active one.
+  const primaryCable = cableActives[0] || null;
+  const primaryInternet = internetActives[0] || null;
 
   // Overall account status: green if any service is currently active,
   // amber if the subscriber has services but none are currently active
   // (lapsed), grey if they've onboarded with no services configured.
-  const anyActive = subscriptionStatus.isActive || internetStatus.isActive;
+  const anyActive = anyCableActive || anyInternetActive;
   const accountStatus = anyActive
     ? { label: 'Active', tone: 'bg-green-500/10 text-green-700 dark:text-green-400' }
     : subscriberServices.length > 0
@@ -363,7 +376,7 @@ export const SubscriberDetail = ({
                     </p>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p><span className="font-medium text-foreground">Provider:</span> {providerNames.cable || '—'}</p>
-                      <p><span className="font-medium text-foreground">Pack:</span> {currentSub?.packName || subscriber.pack || '—'}</p>
+                      <p><span className="font-medium text-foreground">Pack:</span> {primaryCable?.packName || subscriber.pack || '—'}{cableActives.length > 1 && <span className="ml-1 text-muted-foreground">(+{cableActives.length - 1} more)</span>}</p>
                     </div>
                   </div>
                 )}
@@ -381,7 +394,7 @@ export const SubscriberDetail = ({
                     </p>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p><span className="font-medium text-foreground">Provider:</span> {providerNames.internet || '—'}</p>
-                      <p><span className="font-medium text-foreground">Plan:</span> {internetSub?.packName || (subscriber as any).current_internet_pack || '—'}</p>
+                      <p><span className="font-medium text-foreground">Plan:</span> {primaryInternet?.packName || (subscriber as any).current_internet_pack || '—'}{internetActives.length > 1 && <span className="ml-1 text-muted-foreground">(+{internetActives.length - 1} more)</span>}</p>
                     </div>
                   </div>
                 )}
@@ -436,107 +449,119 @@ export const SubscriberDetail = ({
                 </div>
               </CardHeader>
               <CardContent>
-                {currentSub && subscriptionStatus.isActive ? (
+                {cableActives.length > 0 ? (
                   <div className="space-y-4">
-                    <div className="rounded-lg border bg-primary/5 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                            Active
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            subscriptionStatus.statusColor === 'yellow'
-                              ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                          }`}>
-                            {subscriptionStatus.statusText}
-                          </span>
+                    {/* One active card per active subscription. Multi-device
+                        subscribers get multiple cards, one per device. */}
+                    {cableActives.map((sub) => {
+                      const status = getSubscriptionStatus(sub as unknown as SubscriptionEntry);
+                      return (
+                        <div key={sub.subscriptionId} className="rounded-lg border bg-primary/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
+                              {sub.stbNumber && (
+                                <span className="text-xs text-muted-foreground">Device: <span className="font-mono">{sub.stbNumber}</span></span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                                Active
+                              </span>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                status.statusColor === 'yellow'
+                                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                              }`}>
+                                {status.statusText}
+                              </span>
+                            </div>
+                          </div>
+                          <h4 className="text-xl font-bold mb-3">{sub.packName}</h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div>
+                              <p className="text-muted-foreground">Start Date</p>
+                              <p className="font-medium">{new Date(sub.startDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Expiry Date</p>
+                              <p className="font-medium">{new Date(sub.endDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Duration</p>
+                              <p className="font-medium">{sub.duration || 1} months</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Monthly Price</p>
+                              <p className="font-medium">₹{(sub.packPrice || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mb-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                generateThermalReceipt({
+                                  subscriberName: subscriber.name,
+                                  subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                                  mobile: subscriber.mobile,
+                                  stbNumber: sub.stbNumber || subscriber.stbNumber,
+                                  region: subscriber.region,
+                                  packName: sub.packName,
+                                  packPrice: sub.packPrice || 0,
+                                  duration: sub.duration || 1,
+                                  startDate: sub.startDate,
+                                  endDate: sub.endDate,
+                                  totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                                  balance: subscriber.cable_balance || 0,
+                                });
+                              }}
+                            >
+                              <Printer className="h-4 w-4 mr-1" />
+                              Thermal
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                generateSubscriptionInvoice({
+                                  subscriberName: subscriber.name,
+                                  subscriberId: (subscriber as any).subscriber_id || subscriber.id,
+                                  mobile: subscriber.mobile,
+                                  stbNumber: sub.stbNumber || subscriber.stbNumber,
+                                  region: subscriber.region,
+                                  packName: sub.packName,
+                                  packPrice: sub.packPrice || 0,
+                                  duration: sub.duration || 1,
+                                  startDate: sub.startDate,
+                                  endDate: sub.endDate,
+                                  totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
+                                  balance: subscriber.cable_balance || 0,
+                                });
+                              }}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              A4 Invoice
+                            </Button>
+                          </div>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setCancelService('cable');
+                              setShowCancelDialog(true);
+                            }}
+                            className="w-full"
+                          >
+                            Cancel Subscription
+                          </Button>
                         </div>
-                      </div>
-                      <h4 className="text-xl font-bold mb-3">{currentSub.packName}</h4>
-                      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                        <div>
-                          <p className="text-muted-foreground">Start Date</p>
-                          <p className="font-medium">{new Date(currentSub.startDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Expiry Date</p>
-                          <p className="font-medium">{new Date(currentSub.endDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Duration</p>
-                          <p className="font-medium">{currentSub.duration || 1} months</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Monthly Price</p>
-                          <p className="font-medium">₹{(currentSub.packPrice || 0).toFixed(2)}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mb-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            generateThermalReceipt({
-                              subscriberName: subscriber.name,
-                              subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                              mobile: subscriber.mobile,
-                              stbNumber: subscriber.stbNumber,
-                              region: subscriber.region,
-                              packName: currentSub.packName,
-                              packPrice: currentSub.packPrice || 0,
-                              duration: currentSub.duration || 1,
-                              startDate: currentSub.startDate,
-                              endDate: currentSub.endDate,
-                              totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                              balance: subscriber.cable_balance || 0,
-                            });
-                          }}
-                        >
-                          <Printer className="h-4 w-4 mr-1" />
-                          Thermal
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            generateSubscriptionInvoice({
-                              subscriberName: subscriber.name,
-                              subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                              mobile: subscriber.mobile,
-                              stbNumber: subscriber.stbNumber,
-                              region: subscriber.region,
-                              packName: currentSub.packName,
-                              packPrice: currentSub.packPrice || 0,
-                              duration: currentSub.duration || 1,
-                              startDate: currentSub.startDate,
-                              endDate: currentSub.endDate,
-                              totalAmount: (currentSub.packPrice || 0) * (currentSub.duration || 1),
-                              balance: subscriber.cable_balance || 0,
-                            });
-                          }}
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          A4 Invoice
-                        </Button>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          setCancelService('cable');
-                          setShowCancelDialog(true);
-                        }}
-                        className="w-full"
-                      >
-                        Cancel Subscription
-                      </Button>
-                    </div>
+                      );
+                    })}
 
-                    {(subscriber as any).subscription_history && (subscriber as any).subscription_history.length > 0 && (
+                    {cableHistory.length > 0 && (
                       <>
                         <Separator />
                         <div>
@@ -545,11 +570,11 @@ export const SubscriberDetail = ({
                             <h4 className="font-semibold">Subscription History</h4>
                           </div>
                           <div className="space-y-2">
-                            {(subscriber as any).subscription_history
-                              .filter((s: any) => s.id !== (subscriber as any).current_subscription?.id)
-                              .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                              .map((sub: any) => (
-                                <div key={sub.id} className="rounded-lg border p-3 text-sm">
+                            {cableHistory
+                              .slice()
+                              .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                              .map((sub) => (
+                                <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="font-medium">{sub.packName}</span>
                                     <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
@@ -658,57 +683,67 @@ export const SubscriberDetail = ({
                 </div>
               </CardHeader>
               <CardContent>
-                {internetSub && internetStatus.isActive ? (
+                {internetActives.length > 0 ? (
                   <div className="space-y-4">
-                    <div className="rounded-lg border bg-primary/5 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-muted-foreground">Active Plan</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                            Active
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            internetStatus.statusColor === 'yellow'
-                              ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                          }`}>
-                            {internetStatus.statusText}
-                          </span>
+                    {internetActives.map((sub) => {
+                      const status = getSubscriptionStatus(sub as unknown as SubscriptionEntry);
+                      return (
+                        <div key={sub.subscriptionId} className="rounded-lg border bg-primary/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-muted-foreground">Active Plan</span>
+                              {sub.stbNumber && (
+                                <span className="text-xs text-muted-foreground">Device: <span className="font-mono">{sub.stbNumber}</span></span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                                Active
+                              </span>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                status.statusColor === 'yellow'
+                                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                              }`}>
+                                {status.statusText}
+                              </span>
+                            </div>
+                          </div>
+                          <h4 className="text-xl font-bold mb-3">{sub.packName}</h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div>
+                              <p className="text-muted-foreground">Start Date</p>
+                              <p className="font-medium">{new Date(sub.startDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Expiry Date</p>
+                              <p className="font-medium">{new Date(sub.endDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Duration</p>
+                              <p className="font-medium">{sub.duration || 1} months</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Monthly Price</p>
+                              <p className="font-medium">₹{(sub.packPrice || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setCancelService('internet');
+                              setShowCancelDialog(true);
+                            }}
+                            className="w-full"
+                          >
+                            Cancel Plan
+                          </Button>
                         </div>
-                      </div>
-                      <h4 className="text-xl font-bold mb-3">{internetSub.packName}</h4>
-                      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                        <div>
-                          <p className="text-muted-foreground">Start Date</p>
-                          <p className="font-medium">{new Date(internetSub.startDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Expiry Date</p>
-                          <p className="font-medium">{new Date(internetSub.endDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Duration</p>
-                          <p className="font-medium">{internetSub.duration || 1} months</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Monthly Price</p>
-                          <p className="font-medium">₹{(internetSub.packPrice || 0).toFixed(2)}</p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          setCancelService('internet');
-                          setShowCancelDialog(true);
-                        }}
-                        className="w-full"
-                      >
-                        Cancel Plan
-                      </Button>
-                    </div>
+                      );
+                    })}
 
-                    {(subscriber as any).internet_subscription_history && (subscriber as any).internet_subscription_history.length > 0 && (
+                    {internetHistory.length > 0 && (
                       <>
                         <Separator />
                         <div>
@@ -717,11 +752,11 @@ export const SubscriberDetail = ({
                             <h4 className="font-semibold">Plan History</h4>
                           </div>
                           <div className="space-y-2">
-                            {(subscriber as any).internet_subscription_history
-                              .filter((s: any) => s.id !== internetSub?.id)
-                              .sort((a: any, b: any) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                              .map((sub: any) => (
-                                <div key={sub.id} className="rounded-lg border p-3 text-sm">
+                            {internetHistory
+                              .slice()
+                              .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                              .map((sub) => (
+                                <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="font-medium">{sub.packName}</span>
                                     <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
@@ -938,14 +973,17 @@ export const SubscriberDetail = ({
       />
 
       {(() => {
-        const subForCancel = cancelService === 'internet'
-          ? (subscriber as any).internet_subscription
-          : (subscriber as any).current_subscription;
+        // Cancel dialog operates on the primary active subscription for the
+        // chosen service. Today the cancel_subscription RPC works at the
+        // (subscriber, service) grain, so passing the primary blob is
+        // sufficient. When multi-device cancel ships in Phase 5 the dialog
+        // will need a per-subscription selector.
+        const subForCancel = cancelService === 'internet' ? primaryInternet : primaryCable;
         return subForCancel ? (
           <CancelSubscriptionDialog
             open={showCancelDialog}
             onOpenChange={setShowCancelDialog}
-            subscription={subForCancel}
+            subscription={subForCancel as any}
             onConfirm={handleCancelSubscription}
           />
         ) : null;

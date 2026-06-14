@@ -212,8 +212,16 @@ export const SubscriberList = ({
             const stbNum = sAny.stb_number || subscriber.stbNumber || '';
             const cablePack = sAny.current_pack || subscriber.pack || '';
             const internetPack = sAny.current_internet_pack || '';
-            const cableSub = sAny.current_subscription;
-            const internetSub = sAny.internet_subscription;
+            // Active subscriptions are arrays (Phase 4b). Multi-device
+            // subscribers can have more than one entry per service. We
+            // display the most-recent one as the primary expiry indicator
+            // and append a "+N more" badge when there are additional ones.
+            const cableActives = (sAny._activeCable as any[]) || [];
+            const internetActives = (sAny._activeInternet as any[]) || [];
+            const cableSub = cableActives[0] || null;
+            const internetSub = internetActives[0] || null;
+            const cableExtra = Math.max(0, cableActives.length - 1);
+            const internetExtra = Math.max(0, internetActives.length - 1);
             const services: string[] = sAny.services || ['cable'];
             const hasCable = cableEnabled && services.includes('cable');
             const hasInternet = internetEnabled && services.includes('internet');
@@ -234,19 +242,28 @@ export const SubscriberList = ({
               pack,
               expiry,
               balance,
+              extraCount = 0,
             }: {
               icon: typeof Tv;
               label: string;
               pack: string;
               expiry: ReturnType<typeof formatExpiry>;
               balance: number;
+              extraCount?: number;
             }) => (
               <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/40">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">{label}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">{pack || 'No pack'}</div>
+                    <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                      <span className="truncate">{pack || 'No pack'}</span>
+                      {extraCount > 0 && (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1 h-4">
+                          +{extraCount} more
+                        </Badge>
+                      )}
+                    </div>
                     {expiry && <div className={`text-xs ${expiry.tone}`}>{expiry.text}</div>}
                   </div>
                 </div>
@@ -291,18 +308,20 @@ export const SubscriberList = ({
                     <ServiceStrip
                       icon={Tv}
                       label="Cable"
-                      pack={cablePack}
+                      pack={cableSub?.packName || cablePack}
                       expiry={formatExpiry(cableSub)}
                       balance={subscriber.cable_balance || 0}
+                      extraCount={cableExtra}
                     />
                   )}
                   {hasInternet && (
                     <ServiceStrip
                       icon={Wifi}
                       label="Internet"
-                      pack={internetPack}
+                      pack={internetSub?.packName || internetPack}
                       expiry={formatExpiry(internetSub)}
                       balance={(subscriber as any).internet_balance || 0}
+                      extraCount={internetExtra}
                     />
                   )}
                   {!hasCable && !hasInternet && (
