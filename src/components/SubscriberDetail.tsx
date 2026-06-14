@@ -35,10 +35,11 @@ import {
 import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
+import {
   getSubscriptionStatus,
-  SubscriptionEntry 
+  SubscriptionEntry
 } from '@/lib/subscriptionUtils';
+import { getActives, getHistory, hasAnyActive, type SubscriptionBlob } from '@/lib/activeSubs';
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
