@@ -293,7 +293,197 @@ export const SubscriberDetail = ({
     onReload?.();
   };
 
-  return (
+  // -----------------------------------------------------------------------
+  // Phase 5.1: per-service "Devices" card. Each paired device gets its own
+  // card with the matched active subscription summary and workflow buttons:
+  //   - Collect Payment (disabled — wired in Phase 5.3)
+  //   - Renew           (opens AddPackageSubscriptionDialog)
+  //   - Replace Device  (disabled — UI in Phase 5.2; RPC already exists)
+  //   - Unpair          (opens UnpairDeviceDialog -> unpair_device RPC)
+  // Pair Device CTA appears at the bottom of the card list. Multi-device
+  // ready: the list grows as more devices are paired to the same service.
+  // -----------------------------------------------------------------------
+  const renderDevicesCard = (service: 'cable' | 'internet') => {
+    const isCable = service === 'cable';
+    const devicesForService = pairedDevices.filter((d) => d.service_type === service);
+    const actives = isCable ? cableActives : internetActives;
+    const balance = isCable
+      ? (subscriber.cable_balance || 0)
+      : ((subscriber as any).internet_balance || 0);
+    const provider = isCable ? providerNames.cable : providerNames.internet;
+    const Icon = isCable ? Tv : Wifi;
+    const title = isCable ? 'Cable' : 'Internet';
+
+    // Unmatched actives = active subscription with no deviceId or with a
+    // deviceId that isn't in our paired list. Render them as ghost cards so
+    // they're never invisible. Multi-device safety net.
+    const matchedActiveIds = new Set(
+      devicesForService
+        .map((d) => actives.find((a) => a.deviceId === d.id)?.subscriptionId)
+        .filter(Boolean) as string[]
+    );
+    const orphanActives = actives.filter(
+      (a) => !a.subscriptionId || !matchedActiveIds.has(a.subscriptionId)
+    );
+
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5" />{title}</CardTitle>
+            <div className="text-xs text-muted-foreground text-right">
+              <p>Provider: <span className="font-medium text-foreground">{provider || '—'}</span></p>
+              <p>
+                Balance:{' '}
+                <span className={`font-medium ${getBalanceColor(balance)}`}>
+                  ₹{Math.abs(balance).toFixed(2)} {balance >= 0 ? 'dues' : 'advance'}
+                </span>
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {devicesForService.length === 0 && orphanActives.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Icon className="h-8 w-8 mx-auto opacity-40 mb-2" />
+              <p className="text-sm">No device paired</p>
+            </div>
+          ) : (
+            <>
+              {devicesForService.map((dev) => {
+                const sub = actives.find((a) => a.deviceId === dev.id) || null;
+                const daysLeft = sub ? daysUntil(sub.endDate) : null;
+                const subStatus = sub ? getSubscriptionStatus(sub as unknown as SubscriptionEntry) : null;
+
+                return (
+                  <div key={dev.id} className="rounded-lg border p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-medium">{dev.serial_number}</span>
+                          <Badge variant="outline" className="text-xs uppercase">{dev.device_type}</Badge>
+                        </div>
+                        {sub ? (
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Active — </span>
+                            <span className="font-medium">{sub.packName}</span>
+                            {daysLeft !== null && (
+                              <span className={`ml-2 text-xs ${
+                                daysLeft < 0
+                                  ? 'text-destructive'
+                                  : daysLeft <= 3
+                                    ? 'text-yellow-600 dark:text-yellow-400'
+                                    : 'text-muted-foreground'
+                              }`}>
+                                {daysLeft < 0
+                                  ? `Expired ${Math.abs(daysLeft)}d ago`
+                                  : daysLeft === 0
+                                    ? 'Expires today'
+                                    : `${daysLeft}d remaining`}
+                              </span>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-sm mt-1 text-muted-foreground">No active subscription</p>
+                        )}
+                      </div>
+                      {sub ? (
+                        <Badge className={
+                          subStatus?.statusColor === 'yellow'
+                            ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/10'
+                            : 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10'
+                        }>
+                          {subStatus?.statusText || 'Active'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Idle</Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="contents">
+                              <Button variant="outline" size="sm" disabled className="w-full">
+                                <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Coming in Phase 5.3</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setAddPackageService(service); setShowAddPackage(true); }}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        {sub ? 'Renew' : 'Subscribe'}
+                      </Button>
+
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="contents">
+                              <Button variant="outline" size="sm" disabled className="w-full">
+                                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Coming in Phase 5.2</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUnpairDevice(dev)}
+                      >
+                        <Link2Off className="h-3.5 w-3.5 mr-1.5" />Unpair
+                      </Button>
+                    </div>
+
+                    {sub && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-destructive hover:text-destructive"
+                        onClick={() => { setCancelService(service); setShowCancelDialog(true); }}
+                      >
+                        Cancel Subscription
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {orphanActives.map((sub) => (
+                <div key={sub.subscriptionId} className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm">
+                  <p className="font-medium">{sub.packName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Active subscription with no paired device (legacy data). Use the inventory screen to reconcile.
+                  </p>
+                </div>
+              ))}
+            </>
+          )}
+
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full"
+            onClick={() => setPairDialogService(service)}
+          >
+            <Link2 className="h-4 w-4 mr-1.5" />
+            {devicesForService.length === 0 ? 'Pair Device' : 'Pair Another Device'}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack}>
