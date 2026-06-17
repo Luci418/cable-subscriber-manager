@@ -862,6 +862,25 @@ export const SubscriberDetail = ({
         transaction={notesTransaction}
       />
 
+      {pairDialogService && (
+        <PairDeviceDialog
+          open={!!pairDialogService}
+          onOpenChange={(o) => { if (!o) setPairDialogService(null); }}
+          subscriberId={subscriber.id}
+          subscriberName={subscriber.name}
+          service={pairDialogService}
+          onPaired={() => { loadPairedDevices(); onReload?.(); }}
+        />
+      )}
+
+      <UnpairDeviceDialog
+        open={!!unpairDevice}
+        onOpenChange={(o) => { if (!o) setUnpairDevice(null); }}
+        subscriberId={subscriber.id}
+        device={unpairDevice}
+        onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); onReload?.(); }}
+      />
+
       {(() => {
         // Cancel dialog operates on the primary active subscription for the
         // chosen service. Today the cancel_subscription RPC works at the
