@@ -13,14 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User, Link2, Link2Off, ArrowLeftRight, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { TransactionNotesDialog } from './TransactionNotesDialog';
+import { PairDeviceDialog } from './PairDeviceDialog';
+import { UnpairDeviceDialog } from './UnpairDeviceDialog';
 import { friendlyDbError } from '@/lib/dbErrors';
 import {
   AlertDialog,
@@ -39,7 +42,14 @@ import {
   getSubscriptionStatus,
   SubscriptionEntry
 } from '@/lib/subscriptionUtils';
-import { getActives, getHistory, hasAnyActive, type SubscriptionBlob } from '@/lib/activeSubs';
+import { getActives, getHistory, hasAnyActive, daysUntil, type SubscriptionBlob } from '@/lib/activeSubs';
+
+interface PairedDevice {
+  id: string;
+  serial_number: string;
+  device_type: 'stb' | 'onu' | 'router';
+  service_type: 'cable' | 'internet';
+}
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
@@ -71,10 +81,14 @@ export const SubscriberDetail = ({
   const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
-  const [internetDevice, setInternetDevice] = useState<any>(null);
+  const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
   const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
   const [deleteChecking, setDeleteChecking] = useState(false);
+
+  // Pair / Unpair dialog state — Phase 5.1 workflow actions.
+  const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
+  const [unpairDevice, setUnpairDevice] = useState<PairedDevice | null>(null);
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const subscriberServices = subscriber.services && subscriber.services.length > 0
@@ -84,23 +98,25 @@ export const SubscriberDetail = ({
   const showInternetTab = internetEnabled && subscriberServices.includes('internet');
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  // Load the assigned internet device (ONU/router) for this subscriber.
-  // We query stb_inventory filtered by device_type so cable STBs and internet
-  // devices stay in their own lanes.
+  // Load ALL devices paired to this subscriber (Phase 5.1).
+  // Drives the per-device cards in the Cable and Internet tabs. Multi-device
+  // ready: a subscriber may have 0, 1, or many devices per service.
+  const loadPairedDevices = async () => {
+    const { data, error } = await supabase
+      .from('stb_inventory')
+      .select('id, serial_number, device_type, service_type')
+      .eq('subscriber_id', subscriber.id)
+      .eq('status', 'assigned');
+    if (error) {
+      console.warn('Failed to load paired devices:', error);
+      return;
+    }
+    setPairedDevices((data as PairedDevice[]) || []);
+  };
+
   useEffect(() => {
-    if (!showInternetTab) return;
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('stb_inventory')
-        .select('*')
-        .eq('subscriber_id', subscriber.id)
-        .in('device_type', ['onu', 'router'])
-        .maybeSingle();
-      if (!cancelled) setInternetDevice(data);
-    })();
-    return () => { cancelled = true; };
-  }, [subscriber.id, showInternetTab]);
+    loadPairedDevices();
+  }, [subscriber.id]);
 
   // Resolve provider names linked to this subscriber's services so the
   // operator can see WHO is delivering each service without leaving the page.
@@ -277,6 +293,197 @@ export const SubscriberDetail = ({
     onReload?.();
   };
 
+  // -----------------------------------------------------------------------
+  // Phase 5.1: per-service "Devices" card. Each paired device gets its own
+  // card with the matched active subscription summary and workflow buttons:
+  //   - Collect Payment (disabled — wired in Phase 5.3)
+  //   - Renew           (opens AddPackageSubscriptionDialog)
+  //   - Replace Device  (disabled — UI in Phase 5.2; RPC already exists)
+  //   - Unpair          (opens UnpairDeviceDialog -> unpair_device RPC)
+  // Pair Device CTA appears at the bottom of the card list. Multi-device
+  // ready: the list grows as more devices are paired to the same service.
+  // -----------------------------------------------------------------------
+  const renderDevicesCard = (service: 'cable' | 'internet') => {
+    const isCable = service === 'cable';
+    const devicesForService = pairedDevices.filter((d) => d.service_type === service);
+    const actives = isCable ? cableActives : internetActives;
+    const balance = isCable
+      ? (subscriber.cable_balance || 0)
+      : ((subscriber as any).internet_balance || 0);
+    const provider = isCable ? providerNames.cable : providerNames.internet;
+    const Icon = isCable ? Tv : Wifi;
+    const title = isCable ? 'Cable' : 'Internet';
+
+    // Unmatched actives = active subscription with no deviceId or with a
+    // deviceId that isn't in our paired list. Render them as ghost cards so
+    // they're never invisible. Multi-device safety net.
+    const matchedActiveIds = new Set(
+      devicesForService
+        .map((d) => actives.find((a) => a.deviceId === d.id)?.subscriptionId)
+        .filter(Boolean) as string[]
+    );
+    const orphanActives = actives.filter(
+      (a) => !a.subscriptionId || !matchedActiveIds.has(a.subscriptionId)
+    );
+
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5" />{title}</CardTitle>
+            <div className="text-xs text-muted-foreground text-right">
+              <p>Provider: <span className="font-medium text-foreground">{provider || '—'}</span></p>
+              <p>
+                Balance:{' '}
+                <span className={`font-medium ${getBalanceColor(balance)}`}>
+                  ₹{Math.abs(balance).toFixed(2)} {balance >= 0 ? 'dues' : 'advance'}
+                </span>
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {devicesForService.length === 0 && orphanActives.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Icon className="h-8 w-8 mx-auto opacity-40 mb-2" />
+              <p className="text-sm">No device paired</p>
+            </div>
+          ) : (
+            <>
+              {devicesForService.map((dev) => {
+                const sub = actives.find((a) => a.deviceId === dev.id) || null;
+                const daysLeft = sub ? daysUntil(sub.endDate) : null;
+                const subStatus = sub ? getSubscriptionStatus(sub as unknown as SubscriptionEntry) : null;
+
+                return (
+                  <div key={dev.id} className="rounded-lg border p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-medium">{dev.serial_number}</span>
+                          <Badge variant="outline" className="text-xs uppercase">{dev.device_type}</Badge>
+                        </div>
+                        {sub ? (
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Active — </span>
+                            <span className="font-medium">{sub.packName}</span>
+                            {daysLeft !== null && (
+                              <span className={`ml-2 text-xs ${
+                                daysLeft < 0
+                                  ? 'text-destructive'
+                                  : daysLeft <= 3
+                                    ? 'text-yellow-600 dark:text-yellow-400'
+                                    : 'text-muted-foreground'
+                              }`}>
+                                {daysLeft < 0
+                                  ? `Expired ${Math.abs(daysLeft)}d ago`
+                                  : daysLeft === 0
+                                    ? 'Expires today'
+                                    : `${daysLeft}d remaining`}
+                              </span>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-sm mt-1 text-muted-foreground">No active subscription</p>
+                        )}
+                      </div>
+                      {sub ? (
+                        <Badge className={
+                          subStatus?.statusColor === 'yellow'
+                            ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/10'
+                            : 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10'
+                        }>
+                          {subStatus?.statusText || 'Active'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Idle</Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="contents">
+                              <Button variant="outline" size="sm" disabled className="w-full">
+                                <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Coming in Phase 5.3</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setAddPackageService(service); setShowAddPackage(true); }}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        {sub ? 'Renew' : 'Subscribe'}
+                      </Button>
+
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="contents">
+                              <Button variant="outline" size="sm" disabled className="w-full">
+                                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Coming in Phase 5.2</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUnpairDevice(dev)}
+                      >
+                        <Link2Off className="h-3.5 w-3.5 mr-1.5" />Unpair
+                      </Button>
+                    </div>
+
+                    {sub && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-destructive hover:text-destructive"
+                        onClick={() => { setCancelService(service); setShowCancelDialog(true); }}
+                      >
+                        Cancel Subscription
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {orphanActives.map((sub) => (
+                <div key={sub.subscriptionId} className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm">
+                  <p className="font-medium">{sub.packName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Active subscription with no paired device (legacy data). Use the inventory screen to reconcile.
+                  </p>
+                </div>
+              ))}
+            </>
+          )}
+
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full"
+            onClick={() => setPairDialogService(service)}
+          >
+            <Link2 className="h-4 w-4 mr-1.5" />
+            {devicesForService.length === 0 ? 'Pair Device' : 'Pair Another Device'}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -407,395 +614,78 @@ export const SubscriberDetail = ({
         {/* CABLE TAB — STB info + package subscription + history */}
         {showCableTab && (
           <TabsContent value="cable" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Tv className="h-5 w-5" />Cable Service</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Provider</p>
-                    <p className="font-medium">{providerNames.cable || 'Not assigned'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">STB Number</p>
-                    <p className="font-medium">{(subscriber as any).stb_number || subscriber.stbNumber || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Current Pack</p>
-                    <p className="font-medium">{subscriber.pack || 'None'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Balance</p>
-                    <p className={`font-medium ${getBalanceColor(subscriber.cable_balance || 0)}`}>
-                      ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}{' '}
-                      <span className="text-xs text-muted-foreground">
-                        {(subscriber.cable_balance || 0) >= 0 ? 'dues' : 'advance'}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {renderDevicesCard('cable')}
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Package Subscriptions</CardTitle>
-                  <Button onClick={() => { setAddPackageService('cable'); setShowAddPackage(true); }} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Package
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {cableActives.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* One active card per active subscription. Multi-device
-                        subscribers get multiple cards, one per device. */}
-                    {cableActives.map((sub) => {
-                      const status = getSubscriptionStatus(sub as unknown as SubscriptionEntry);
-                      return (
-                        <div key={sub.subscriptionId} className="rounded-lg border bg-primary/5 p-4">
+            {cableHistory.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <History className="h-4 w-4" /> Subscription History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {cableHistory
+                      .slice()
+                      .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                      .map((sub) => (
+                        <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-muted-foreground">Active Pack</span>
-                              {sub.stbNumber && (
-                                <span className="text-xs text-muted-foreground">Device: <span className="font-mono">{sub.stbNumber}</span></span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                                Active
-                              </span>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                status.statusColor === 'yellow'
-                                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                              }`}>
-                                {status.statusText}
-                              </span>
-                            </div>
+                            <span className="font-medium">{sub.packName}</span>
+                            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                              {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
+                            </span>
                           </div>
-                          <h4 className="text-xl font-bold mb-3">{sub.packName}</h4>
-                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                            <div>
-                              <p className="text-muted-foreground">Start Date</p>
-                              <p className="font-medium">{new Date(sub.startDate).toLocaleDateString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Expiry Date</p>
-                              <p className="font-medium">{new Date(sub.endDate).toLocaleDateString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Duration</p>
-                              <p className="font-medium">{sub.duration || 1} months</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Monthly Price</p>
-                              <p className="font-medium">₹{(sub.packPrice || 0).toFixed(2)}</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mb-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1"
-                              onClick={() => {
-                                generateThermalReceipt({
-                                  subscriberName: subscriber.name,
-                                  subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                                  mobile: subscriber.mobile,
-                                  stbNumber: sub.stbNumber || subscriber.stbNumber,
-                                  region: subscriber.region,
-                                  packName: sub.packName,
-                                  packPrice: sub.packPrice || 0,
-                                  duration: sub.duration || 1,
-                                  startDate: sub.startDate,
-                                  endDate: sub.endDate,
-                                  totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
-                                  balance: subscriber.cable_balance || 0,
-                                });
-                              }}
-                            >
-                              <Printer className="h-4 w-4 mr-1" />
-                              Thermal
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1"
-                              onClick={() => {
-                                generateSubscriptionInvoice({
-                                  subscriberName: subscriber.name,
-                                  subscriberId: (subscriber as any).subscriber_id || subscriber.id,
-                                  mobile: subscriber.mobile,
-                                  stbNumber: sub.stbNumber || subscriber.stbNumber,
-                                  region: subscriber.region,
-                                  packName: sub.packName,
-                                  packPrice: sub.packPrice || 0,
-                                  duration: sub.duration || 1,
-                                  startDate: sub.startDate,
-                                  endDate: sub.endDate,
-                                  totalAmount: (sub.packPrice || 0) * (sub.duration || 1),
-                                  balance: subscriber.cable_balance || 0,
-                                });
-                              }}
-                            >
-                              <FileText className="h-4 w-4 mr-1" />
-                              A4 Invoice
-                            </Button>
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              setCancelService('cable');
-                              setShowCancelDialog(true);
-                            }}
-                            className="w-full"
-                          >
-                            Cancel Subscription
-                          </Button>
-                        </div>
-                      );
-                    })}
-
-                    {cableHistory.length > 0 && (
-                      <>
-                        <Separator />
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <History className="h-4 w-4" />
-                            <h4 className="font-semibold">Subscription History</h4>
-                          </div>
-                          <div className="space-y-2">
-                            {cableHistory
-                              .slice()
-                              .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                              .map((sub) => (
-                                <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="font-medium">{sub.packName}</span>
-                                    <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                                      {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
-                                    </span>
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                                    <div>
-                                      <span className="block">Duration</span>
-                                      <span className="font-medium text-foreground">{sub.duration}m</span>
-                                    </div>
-                                    <div>
-                                      <span className="block">Started</span>
-                                      <span className="font-medium text-foreground">
-                                        {new Date(sub.startDate).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="block">Ended</span>
-                                      <span className="font-medium text-foreground">
-                                        {new Date(sub.endDate).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
+                          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                            <div><span className="block">Duration</span><span className="font-medium text-foreground">{sub.duration}m</span></div>
+                            <div><span className="block">Started</span><span className="font-medium text-foreground">{new Date(sub.startDate).toLocaleDateString()}</span></div>
+                            <div><span className="block">Ended</span><span className="font-medium text-foreground">{new Date(sub.endDate).toLocaleDateString()}</span></div>
                           </div>
                         </div>
-                      </>
-                    )}
+                      ))}
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No active package subscription</p>
-                    <p className="text-sm mt-1">Click "Add Package" to subscribe</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         )}
 
         {/* INTERNET TAB — ONU/router device, current pack, history */}
         {showInternetTab && (
           <TabsContent value="internet" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Wifi className="h-5 w-5" />Internet Device</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Provider</p>
-                    <p className="font-medium">{providerNames.internet || 'Not assigned'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Balance</p>
-                    <p className={`font-medium ${getBalanceColor(subscriber.internet_balance || 0)}`}>
-                      ₹{Math.abs(subscriber.internet_balance || 0).toFixed(2)}{' '}
-                      <span className="text-xs text-muted-foreground">
-                        {(subscriber.internet_balance || 0) >= 0 ? 'dues' : 'advance'}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <Separator />
-                {internetDevice ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Device Type</p>
-                      <p className="font-medium capitalize">{internetDevice.device_type || 'Router'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Serial Number</p>
-                      <p className="font-mono text-sm">{internetDevice.serial_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <Badge variant="secondary" className="capitalize">{internetDevice.status}</Badge>
-                    </div>
-                    {internetDevice.notes && (
-                      <div className="md:col-span-2">
-                        <p className="text-sm text-muted-foreground">Notes</p>
-                        <p className="text-sm">{internetDevice.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <Wifi className="h-8 w-8 mx-auto opacity-40 mb-2" />
-                    <p>No ONU/Router assigned to this subscriber.</p>
-                    <p className="text-sm mt-1">Assign one from the Inventory screen.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {renderDevicesCard('internet')}
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Internet Plan</CardTitle>
-                  <Button onClick={() => { setAddPackageService('internet'); setShowAddPackage(true); }} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Plan
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {internetActives.length > 0 ? (
-                  <div className="space-y-4">
-                    {internetActives.map((sub) => {
-                      const status = getSubscriptionStatus(sub as unknown as SubscriptionEntry);
-                      return (
-                        <div key={sub.subscriptionId} className="rounded-lg border bg-primary/5 p-4">
+            {internetHistory.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <History className="h-4 w-4" /> Plan History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {internetHistory
+                      .slice()
+                      .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                      .map((sub) => (
+                        <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-muted-foreground">Active Plan</span>
-                              {sub.stbNumber && (
-                                <span className="text-xs text-muted-foreground">Device: <span className="font-mono">{sub.stbNumber}</span></span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                                Active
-                              </span>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                status.statusColor === 'yellow'
-                                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                              }`}>
-                                {status.statusText}
-                              </span>
-                            </div>
+                            <span className="font-medium">{sub.packName}</span>
+                            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                              {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
+                            </span>
                           </div>
-                          <h4 className="text-xl font-bold mb-3">{sub.packName}</h4>
-                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                            <div>
-                              <p className="text-muted-foreground">Start Date</p>
-                              <p className="font-medium">{new Date(sub.startDate).toLocaleDateString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Expiry Date</p>
-                              <p className="font-medium">{new Date(sub.endDate).toLocaleDateString()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Duration</p>
-                              <p className="font-medium">{sub.duration || 1} months</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Monthly Price</p>
-                              <p className="font-medium">₹{(sub.packPrice || 0).toFixed(2)}</p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              setCancelService('internet');
-                              setShowCancelDialog(true);
-                            }}
-                            className="w-full"
-                          >
-                            Cancel Plan
-                          </Button>
-                        </div>
-                      );
-                    })}
-
-                    {internetHistory.length > 0 && (
-                      <>
-                        <Separator />
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <History className="h-4 w-4" />
-                            <h4 className="font-semibold">Plan History</h4>
-                          </div>
-                          <div className="space-y-2">
-                            {internetHistory
-                              .slice()
-                              .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                              .map((sub) => (
-                                <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="font-medium">{sub.packName}</span>
-                                    <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                                      {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
-                                    </span>
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                                    <div>
-                                      <span className="block">Duration</span>
-                                      <span className="font-medium text-foreground">{sub.duration}m</span>
-                                    </div>
-                                    <div>
-                                      <span className="block">Started</span>
-                                      <span className="font-medium text-foreground">
-                                        {new Date(sub.startDate).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <span className="block">Ended</span>
-                                      <span className="font-medium text-foreground">
-                                        {new Date(sub.endDate).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
+                          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                            <div><span className="block">Duration</span><span className="font-medium text-foreground">{sub.duration}m</span></div>
+                            <div><span className="block">Started</span><span className="font-medium text-foreground">{new Date(sub.startDate).toLocaleDateString()}</span></div>
+                            <div><span className="block">Ended</span><span className="font-medium text-foreground">{new Date(sub.endDate).toLocaleDateString()}</span></div>
                           </div>
                         </div>
-                      </>
-                    )}
+                      ))}
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No active internet plan</p>
-                    <p className="text-sm mt-1">Click "Add Plan" to subscribe</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         )}
 
@@ -970,6 +860,25 @@ export const SubscriberDetail = ({
         open={showNotesDialog}
         onOpenChange={setShowNotesDialog}
         transaction={notesTransaction}
+      />
+
+      {pairDialogService && (
+        <PairDeviceDialog
+          open={!!pairDialogService}
+          onOpenChange={(o) => { if (!o) setPairDialogService(null); }}
+          subscriberId={subscriber.id}
+          subscriberName={subscriber.name}
+          service={pairDialogService}
+          onPaired={() => { loadPairedDevices(); onReload?.(); }}
+        />
+      )}
+
+      <UnpairDeviceDialog
+        open={!!unpairDevice}
+        onOpenChange={(o) => { if (!o) setUnpairDevice(null); }}
+        subscriberId={subscriber.id}
+        device={unpairDevice}
+        onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); onReload?.(); }}
       />
 
       {(() => {

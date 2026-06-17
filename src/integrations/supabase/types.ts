@@ -1023,6 +1023,14 @@ export type Database = {
       is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
       is_provider_in_use: { Args: { provider_uuid: string }; Returns: boolean }
       is_region_in_use: { Args: { region_name: string }; Returns: boolean }
+      pair_device: {
+        Args: {
+          p_device_id: string
+          p_reason?: string
+          p_subscriber_id: string
+        }
+        Returns: Json
+      }
       recalc_subscriber_balance: {
         Args: { p_service_type: string; p_subscriber_id: string }
         Returns: undefined
@@ -1033,6 +1041,15 @@ export type Database = {
           p_new_serial: string
           p_old_serial: string
           p_reason?: string
+          p_subscriber_id: string
+        }
+        Returns: Json
+      }
+      unpair_device: {
+        Args: {
+          p_device_id: string
+          p_reason: string
+          p_return_status?: string
           p_subscriber_id: string
         }
         Returns: Json
