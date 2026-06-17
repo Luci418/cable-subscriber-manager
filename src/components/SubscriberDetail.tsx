@@ -81,10 +81,14 @@ export const SubscriberDetail = ({
   const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
-  const [internetDevice, setInternetDevice] = useState<any>(null);
+  const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
   const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
   const [deleteChecking, setDeleteChecking] = useState(false);
+
+  // Pair / Unpair dialog state — Phase 5.1 workflow actions.
+  const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
+  const [unpairDevice, setUnpairDevice] = useState<PairedDevice | null>(null);
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const subscriberServices = subscriber.services && subscriber.services.length > 0
@@ -94,23 +98,25 @@ export const SubscriberDetail = ({
   const showInternetTab = internetEnabled && subscriberServices.includes('internet');
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  // Load the assigned internet device (ONU/router) for this subscriber.
-  // We query stb_inventory filtered by device_type so cable STBs and internet
-  // devices stay in their own lanes.
+  // Load ALL devices paired to this subscriber (Phase 5.1).
+  // Drives the per-device cards in the Cable and Internet tabs. Multi-device
+  // ready: a subscriber may have 0, 1, or many devices per service.
+  const loadPairedDevices = async () => {
+    const { data, error } = await supabase
+      .from('stb_inventory')
+      .select('id, serial_number, device_type, service_type')
+      .eq('subscriber_id', subscriber.id)
+      .eq('status', 'assigned');
+    if (error) {
+      console.warn('Failed to load paired devices:', error);
+      return;
+    }
+    setPairedDevices((data as PairedDevice[]) || []);
+  };
+
   useEffect(() => {
-    if (!showInternetTab) return;
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('stb_inventory')
-        .select('*')
-        .eq('subscriber_id', subscriber.id)
-        .in('device_type', ['onu', 'router'])
-        .maybeSingle();
-      if (!cancelled) setInternetDevice(data);
-    })();
-    return () => { cancelled = true; };
-  }, [subscriber.id, showInternetTab]);
+    loadPairedDevices();
+  }, [subscriber.id]);
 
   // Resolve provider names linked to this subscriber's services so the
   // operator can see WHO is delivering each service without leaving the page.
