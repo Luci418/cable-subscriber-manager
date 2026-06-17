@@ -13,14 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User, Link2, Link2Off, ArrowLeftRight, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { TransactionNotesDialog } from './TransactionNotesDialog';
+import { PairDeviceDialog } from './PairDeviceDialog';
+import { UnpairDeviceDialog } from './UnpairDeviceDialog';
 import { friendlyDbError } from '@/lib/dbErrors';
 import {
   AlertDialog,
@@ -39,7 +42,14 @@ import {
   getSubscriptionStatus,
   SubscriptionEntry
 } from '@/lib/subscriptionUtils';
-import { getActives, getHistory, hasAnyActive, type SubscriptionBlob } from '@/lib/activeSubs';
+import { getActives, getHistory, hasAnyActive, daysUntil, type SubscriptionBlob } from '@/lib/activeSubs';
+
+interface PairedDevice {
+  id: string;
+  serial_number: string;
+  device_type: 'stb' | 'onu' | 'router';
+  service_type: 'cable' | 'internet';
+}
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
