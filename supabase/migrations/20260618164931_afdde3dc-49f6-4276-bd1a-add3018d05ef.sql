@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.uq_stb_inventory_sub_service;
