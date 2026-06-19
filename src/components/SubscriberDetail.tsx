@@ -868,12 +868,14 @@ export const SubscriberDetail = ({
 
       <AddPackageSubscriptionDialog
         open={showAddPackage}
-        onOpenChange={setShowAddPackage}
+        onOpenChange={(o) => { setShowAddPackage(o); if (!o) setAddPackageDeviceId(null); }}
         subscriberId={subscriber.id}
         subscriberName={subscriber.name}
         serviceType={addPackageService}
+        deviceId={addPackageDeviceId}
         onSuccess={() => {
           setShowAddPackage(false);
+          setAddPackageDeviceId(null);
           onReload?.();
         }}
       />
