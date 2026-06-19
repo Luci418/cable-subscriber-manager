@@ -432,7 +432,12 @@ export const SubscriberDetail = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => { setAddPackageService(service); setShowAddPackage(true); }}
+                        onClick={() => {
+                          // Phase 5.1 multi-device fix: pin the renew to THIS device.
+                          setAddPackageService(service);
+                          setAddPackageDeviceId(dev.id);
+                          setShowAddPackage(true);
+                        }}
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                         {sub ? 'Renew' : 'Subscribe'}
@@ -465,7 +470,16 @@ export const SubscriberDetail = ({
                         variant="ghost"
                         size="sm"
                         className="w-full text-destructive hover:text-destructive"
-                        onClick={() => { setCancelService(service); setShowCancelDialog(true); }}
+                        onClick={() => {
+                          // Phase 5.1 multi-device fix: target the exact
+                          // subscription on this device card.
+                          setCancelTarget({
+                            service,
+                            subscriptionId: sub.subscriptionId,
+                            blob: sub,
+                          });
+                          setShowCancelDialog(true);
+                        }}
                       >
                         Cancel Subscription
                       </Button>
