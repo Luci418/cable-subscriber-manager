@@ -75,12 +75,22 @@ export const SubscriberDetail = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddPackage, setShowAddPackage] = useState(false);
   const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
+  // Phase 5.1 multi-device fix: when the operator clicks Renew on a per-device
+  // card, route the new subscription to THAT device via the create_subscription
+  // RPC's p_device_id. Null = legacy fallback (RPC picks an assigned device).
+  const [addPackageDeviceId, setAddPackageDeviceId] = useState<string | null>(null);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
+  // Phase 5.1 multi-device fix: cancel targets a specific subscription
+  // (by subscriptionId) rather than "the latest active for this service".
+  const [cancelTarget, setCancelTarget] = useState<{
+    service: 'cable' | 'internet';
+    subscriptionId: string;
+    blob: SubscriptionBlob;
+  } | null>(null);
   const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
   const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
