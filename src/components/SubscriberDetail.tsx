@@ -275,19 +275,22 @@ export const SubscriberDetail = ({
 
 
   const handleCancelSubscription = async (refundAmount: number) => {
-    // Phase 1 (ADR-012): cancellation goes through a single atomic RPC.
-    // The server clears current_subscription, marks history cancelled, and
-    // inserts the refund payment on the ledger in one transaction. The
-    // balance trigger recomputes cable_balance / internet_balance — we
-    // never write balance from the client.
-    const isInternet = cancelService === 'internet';
-    const label = isInternet ? 'Internet' : 'Cable';
+    // Phase 5.1 multi-device fix: pass p_subscription_id so the server
+    // cancels the EXACT subscription the operator clicked on, not the
+    // "latest active for this service" (which would corrupt sibling
+    // device subscriptions).
+    if (!cancelTarget) {
+      toast.error('No subscription selected to cancel');
+      return;
+    }
+    const label = cancelTarget.service === 'internet' ? 'Internet' : 'Cable';
 
     const { error } = await (supabase as any).rpc('cancel_subscription', {
       p_subscriber_id: subscriber.id,
-      p_service_type: cancelService,
+      p_service_type: cancelTarget.service,
       p_refund_amount: refundAmount || 0,
       p_reason: null,
+      p_subscription_id: cancelTarget.subscriptionId,
     });
 
     if (error) {
@@ -300,8 +303,10 @@ export const SubscriberDetail = ({
       ? `${label} subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`
       : `${label} subscription cancelled.`);
     setShowCancelDialog(false);
+    setCancelTarget(null);
     onReload?.();
   };
+
 
   // -----------------------------------------------------------------------
   // Phase 5.1: per-service "Devices" card. Each paired device gets its own
