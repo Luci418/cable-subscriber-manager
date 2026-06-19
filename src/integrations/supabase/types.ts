@@ -999,6 +999,7 @@ export type Database = {
           p_refund_amount?: number
           p_service_type: string
           p_subscriber_id: string
+          p_subscription_id?: string
         }
         Returns: Json
       }
@@ -1008,6 +1009,7 @@ export type Database = {
       }
       create_subscription: {
         Args: {
+          p_device_id?: string
           p_duration: number
           p_pack_id: string
           p_service_type: string

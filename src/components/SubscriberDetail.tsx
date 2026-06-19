@@ -75,12 +75,22 @@ export const SubscriberDetail = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddPackage, setShowAddPackage] = useState(false);
   const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
+  // Phase 5.1 multi-device fix: when the operator clicks Renew on a per-device
+  // card, route the new subscription to THAT device via the create_subscription
+  // RPC's p_device_id. Null = legacy fallback (RPC picks an assigned device).
+  const [addPackageDeviceId, setAddPackageDeviceId] = useState<string | null>(null);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [cancelService, setCancelService] = useState<'cable' | 'internet'>('cable');
+  // Phase 5.1 multi-device fix: cancel targets a specific subscription
+  // (by subscriptionId) rather than "the latest active for this service".
+  const [cancelTarget, setCancelTarget] = useState<{
+    service: 'cable' | 'internet';
+    subscriptionId: string;
+    blob: SubscriptionBlob;
+  } | null>(null);
   const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
   const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
@@ -265,19 +275,22 @@ export const SubscriberDetail = ({
 
 
   const handleCancelSubscription = async (refundAmount: number) => {
-    // Phase 1 (ADR-012): cancellation goes through a single atomic RPC.
-    // The server clears current_subscription, marks history cancelled, and
-    // inserts the refund payment on the ledger in one transaction. The
-    // balance trigger recomputes cable_balance / internet_balance — we
-    // never write balance from the client.
-    const isInternet = cancelService === 'internet';
-    const label = isInternet ? 'Internet' : 'Cable';
+    // Phase 5.1 multi-device fix: pass p_subscription_id so the server
+    // cancels the EXACT subscription the operator clicked on, not the
+    // "latest active for this service" (which would corrupt sibling
+    // device subscriptions).
+    if (!cancelTarget) {
+      toast.error('No subscription selected to cancel');
+      return;
+    }
+    const label = cancelTarget.service === 'internet' ? 'Internet' : 'Cable';
 
     const { error } = await (supabase as any).rpc('cancel_subscription', {
       p_subscriber_id: subscriber.id,
-      p_service_type: cancelService,
+      p_service_type: cancelTarget.service,
       p_refund_amount: refundAmount || 0,
       p_reason: null,
+      p_subscription_id: cancelTarget.subscriptionId,
     });
 
     if (error) {
@@ -290,8 +303,10 @@ export const SubscriberDetail = ({
       ? `${label} subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`
       : `${label} subscription cancelled.`);
     setShowCancelDialog(false);
+    setCancelTarget(null);
     onReload?.();
   };
+
 
   // -----------------------------------------------------------------------
   // Phase 5.1: per-service "Devices" card. Each paired device gets its own
@@ -417,7 +432,12 @@ export const SubscriberDetail = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => { setAddPackageService(service); setShowAddPackage(true); }}
+                        onClick={() => {
+                          // Phase 5.1 multi-device fix: pin the renew to THIS device.
+                          setAddPackageService(service);
+                          setAddPackageDeviceId(dev.id);
+                          setShowAddPackage(true);
+                        }}
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                         {sub ? 'Renew' : 'Subscribe'}
@@ -450,7 +470,16 @@ export const SubscriberDetail = ({
                         variant="ghost"
                         size="sm"
                         className="w-full text-destructive hover:text-destructive"
-                        onClick={() => { setCancelService(service); setShowCancelDialog(true); }}
+                        onClick={() => {
+                          // Phase 5.1 multi-device fix: target the exact
+                          // subscription on this device card.
+                          setCancelTarget({
+                            service,
+                            subscriptionId: sub.subscriptionId,
+                            blob: sub,
+                          });
+                          setShowCancelDialog(true);
+                        }}
                       >
                         Cancel Subscription
                       </Button>
@@ -839,12 +868,14 @@ export const SubscriberDetail = ({
 
       <AddPackageSubscriptionDialog
         open={showAddPackage}
-        onOpenChange={setShowAddPackage}
+        onOpenChange={(o) => { setShowAddPackage(o); if (!o) setAddPackageDeviceId(null); }}
         subscriberId={subscriber.id}
         subscriberName={subscriber.name}
         serviceType={addPackageService}
+        deviceId={addPackageDeviceId}
         onSuccess={() => {
           setShowAddPackage(false);
+          setAddPackageDeviceId(null);
           onReload?.();
         }}
       />
@@ -881,22 +912,14 @@ export const SubscriberDetail = ({
         onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); onReload?.(); }}
       />
 
-      {(() => {
-        // Cancel dialog operates on the primary active subscription for the
-        // chosen service. Today the cancel_subscription RPC works at the
-        // (subscriber, service) grain, so passing the primary blob is
-        // sufficient. When multi-device cancel ships in Phase 5 the dialog
-        // will need a per-subscription selector.
-        const subForCancel = cancelService === 'internet' ? primaryInternet : primaryCable;
-        return subForCancel ? (
-          <CancelSubscriptionDialog
-            open={showCancelDialog}
-            onOpenChange={setShowCancelDialog}
-            subscription={subForCancel as any}
-            onConfirm={handleCancelSubscription}
-          />
-        ) : null;
-      })()}
+      {cancelTarget && (
+        <CancelSubscriptionDialog
+          open={showCancelDialog}
+          onOpenChange={(o) => { setShowCancelDialog(o); if (!o) setCancelTarget(null); }}
+          subscription={cancelTarget.blob as any}
+          onConfirm={handleCancelSubscription}
+        />
+      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

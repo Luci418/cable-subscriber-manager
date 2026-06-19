@@ -21,6 +21,14 @@ interface AddPackageSubscriptionDialogProps {
   onSuccess: () => void;
   /** Which service this subscription belongs to. Defaults to 'cable' for backward compat. */
   serviceType?: ServiceType;
+  /**
+   * Phase 5.1 multi-device fix: explicit device id to renew/subscribe ON.
+   * When provided, the server (create_subscription RPC) pins the new
+   * subscription to this device instead of picking "most-recently-updated
+   * assigned device for this service". Pass null/undefined for the legacy
+   * fallback (single-device subscribers / no specific device context).
+   */
+  deviceId?: string | null;
 }
 
 export const AddPackageSubscriptionDialog = ({
@@ -30,6 +38,7 @@ export const AddPackageSubscriptionDialog = ({
   subscriberName,
   onSuccess,
   serviceType = 'cable',
+  deviceId = null,
 }: AddPackageSubscriptionDialogProps) => {
   const { user, loading: authLoading } = useAuth();
   const { packs, loading: packsLoading, reloadPacks, getActivePacks } = usePacks(user?.id);
@@ -113,6 +122,7 @@ export const AddPackageSubscriptionDialog = ({
       p_service_type: serviceType,
       p_pack_id: selectedPackData.id,
       p_duration: duration,
+      p_device_id: deviceId,
     });
 
     if (error) {
