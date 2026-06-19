@@ -122,6 +122,7 @@ export const AddPackageSubscriptionDialog = ({
       p_service_type: serviceType,
       p_pack_id: selectedPackData.id,
       p_duration: duration,
+      p_device_id: deviceId,
     });
 
     if (error) {
