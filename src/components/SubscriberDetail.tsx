@@ -962,6 +962,44 @@ export const SubscriberDetail = ({
         onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); onReload?.(); }}
       />
 
+      <ReplaceDeviceDialog
+        open={!!replaceDevice}
+        onOpenChange={(o) => { if (!o) setReplaceDevice(null); }}
+        subscriberId={subscriber.id}
+        subscriberName={subscriber.name}
+        oldDevice={replaceDevice}
+        onReplaced={() => {
+          setReplaceDevice(null);
+          loadPairedDevices();
+          loadOutstanding();
+          onReload?.();
+        }}
+      />
+
+      {collectTarget && (
+        <CollectPaymentDialog
+          open={!!collectTarget}
+          onOpenChange={(o) => { if (!o) setCollectTarget(null); }}
+          subscriberId={subscriber.id}
+          subscriberName={subscriber.name}
+          service={collectTarget.service}
+          subscriptionId={collectTarget.subscriptionId}
+          packName={collectTarget.packName}
+          outstandingForSubscription={collectTarget.outstandingForSubscription}
+          serviceBalance={
+            collectTarget.service === 'cable'
+              ? (subscriber.cable_balance || 0)
+              : ((subscriber as any).internet_balance || 0)
+          }
+          onCollected={() => {
+            setCollectTarget(null);
+            loadOutstanding();
+            onReload?.();
+          }}
+        />
+      )}
+
+
       {cancelTarget && (
         <CancelSubscriptionDialog
           open={showCancelDialog}
