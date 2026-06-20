@@ -24,6 +24,8 @@ import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { TransactionNotesDialog } from './TransactionNotesDialog';
 import { PairDeviceDialog } from './PairDeviceDialog';
 import { UnpairDeviceDialog } from './UnpairDeviceDialog';
+import { ReplaceDeviceDialog } from './ReplaceDeviceDialog';
+import { CollectPaymentDialog } from './CollectPaymentDialog';
 import { friendlyDbError } from '@/lib/dbErrors';
 import {
   AlertDialog,
@@ -96,9 +98,24 @@ export const SubscriberDetail = ({
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
   const [deleteChecking, setDeleteChecking] = useState(false);
 
-  // Pair / Unpair dialog state — Phase 5.1 workflow actions.
+  // Pair / Unpair / Replace / Collect dialog state — Phase 5.1–5.3 workflow actions.
   const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
   const [unpairDevice, setUnpairDevice] = useState<PairedDevice | null>(null);
+  const [replaceDevice, setReplaceDevice] = useState<PairedDevice | null>(null);
+  // Phase 5.3: bill-first Collect Payment. Carries device + subscription
+  // context from the invoking card so the payment is recorded against the
+  // exact subscription the operator was looking at.
+  const [collectTarget, setCollectTarget] = useState<{
+    service: 'cable' | 'internet';
+    subscriptionId: string | null;
+    packName: string | null;
+    outstandingForSubscription: number;
+  } | null>(null);
+  // Outstanding-per-active-subscription, keyed by subscriptionId, scoped to
+  // this subscriber. Computed from subscriptions.total_charged minus the
+  // sum of payment_allocations against that subscription.
+  const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
+
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const subscriberServices = subscriber.services && subscriber.services.length > 0
