@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User, Link2, Link2Off, ArrowLeftRight, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+// Tooltip import removed in Phase 5.2/5.3 — no remaining tooltip usages.
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
