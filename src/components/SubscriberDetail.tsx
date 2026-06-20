@@ -173,6 +173,18 @@ export const SubscriberDetail = ({
     loadOutstanding();
   }, [subscriber.id]);
 
+  // Resolve provider names linked to this subscriber's services so the
+  // operator can see WHO is delivering each service without leaving the page.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [
+      (subscriber as any).cable_provider_id,
+      (subscriber as any).internet_provider_id,
+    ].filter(Boolean) as string[];
+    if (ids.length === 0) {
+      setProviderNames({});
+      return;
+    }
     (async () => {
       const { data } = await (supabase as any)
         .from('providers')
@@ -188,6 +200,7 @@ export const SubscriberDetail = ({
     })();
     return () => { cancelled = true; };
   }, [subscriber.id, (subscriber as any).cable_provider_id, (subscriber as any).internet_provider_id]);
+
 
   // Pre-flight check before opening the destructive delete dialog. The RPC
   // returns a list of human-readable blockers (active subs, balance owed,
