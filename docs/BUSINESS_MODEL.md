@@ -134,7 +134,53 @@ Customer
 
 ---
 
+### Open Question (2026-06-20): is `services[]` declared intent, or a derived cache?
+
+This question must be resolved before any further behavior change to the
+`services[]` column or the `pair_device` / `unpair_device` auto-writes.
+
+**The question:** Is there any real operator workflow in which `services[]`
+contains a service that has no corresponding device in `stb_inventory`?
+
+The candidate scenario is **prospect-before-installation**: an LCO records
+a customer as a Cable prospect days or weeks before a technician shows up
+with an STB. During that window:
+- the subscriber row exists (`customer_status = 'prospect'`),
+- `services[]` declares Cable as the intended service,
+- there is no `stb_inventory` row paired to the subscriber yet.
+
+A second candidate is **temporary device removal** — a paired STB sent
+back to the warehouse for repair while the customer still considers
+themselves a Cable subscriber. Under the current model the operator must
+unpair (which removes the service from `services[]` when it's the last
+device of that type), then re-pair on return. If the operator wants
+`services[]` to persist through that window, it is declared intent.
+
+**Decision rule:**
+- **If YES** (real prospect/temporary-removal workflow exists): `services[]`
+  is genuine declared intent. The auto-writes in `pair_device` (append on
+  pair) and `unpair_device` (remove on last-device unpair) should be
+  REMOVED — `services[]` should only change when an operator explicitly
+  edits it. Pairing a device whose service isn't in `services[]` would
+  then become an explicit operator-confirmed action, not an implicit
+  mutation.
+- **If NO** (every realistic state has at least one device per declared
+  service): `services[]` is a derived cache. It should eventually be
+  replaced by a query against `stb_inventory` (assigned devices' service
+  types) ∪ `subscriptions` (active subs' service types), and the column
+  dropped per Batch C/D of the legacy column audit.
+
+**Status:** unresolved. No behavior change applied. Documented here to
+prevent silent drift between the data model and the operator workflow.
+
+**Answer when known:** _TBD — operator interviews / commercial-rollout
+testing._ Once decided, update this section with the answer and the
+corresponding cleanup (either remove the auto-writes, or schedule
+`services[]` for derivation + drop).
+
 ---
+
+
 
 # PART TWO — SECTION A: CUSTOMER LIFECYCLE
 
