@@ -449,9 +449,7 @@ export type Database = {
           cable_provider_id: string | null
           created_at: string
           current_internet_pack: string | null
-          current_internet_pack_id: string | null
           current_pack: string | null
-          current_pack_id: string | null
           current_subscription: Json | null
           customer_status: Database["public"]["Enums"]["customer_status"]
           id: string
@@ -478,9 +476,7 @@ export type Database = {
           cable_provider_id?: string | null
           created_at?: string
           current_internet_pack?: string | null
-          current_internet_pack_id?: string | null
           current_pack?: string | null
-          current_pack_id?: string | null
           current_subscription?: Json | null
           customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
@@ -507,9 +503,7 @@ export type Database = {
           cable_provider_id?: string | null
           created_at?: string
           current_internet_pack?: string | null
-          current_internet_pack_id?: string | null
           current_pack?: string | null
-          current_pack_id?: string | null
           current_subscription?: Json | null
           customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
@@ -537,20 +531,6 @@ export type Database = {
             columns: ["cable_provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscribers_current_internet_pack_id_fkey"
-            columns: ["current_internet_pack_id"]
-            isOneToOne: false
-            referencedRelation: "packs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscribers_current_pack_id_fkey"
-            columns: ["current_pack_id"]
-            isOneToOne: false
-            referencedRelation: "packs"
             referencedColumns: ["id"]
           },
           {
