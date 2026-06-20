@@ -462,18 +462,26 @@ export const SubscriberDetail = ({
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="contents">
-                              <Button variant="outline" size="sm" disabled className="w-full">
-                                <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Coming in Phase 5.3</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Phase 5.3: bill-first Collect Payment. Pass the
+                          // exact subscription on THIS device card so the
+                          // dialog can show this device's bill at the top.
+                          setCollectTarget({
+                            service,
+                            subscriptionId: sub?.subscriptionId || null,
+                            packName: sub?.packName || null,
+                            outstandingForSubscription:
+                              sub?.subscriptionId
+                                ? (outstandingBySub[sub.subscriptionId] || 0)
+                                : 0,
+                          });
+                        }}
+                      >
+                        <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
+                      </Button>
 
                       <Button
                         variant="outline"
@@ -489,18 +497,14 @@ export const SubscriberDetail = ({
                         {sub ? 'Renew' : 'Subscribe'}
                       </Button>
 
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="contents">
-                              <Button variant="outline" size="sm" disabled className="w-full">
-                                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Coming in Phase 5.2</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReplaceDevice(dev)}
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
+                      </Button>
+
 
                       <Button
                         variant="outline"
