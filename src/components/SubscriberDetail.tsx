@@ -141,22 +141,38 @@ export const SubscriberDetail = ({
     setPairedDevices((data as PairedDevice[]) || []);
   };
 
+  // Outstanding per active subscription = total_charged minus allocated cash.
+  // We compute this client-side (one round-trip) so each device card can show
+  // its own bill in Collect Payment. Reloaded whenever paired devices reload.
+  const loadOutstanding = async () => {
+    const { data: subs, error: subErr } = await (supabase as any)
+      .from('subscriptions')
+      .select('id,total_charged')
+      .eq('subscriber_id', subscriber.id)
+      .eq('status', 'active');
+    if (subErr || !subs) return;
+    const ids = (subs as any[]).map((s) => s.id);
+    if (ids.length === 0) { setOutstandingBySub({}); return; }
+    const { data: allocs } = await (supabase as any)
+      .from('payment_allocations')
+      .select('subscription_id,amount')
+      .in('subscription_id', ids);
+    const allocBy: Record<string, number> = {};
+    (allocs as any[] || []).forEach((a) => {
+      allocBy[a.subscription_id] = (allocBy[a.subscription_id] || 0) + Number(a.amount || 0);
+    });
+    const out: Record<string, number> = {};
+    (subs as any[]).forEach((s) => {
+      out[s.id] = Math.max(0, Number(s.total_charged || 0) - (allocBy[s.id] || 0));
+    });
+    setOutstandingBySub(out);
+  };
+
   useEffect(() => {
     loadPairedDevices();
+    loadOutstanding();
   }, [subscriber.id]);
 
-  // Resolve provider names linked to this subscriber's services so the
-  // operator can see WHO is delivering each service without leaving the page.
-  useEffect(() => {
-    let cancelled = false;
-    const ids = [
-      (subscriber as any).cable_provider_id,
-      (subscriber as any).internet_provider_id,
-    ].filter(Boolean) as string[];
-    if (ids.length === 0) {
-      setProviderNames({});
-      return;
-    }
     (async () => {
       const { data } = await (supabase as any)
         .from('providers')
