@@ -248,3 +248,29 @@ keep it in agreement. No removal planned.
 
 No code changes are made by this audit. Awaiting decision on which
 batches to execute.
+
+---
+
+## Execution status (2026-06-20)
+
+- **Batch A** — **EXECUTED.** Migration `20260620_*` dropped
+  `current_pack_id` and `current_internet_pack_id`, removed the FKs
+  (`subscribers_current_pack_id_fkey`, `subscribers_current_internet_pack_id_fkey`)
+  and indexes (`idx_subscribers_current_pack_id`,
+  `idx_subscribers_current_internet_pack`), and rewrote
+  `create_subscription` / `cancel_subscription` to stop writing those
+  columns. No frontend reader was touched (none existed).
+- **Batch B** — deferred until after Phase 5.3 ships.
+- **Batch C** — deferred until after the profile redesign (the JSONB blob
+  consumers in `subscribers_enforce_invariants`,
+  `check_subscriber_deletable`, `expire_lapsed_subscriptions`,
+  `cancel_subscription`, and `replace_device` need to be rewritten against
+  `subscriptions` first).
+- **Batch D** — deferred until the full migration sequence (invariant
+  rewritten, UI readers migrated, CSV migrated, `sync_stb_inventory_on_subscriber_change`
+  trigger retired) is complete.
+- **`services[]`** — see BUSINESS_MODEL.md "Open Question (2026-06-20):
+  is `services[]` declared intent, or a derived cache?". No behavior
+  change applied; auto-writes in `pair_device` / `unpair_device` are
+  intentionally untouched pending that decision.
+

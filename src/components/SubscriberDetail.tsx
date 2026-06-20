@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User, Link2, Link2Off, ArrowLeftRight, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+// Tooltip import removed in Phase 5.2/5.3 — no remaining tooltip usages.
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
@@ -24,6 +24,8 @@ import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { TransactionNotesDialog } from './TransactionNotesDialog';
 import { PairDeviceDialog } from './PairDeviceDialog';
 import { UnpairDeviceDialog } from './UnpairDeviceDialog';
+import { ReplaceDeviceDialog } from './ReplaceDeviceDialog';
+import { CollectPaymentDialog } from './CollectPaymentDialog';
 import { friendlyDbError } from '@/lib/dbErrors';
 import {
   AlertDialog,
@@ -96,9 +98,24 @@ export const SubscriberDetail = ({
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
   const [deleteChecking, setDeleteChecking] = useState(false);
 
-  // Pair / Unpair dialog state — Phase 5.1 workflow actions.
+  // Pair / Unpair / Replace / Collect dialog state — Phase 5.1–5.3 workflow actions.
   const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
   const [unpairDevice, setUnpairDevice] = useState<PairedDevice | null>(null);
+  const [replaceDevice, setReplaceDevice] = useState<PairedDevice | null>(null);
+  // Phase 5.3: bill-first Collect Payment. Carries device + subscription
+  // context from the invoking card so the payment is recorded against the
+  // exact subscription the operator was looking at.
+  const [collectTarget, setCollectTarget] = useState<{
+    service: 'cable' | 'internet';
+    subscriptionId: string | null;
+    packName: string | null;
+    outstandingForSubscription: number;
+  } | null>(null);
+  // Outstanding-per-active-subscription, keyed by subscriptionId, scoped to
+  // this subscriber. Computed from subscriptions.total_charged minus the
+  // sum of payment_allocations against that subscription.
+  const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
+
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const subscriberServices = subscriber.services && subscriber.services.length > 0
@@ -124,8 +141,36 @@ export const SubscriberDetail = ({
     setPairedDevices((data as PairedDevice[]) || []);
   };
 
+  // Outstanding per active subscription = total_charged minus allocated cash.
+  // We compute this client-side (one round-trip) so each device card can show
+  // its own bill in Collect Payment. Reloaded whenever paired devices reload.
+  const loadOutstanding = async () => {
+    const { data: subs, error: subErr } = await (supabase as any)
+      .from('subscriptions')
+      .select('id,total_charged')
+      .eq('subscriber_id', subscriber.id)
+      .eq('status', 'active');
+    if (subErr || !subs) return;
+    const ids = (subs as any[]).map((s) => s.id);
+    if (ids.length === 0) { setOutstandingBySub({}); return; }
+    const { data: allocs } = await (supabase as any)
+      .from('payment_allocations')
+      .select('subscription_id,amount')
+      .in('subscription_id', ids);
+    const allocBy: Record<string, number> = {};
+    (allocs as any[] || []).forEach((a) => {
+      allocBy[a.subscription_id] = (allocBy[a.subscription_id] || 0) + Number(a.amount || 0);
+    });
+    const out: Record<string, number> = {};
+    (subs as any[]).forEach((s) => {
+      out[s.id] = Math.max(0, Number(s.total_charged || 0) - (allocBy[s.id] || 0));
+    });
+    setOutstandingBySub(out);
+  };
+
   useEffect(() => {
     loadPairedDevices();
+    loadOutstanding();
   }, [subscriber.id]);
 
   // Resolve provider names linked to this subscriber's services so the
@@ -155,6 +200,7 @@ export const SubscriberDetail = ({
     })();
     return () => { cancelled = true; };
   }, [subscriber.id, (subscriber as any).cable_provider_id, (subscriber as any).internet_provider_id]);
+
 
   // Pre-flight check before opening the destructive delete dialog. The RPC
   // returns a list of human-readable blockers (active subs, balance owed,
@@ -416,18 +462,26 @@ export const SubscriberDetail = ({
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="contents">
-                              <Button variant="outline" size="sm" disabled className="w-full">
-                                <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Coming in Phase 5.3</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Phase 5.3: bill-first Collect Payment. Pass the
+                          // exact subscription on THIS device card so the
+                          // dialog can show this device's bill at the top.
+                          setCollectTarget({
+                            service,
+                            subscriptionId: sub?.subscriptionId || null,
+                            packName: sub?.packName || null,
+                            outstandingForSubscription:
+                              sub?.subscriptionId
+                                ? (outstandingBySub[sub.subscriptionId] || 0)
+                                : 0,
+                          });
+                        }}
+                      >
+                        <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
+                      </Button>
 
                       <Button
                         variant="outline"
@@ -443,18 +497,14 @@ export const SubscriberDetail = ({
                         {sub ? 'Renew' : 'Subscribe'}
                       </Button>
 
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="contents">
-                              <Button variant="outline" size="sm" disabled className="w-full">
-                                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Coming in Phase 5.2</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReplaceDevice(dev)}
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
+                      </Button>
+
 
                       <Button
                         variant="outline"
@@ -911,6 +961,44 @@ export const SubscriberDetail = ({
         device={unpairDevice}
         onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); onReload?.(); }}
       />
+
+      <ReplaceDeviceDialog
+        open={!!replaceDevice}
+        onOpenChange={(o) => { if (!o) setReplaceDevice(null); }}
+        subscriberId={subscriber.id}
+        subscriberName={subscriber.name}
+        oldDevice={replaceDevice}
+        onReplaced={() => {
+          setReplaceDevice(null);
+          loadPairedDevices();
+          loadOutstanding();
+          onReload?.();
+        }}
+      />
+
+      {collectTarget && (
+        <CollectPaymentDialog
+          open={!!collectTarget}
+          onOpenChange={(o) => { if (!o) setCollectTarget(null); }}
+          subscriberId={subscriber.id}
+          subscriberName={subscriber.name}
+          service={collectTarget.service}
+          subscriptionId={collectTarget.subscriptionId}
+          packName={collectTarget.packName}
+          outstandingForSubscription={collectTarget.outstandingForSubscription}
+          serviceBalance={
+            collectTarget.service === 'cable'
+              ? (subscriber.cable_balance || 0)
+              : ((subscriber as any).internet_balance || 0)
+          }
+          onCollected={() => {
+            setCollectTarget(null);
+            loadOutstanding();
+            onReload?.();
+          }}
+        />
+      )}
+
 
       {cancelTarget && (
         <CancelSubscriptionDialog
