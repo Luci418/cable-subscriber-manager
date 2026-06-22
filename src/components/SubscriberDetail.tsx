@@ -651,46 +651,122 @@ export const SubscriberDetail = ({
 
               <Separator />
 
-              {/* Per-service balance summary — also surfaces provider + active pack
-                  so operators see WHO delivers each service at a glance. */}
-              <div className={`grid gap-4 ${showCableTab && showInternetTab ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
-                {showCableTab && (
-                  <div className="rounded-lg border p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Tv className="h-4 w-4" />
-                      <span>Cable</span>
-                      <span className="ml-auto text-xs">
-                        {(subscriber.cable_balance || 0) >= 0 ? 'Dues' : 'Advance'}
+              {/* BUSINESS_MODEL §G1 — overall financial position + per-device breakdown.
+                  The operator must read total + composition without scrolling and
+                  without arithmetic. Labels are mandatory: never raw signed numbers.
+                  §G5 next-action chip is shown alongside the position. */}
+              {(() => {
+                const position = computeOverallPosition(subscriber);
+                const chip = computeNextActionChip(subscriber);
+                return (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Overall position</p>
+                        <p className={`text-2xl font-bold ${positionToneClasses(position.kind)}`}>
+                          {position.label}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
+                      >
+                        <span aria-hidden>{chip.icon}</span>
+                        {chip.label}
                       </span>
                     </div>
-                    <p className={`text-2xl font-bold ${getBalanceColor(subscriber.cable_balance || 0)}`}>
-                      ₹{Math.abs(subscriber.cable_balance || 0).toFixed(2)}
+
+                    {/* Per-device composition — one line per active sub per service.
+                        Renders even at zero so the operator sees what makes up Settled. */}
+                    <div className="space-y-2 text-sm">
+                      {position.breakdown.map((svc) => {
+                        const svcLabel = svc.service === 'cable' ? 'Cable TV' : 'Internet';
+                        const ServiceIcon = svc.service === 'cable' ? Tv : Wifi;
+                        const devices = pairedDevices.filter((d) => d.service_type === svc.service);
+                        // Build per-device rows. Match each device to its active sub
+                        // (if any), then use per-sub outstanding when available.
+                        const rows = devices.map((dev) => {
+                          const sub = svc.actives.find((a) => a.deviceId === dev.id);
+                          const outstanding = sub?.subscriptionId
+                            ? (outstandingBySub[sub.subscriptionId] || 0)
+                            : 0;
+                          const daysLeft = sub ? daysUntil(sub.endDate) : null;
+                          let statusText: string;
+                          let statusClass = 'text-muted-foreground';
+                          if (!sub) {
+                            statusText = 'No active subscription';
+                            statusClass = 'text-yellow-700 dark:text-yellow-400';
+                          } else if (daysLeft !== null && daysLeft < 0) {
+                            statusText = `Expired ${Math.abs(daysLeft)}d ago${outstanding > 0 ? ` · ₹${outstanding.toFixed(0)} due` : ''}`;
+                            statusClass = 'text-red-700 dark:text-red-400';
+                          } else if (outstanding > 0) {
+                            statusText = `₹${outstanding.toFixed(0)} due`;
+                            statusClass = 'text-red-700 dark:text-red-400';
+                          } else {
+                            statusText = 'Settled';
+                          }
+                          return {
+                            key: dev.id,
+                            primary: `${dev.serial_number}${sub?.packName ? ` (${sub.packName})` : ''}`,
+                            statusText,
+                            statusClass,
+                          };
+                        });
+                        // Orphan actives (sub with no/unknown device) so we don't hide them.
+                        svc.actives
+                          .filter((a) => !a.deviceId || !devices.some((d) => d.id === a.deviceId))
+                          .forEach((a) => {
+                            const outstanding = a.subscriptionId
+                              ? (outstandingBySub[a.subscriptionId] || 0)
+                              : 0;
+                            rows.push({
+                              key: a.subscriptionId,
+                              primary: `${a.packName} (no device)`,
+                              statusText: outstanding > 0 ? `₹${outstanding.toFixed(0)} due` : 'Settled',
+                              statusClass: outstanding > 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
+                            });
+                          });
+                        // Net per-service balance label (using §G1 vocab).
+                        const svcNet = svc.balance;
+                        const svcSummary =
+                          svcNet > 0 ? `Outstanding ₹${svcNet.toFixed(0)}` :
+                          svcNet < 0 ? `Available Credit ₹${Math.abs(svcNet).toFixed(0)}` :
+                          'Settled';
+                        return (
+                          <div key={svc.service} className="rounded-md bg-background/60 p-3 border">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <ServiceIcon className="h-3.5 w-3.5" /> {svcLabel}
+                              </div>
+                              <span className={`text-xs font-medium ${positionToneClasses(svcNet > 0 ? 'outstanding' : svcNet < 0 ? 'available_credit' : 'settled')}`}>
+                                {svcSummary}
+                              </span>
+                            </div>
+                            {rows.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No device paired</p>
+                            ) : (
+                              <ul className="space-y-0.5">
+                                {rows.map((r) => (
+                                  <li key={r.key} className="flex items-center justify-between gap-2 text-xs">
+                                    <span className="font-mono truncate">{r.primary}</span>
+                                    <span className={`shrink-0 ${r.statusClass}`}>{r.statusText}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Provider:{' '}
+                      {showCableTab && <span className="mr-2"><Tv className="inline h-3 w-3 mr-0.5" />{providerNames.cable || '—'}</span>}
+                      {showInternetTab && <span><Wifi className="inline h-3 w-3 mr-0.5" />{providerNames.internet || '—'}</span>}
                     </p>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p><span className="font-medium text-foreground">Provider:</span> {providerNames.cable || '—'}</p>
-                      <p><span className="font-medium text-foreground">Pack:</span> {primaryCable?.packName || subscriber.pack || '—'}{cableActives.length > 1 && <span className="ml-1 text-muted-foreground">(+{cableActives.length - 1} more)</span>}</p>
-                    </div>
                   </div>
-                )}
-                {showInternetTab && (
-                  <div className="rounded-lg border p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Wifi className="h-4 w-4" />
-                      <span>Internet</span>
-                      <span className="ml-auto text-xs">
-                        {(subscriber.internet_balance || 0) >= 0 ? 'Dues' : 'Advance'}
-                      </span>
-                    </div>
-                    <p className={`text-2xl font-bold ${getBalanceColor(subscriber.internet_balance || 0)}`}>
-                      ₹{Math.abs(subscriber.internet_balance || 0).toFixed(2)}
-                    </p>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p><span className="font-medium text-foreground">Provider:</span> {providerNames.internet || '—'}</p>
-                      <p><span className="font-medium text-foreground">Plan:</span> {primaryInternet?.packName || (subscriber as any).current_internet_pack || '—'}{internetActives.length > 1 && <span className="ml-1 text-muted-foreground">(+{internetActives.length - 1} more)</span>}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                );
+              })()}
+
 
             </CardContent>
           </Card>
