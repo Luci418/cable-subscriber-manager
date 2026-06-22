@@ -110,3 +110,31 @@ Order = (a) DB primitives first, then (b) the workflows that depend on them, the
 - **Role-based access (collection agent / admin / owner) + collection-agent map app** — see Phase 6 sketch in `.lovable/plan.md`.
 - Proration on plan change
 - Discounts / promo packs as first-class entities
+
+---
+
+## 5.5 ledger rendering — known requirement (flagged 2026-06-22)
+
+The targeted-allocation verification in Phase 5.3 (Test 3) produced a state
+that is mathematically correct but visually misleading if rendered as a net:
+
+> Subscriber has ₹102 advance credit AND ₹200 outstanding on a separate
+> subscription simultaneously. Net `cable_balance = ₹98 due`.
+
+Showing only "₹98 due" will confuse operators who don't understand why the
+collection target is lower than the outstanding bill. The passbook in 5.5
+MUST surface the gross components:
+
+> "₹200 outstanding on STB-001, ₹102 advance credit"
+
+…not just the net figure. This is the same principle as BUSINESS_MODEL §G1
+("never display a raw balance number without its meaning label") applied
+to per-subscription positions, and the same intent as the bill-first
+Collect Payment dialog: the operator sees what they're collecting against,
+not an opaque aggregate.
+
+Implementation hint: the passbook can compute per-subscription outstanding
+from `subscriptions.total_charged` minus `payment_allocations` per
+`subscription_id` (the same query already used in `SubscriberDetail` for
+the per-device breakdown). Advance credit is the residual portion of any
+payment with no remaining allocation target on the same service line.
