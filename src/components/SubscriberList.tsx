@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv, Building } from 'lucide-react';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { computeNextActionChip, chipToneClasses } from '@/lib/financialPosition';
 import {
   Select,
   SelectContent,
