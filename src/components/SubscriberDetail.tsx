@@ -45,6 +45,12 @@ import {
   SubscriptionEntry
 } from '@/lib/subscriptionUtils';
 import { getActives, getHistory, hasAnyActive, daysUntil, type SubscriptionBlob } from '@/lib/activeSubs';
+import {
+  computeOverallPosition,
+  computeNextActionChip,
+  chipToneClasses,
+  positionToneClasses,
+} from '@/lib/financialPosition';
 
 interface PairedDevice {
   id: string;
