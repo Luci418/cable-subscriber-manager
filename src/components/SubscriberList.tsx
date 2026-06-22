@@ -274,6 +274,8 @@ export const SubscriberList = ({
               </div>
             );
 
+            const chip = computeNextActionChip(subscriber);
+
             return (
               <Card
                 key={subscriber.id}
@@ -302,6 +304,16 @@ export const SubscriberList = ({
                         </Badge>
                       )}
                     </div>
+                  </div>
+                  {/* Next-action chip — single computed label per BUSINESS_MODEL §G5.
+                      Replaces the need to open each profile to know what to do. */}
+                  <div className="mt-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
+                    >
+                      <span aria-hidden>{chip.icon}</span>
+                      {chip.label}
+                    </span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
