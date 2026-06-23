@@ -206,7 +206,7 @@ export function buildLedgerEntries(
       title = `Payment received — ${paymentMethodLabel(t.payment_method)}`;
       sign = 'credit';
     } else if (t.source === 'adjustment' || t.type === 'adjustment') {
-      const reducesDebt = t.type === 'payment' || t.amount < 0;
+      const reducesDebt = (t.type as string) === 'payment' || t.amount < 0;
       kind = reducesDebt ? 'service_credit' : 'service_charge';
       const reason = t.description || (kind === 'service_credit' ? 'goodwill adjustment' : 'adjustment');
       title = kind === 'service_credit'
