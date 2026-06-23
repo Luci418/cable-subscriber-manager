@@ -164,27 +164,71 @@ export const SubscriberDetail = ({
   // We compute this client-side (one round-trip) so each device card can show
   // its own bill in Collect Payment. Reloaded whenever paired devices reload.
   const loadOutstanding = async () => {
+    // Pull every subscription this subscriber has ever had (active + history)
+    // so the passbook can resolve pack/dates for charge AND refund rows. The
+    // outstanding map below still keys only on `status='active'` rows.
     const { data: subs, error: subErr } = await (supabase as any)
       .from('subscriptions')
-      .select('id,total_charged')
-      .eq('subscriber_id', subscriber.id)
-      .eq('status', 'active');
+      .select('id,total_charged,status,service_type,pack_name_snapshot,start_date,end_date,device_serial_snapshot,previous_subscription_id,cancelled_at,cancel_reason_note,refund_amount')
+      .eq('subscriber_id', subscriber.id);
     if (subErr || !subs) return;
-    const ids = (subs as any[]).map((s) => s.id);
-    if (ids.length === 0) { setOutstandingBySub({}); return; }
-    const { data: allocs } = await (supabase as any)
-      .from('payment_allocations')
-      .select('subscription_id,amount')
-      .in('subscription_id', ids);
+    const subMap: Record<string, LedgerSubscription> = {};
+    (subs as any[]).forEach((s) => {
+      subMap[s.id] = {
+        id: s.id,
+        service_type: s.service_type,
+        pack_name_snapshot: s.pack_name_snapshot,
+        start_date: s.start_date,
+        end_date: s.end_date,
+        device_serial_snapshot: s.device_serial_snapshot,
+        previous_subscription_id: s.previous_subscription_id,
+        cancelled_at: s.cancelled_at,
+        cancel_reason_note: s.cancel_reason_note,
+        refund_amount: s.refund_amount,
+      };
+    });
+    setSubsById(subMap);
+
+    const activeIds = (subs as any[]).filter((s) => s.status === 'active').map((s) => s.id);
+    const out: Record<string, number> = {};
+    let allocs: any[] = [];
+    if (activeIds.length > 0) {
+      const { data } = await (supabase as any)
+        .from('payment_allocations')
+        .select('subscription_id,amount')
+        .in('subscription_id', activeIds);
+      allocs = (data as any[]) || [];
+    }
     const allocBy: Record<string, number> = {};
-    (allocs as any[] || []).forEach((a) => {
+    allocs.forEach((a) => {
       allocBy[a.subscription_id] = (allocBy[a.subscription_id] || 0) + Number(a.amount || 0);
     });
-    const out: Record<string, number> = {};
-    (subs as any[]).forEach((s) => {
+    (subs as any[]).filter((s) => s.status === 'active').forEach((s) => {
       out[s.id] = Math.max(0, Number(s.total_charged || 0) - (allocBy[s.id] || 0));
     });
     setOutstandingBySub(out);
+
+    // All allocations keyed by transaction_id — drives "Applied to..." rows
+    // in the passbook. Scope to this subscriber's transactions.
+    const txIds = transactions.map((t) => t.id);
+    if (txIds.length > 0) {
+      const { data: txAllocs } = await (supabase as any)
+        .from('payment_allocations')
+        .select('transaction_id,subscription_id,amount,allocated_by')
+        .in('transaction_id', txIds);
+      const map: Record<string, LedgerAllocation[]> = {};
+      ((txAllocs as any[]) || []).forEach((a) => {
+        (map[a.transaction_id] ||= []).push({
+          transaction_id: a.transaction_id,
+          subscription_id: a.subscription_id,
+          amount: Number(a.amount) || 0,
+          allocated_by: a.allocated_by,
+        });
+      });
+      setAllocByTx(map);
+    } else {
+      setAllocByTx({});
+    }
   };
 
   useEffect(() => {
