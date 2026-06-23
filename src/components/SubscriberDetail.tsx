@@ -952,6 +952,43 @@ export const SubscriberDetail = ({
                       )}
                     </div>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const rawTxs: LedgerRawTransaction[] = transactions.map((t: any) => ({
+                        id: t.id,
+                        date: t.date,
+                        type: t.type,
+                        amount: Number(t.amount) || 0,
+                        description: t.description ?? null,
+                        service_type: (t.service_type as any) ?? null,
+                        source: t.source ?? 'manual_charge',
+                        status: t.status ?? 'posted',
+                        payment_method: t.payment_method ?? null,
+                        subscription_id: t.subscription_id ?? null,
+                        reverses_transaction_id: t.reverses_transaction_id ?? null,
+                        void_reason: t.void_reason ?? null,
+                        void_reason_code: t.void_reason_code ?? null,
+                      }));
+                      const entries = buildLedgerEntries(rawTxs, subsById, allocByTx);
+                      const position = computeOverallPosition(subscriber);
+                      const gross = buildGrossComponents(
+                        subscriber as any,
+                        outstandingBySub,
+                        subsById,
+                      );
+                      generateAccountStatementPDF({
+                        subscriber,
+                        entries,
+                        positionLabel: position.label,
+                        grossComponents: gross,
+                      });
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Statement
+                  </Button>
                   <Button onClick={() => setShowAddTransaction(true)} size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Transaction
