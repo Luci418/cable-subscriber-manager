@@ -1000,8 +1000,6 @@ export const SubscriberDetail = ({
                 );
               })()}
             </CardContent>
-...
-
           </Card>
         </TabsContent>
       </Tabs>
