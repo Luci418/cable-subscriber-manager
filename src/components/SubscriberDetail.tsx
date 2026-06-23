@@ -718,6 +718,13 @@ export const SubscriberDetail = ({
               {(() => {
                 const position = computeOverallPosition(subscriber);
                 const chip = computeNextActionChip(subscriber);
+                const gross = buildGrossComponents(subscriber as any, outstandingBySub, subsById);
+                // Show gross components only when both debt AND credit coexist
+                // (the case where net hides reality). Single-sided positions
+                // are already self-explanatory from the label above.
+                const hasDebt = gross.some((g) => g.kind === 'outstanding');
+                const hasCredit = gross.some((g) => g.kind === 'available_credit' || g.kind === 'service_credit');
+                const showGross = hasDebt && hasCredit;
                 return (
                   <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -726,6 +733,11 @@ export const SubscriberDetail = ({
                         <p className={`text-2xl font-bold ${positionToneClasses(position.kind)}`}>
                           {position.label}
                         </p>
+                        {showGross && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {gross.map((g) => g.label).join(' · ')}
+                          </p>
+                        )}
                       </div>
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
