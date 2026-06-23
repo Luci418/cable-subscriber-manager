@@ -960,86 +960,48 @@ export const SubscriberDetail = ({
               </div>
             </CardHeader>
             <CardContent>
-              {visibleTransactions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No transactions to show</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Service</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibleTransactions.map(transaction => {
-                      const svc = ((transaction as any).service_type || 'cable') as 'cable' | 'internet';
-                      const status = ((transaction as any).status as string) || 'posted';
-                      const source = ((transaction as any).source as string) || 'manual_charge';
-                      const isVoided = status === 'voided';
-                      const isReversal = status === 'reversal';
-                      const isSubscriptionSourced =
-                        source === 'subscription_charge' || source === 'subscription_refund';
-                      const rowMuted = isVoided ? 'opacity-60 line-through' : '';
-                      return (
-                        <TableRow key={transaction.id} className={rowMuted}>
-                          <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="gap-1">
-                              {svc === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-                              {svc === 'internet' ? 'Internet' : 'Cable'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
-                                {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
-                              </Badge>
-                              {isSubscriptionSourced && (
-                                <Badge variant="secondary" className="text-xs">Subscription</Badge>
-                              )}
-                              {isVoided && <Badge variant="outline" className="text-xs">Voided</Badge>}
-                              {isReversal && <Badge variant="outline" className="text-xs">Reversal</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell>{transaction.description}</TableCell>
-                          <TableCell className={`text-right font-semibold ${
-                            transaction.type === 'payment' ? 'text-success' : 'text-destructive'
-                          }`}>
-                            {transaction.type === 'payment' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => openNotes(transaction)} title="Notes">
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)} title="Download invoice">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              {!isVoided && !isReversal && !isSubscriptionSourced && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  title="Void transaction"
-                                  onClick={() => openVoid(transaction)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-
-                  </TableBody>
-                </Table>
-              )}
+              {(() => {
+                // Phase 5.5 — passbook. Convert raw rows into business events
+                // via the shared rendering model. Same model feeds the PDF.
+                const rawTxs: LedgerRawTransaction[] = visibleTransactions.map((t: any) => ({
+                  id: t.id,
+                  date: t.date,
+                  type: t.type,
+                  amount: Number(t.amount) || 0,
+                  description: t.description ?? null,
+                  service_type: (t.service_type as any) ?? null,
+                  source: t.source ?? 'manual_charge',
+                  status: t.status ?? 'posted',
+                  payment_method: t.payment_method ?? null,
+                  subscription_id: t.subscription_id ?? null,
+                  reverses_transaction_id: t.reverses_transaction_id ?? null,
+                  void_reason: t.void_reason ?? null,
+                  void_reason_code: t.void_reason_code ?? null,
+                }));
+                const entries = buildLedgerEntries(rawTxs, subsById, allocByTx);
+                return (
+                  <TransactionLedger
+                    entries={entries}
+                    onOpenNotes={(txId) => {
+                      const tx = transactions.find((t) => t.id === txId);
+                      if (tx) openNotes(tx);
+                    }}
+                    onVoid={(txId) => {
+                      const tx = transactions.find((t) => t.id === txId);
+                      if (tx) openVoid(tx);
+                    }}
+                    canVoid={(e) =>
+                      !e.voided &&
+                      e.kind !== 'subscription_activated' &&
+                      e.kind !== 'subscription_renewed' &&
+                      e.kind !== 'subscription_refund'
+                    }
+                  />
+                );
+              })()}
             </CardContent>
+...
+
           </Card>
         </TabsContent>
       </Tabs>
