@@ -234,7 +234,10 @@ export const SubscriberDetail = ({
   useEffect(() => {
     loadPairedDevices();
     loadOutstanding();
-  }, [subscriber.id]);
+    // Re-run when the transaction set changes so the allocations map and
+    // outstanding-by-sub stay in sync with the passbook content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriber.id, transactions.length]);
 
   // Resolve provider names linked to this subscriber's services so the
   // operator can see WHO is delivering each service without leaving the page.
