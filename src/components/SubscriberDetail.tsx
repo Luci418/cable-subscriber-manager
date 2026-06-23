@@ -51,6 +51,15 @@ import {
   chipToneClasses,
   positionToneClasses,
 } from '@/lib/financialPosition';
+import {
+  buildLedgerEntries,
+  buildGrossComponents,
+  type LedgerSubscription,
+  type LedgerAllocation,
+  type LedgerRawTransaction,
+} from '@/lib/ledgerRendering';
+import { TransactionLedger } from './TransactionLedger';
+import { generateAccountStatementPDF } from '@/lib/pdfStatement';
 
 interface PairedDevice {
   id: string;
@@ -121,6 +130,10 @@ export const SubscriberDetail = ({
   // this subscriber. Computed from subscriptions.total_charged minus the
   // sum of payment_allocations against that subscription.
   const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
+  // Phase 5.5 — passbook rendering. Subscriptions (full snapshots) and
+  // allocations (per-transaction) feed the shared `buildLedgerEntries` model.
+  const [subsById, setSubsById] = useState<Record<string, LedgerSubscription>>({});
+  const [allocByTx, setAllocByTx] = useState<Record<string, LedgerAllocation[]>>({});
 
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
@@ -151,33 +164,80 @@ export const SubscriberDetail = ({
   // We compute this client-side (one round-trip) so each device card can show
   // its own bill in Collect Payment. Reloaded whenever paired devices reload.
   const loadOutstanding = async () => {
+    // Pull every subscription this subscriber has ever had (active + history)
+    // so the passbook can resolve pack/dates for charge AND refund rows. The
+    // outstanding map below still keys only on `status='active'` rows.
     const { data: subs, error: subErr } = await (supabase as any)
       .from('subscriptions')
-      .select('id,total_charged')
-      .eq('subscriber_id', subscriber.id)
-      .eq('status', 'active');
+      .select('id,total_charged,status,service_type,pack_name_snapshot,start_date,end_date,device_serial_snapshot,previous_subscription_id,cancelled_at,cancel_reason_note,refund_amount')
+      .eq('subscriber_id', subscriber.id);
     if (subErr || !subs) return;
-    const ids = (subs as any[]).map((s) => s.id);
-    if (ids.length === 0) { setOutstandingBySub({}); return; }
-    const { data: allocs } = await (supabase as any)
-      .from('payment_allocations')
-      .select('subscription_id,amount')
-      .in('subscription_id', ids);
+    const subMap: Record<string, LedgerSubscription> = {};
+    (subs as any[]).forEach((s) => {
+      subMap[s.id] = {
+        id: s.id,
+        service_type: s.service_type,
+        pack_name_snapshot: s.pack_name_snapshot,
+        start_date: s.start_date,
+        end_date: s.end_date,
+        device_serial_snapshot: s.device_serial_snapshot,
+        previous_subscription_id: s.previous_subscription_id,
+        cancelled_at: s.cancelled_at,
+        cancel_reason_note: s.cancel_reason_note,
+        refund_amount: s.refund_amount,
+      };
+    });
+    setSubsById(subMap);
+
+    const activeIds = (subs as any[]).filter((s) => s.status === 'active').map((s) => s.id);
+    const out: Record<string, number> = {};
+    let allocs: any[] = [];
+    if (activeIds.length > 0) {
+      const { data } = await (supabase as any)
+        .from('payment_allocations')
+        .select('subscription_id,amount')
+        .in('subscription_id', activeIds);
+      allocs = (data as any[]) || [];
+    }
     const allocBy: Record<string, number> = {};
-    (allocs as any[] || []).forEach((a) => {
+    allocs.forEach((a) => {
       allocBy[a.subscription_id] = (allocBy[a.subscription_id] || 0) + Number(a.amount || 0);
     });
-    const out: Record<string, number> = {};
-    (subs as any[]).forEach((s) => {
+    (subs as any[]).filter((s) => s.status === 'active').forEach((s) => {
       out[s.id] = Math.max(0, Number(s.total_charged || 0) - (allocBy[s.id] || 0));
     });
     setOutstandingBySub(out);
+
+    // All allocations keyed by transaction_id — drives "Applied to..." rows
+    // in the passbook. Scope to this subscriber's transactions.
+    const txIds = transactions.map((t) => t.id);
+    if (txIds.length > 0) {
+      const { data: txAllocs } = await (supabase as any)
+        .from('payment_allocations')
+        .select('transaction_id,subscription_id,amount,allocated_by')
+        .in('transaction_id', txIds);
+      const map: Record<string, LedgerAllocation[]> = {};
+      ((txAllocs as any[]) || []).forEach((a) => {
+        (map[a.transaction_id] ||= []).push({
+          transaction_id: a.transaction_id,
+          subscription_id: a.subscription_id,
+          amount: Number(a.amount) || 0,
+          allocated_by: a.allocated_by,
+        });
+      });
+      setAllocByTx(map);
+    } else {
+      setAllocByTx({});
+    }
   };
 
   useEffect(() => {
     loadPairedDevices();
     loadOutstanding();
-  }, [subscriber.id]);
+    // Re-run when the transaction set changes so the allocations map and
+    // outstanding-by-sub stay in sync with the passbook content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriber.id, transactions.length]);
 
   // Resolve provider names linked to this subscriber's services so the
   // operator can see WHO is delivering each service without leaving the page.
@@ -658,6 +718,13 @@ export const SubscriberDetail = ({
               {(() => {
                 const position = computeOverallPosition(subscriber);
                 const chip = computeNextActionChip(subscriber);
+                const gross = buildGrossComponents(subscriber as any, outstandingBySub, subsById);
+                // Show gross components only when both debt AND credit coexist
+                // (the case where net hides reality). Single-sided positions
+                // are already self-explanatory from the label above.
+                const hasDebt = gross.some((g) => g.kind === 'outstanding');
+                const hasCredit = gross.some((g) => g.kind === 'available_credit' || g.kind === 'service_credit');
+                const showGross = hasDebt && hasCredit;
                 return (
                   <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -666,6 +733,11 @@ export const SubscriberDetail = ({
                         <p className={`text-2xl font-bold ${positionToneClasses(position.kind)}`}>
                           {position.label}
                         </p>
+                        {showGross && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {gross.map((g) => g.label).join(' · ')}
+                          </p>
+                        )}
                       </div>
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
@@ -892,6 +964,43 @@ export const SubscriberDetail = ({
                       )}
                     </div>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const rawTxs: LedgerRawTransaction[] = transactions.map((t: any) => ({
+                        id: t.id,
+                        date: t.date,
+                        type: t.type,
+                        amount: Number(t.amount) || 0,
+                        description: t.description ?? null,
+                        service_type: (t.service_type as any) ?? null,
+                        source: t.source ?? 'manual_charge',
+                        status: t.status ?? 'posted',
+                        payment_method: t.payment_method ?? null,
+                        subscription_id: t.subscription_id ?? null,
+                        reverses_transaction_id: t.reverses_transaction_id ?? null,
+                        void_reason: t.void_reason ?? null,
+                        void_reason_code: t.void_reason_code ?? null,
+                      }));
+                      const entries = buildLedgerEntries(rawTxs, subsById, allocByTx);
+                      const position = computeOverallPosition(subscriber);
+                      const gross = buildGrossComponents(
+                        subscriber as any,
+                        outstandingBySub,
+                        subsById,
+                      );
+                      generateAccountStatementPDF({
+                        subscriber,
+                        entries,
+                        positionLabel: position.label,
+                        grossComponents: gross,
+                      });
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Statement
+                  </Button>
                   <Button onClick={() => setShowAddTransaction(true)} size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Transaction
@@ -900,85 +1009,45 @@ export const SubscriberDetail = ({
               </div>
             </CardHeader>
             <CardContent>
-              {visibleTransactions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No transactions to show</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Service</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibleTransactions.map(transaction => {
-                      const svc = ((transaction as any).service_type || 'cable') as 'cable' | 'internet';
-                      const status = ((transaction as any).status as string) || 'posted';
-                      const source = ((transaction as any).source as string) || 'manual_charge';
-                      const isVoided = status === 'voided';
-                      const isReversal = status === 'reversal';
-                      const isSubscriptionSourced =
-                        source === 'subscription_charge' || source === 'subscription_refund';
-                      const rowMuted = isVoided ? 'opacity-60 line-through' : '';
-                      return (
-                        <TableRow key={transaction.id} className={rowMuted}>
-                          <TableCell className="text-sm">{formatDate(transaction.date)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="gap-1">
-                              {svc === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-                              {svc === 'internet' ? 'Internet' : 'Cable'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge variant={transaction.type === 'payment' ? 'default' : 'destructive'}>
-                                {transaction.type === 'payment' ? 'Cash Received' : 'Bill'}
-                              </Badge>
-                              {isSubscriptionSourced && (
-                                <Badge variant="secondary" className="text-xs">Subscription</Badge>
-                              )}
-                              {isVoided && <Badge variant="outline" className="text-xs">Voided</Badge>}
-                              {isReversal && <Badge variant="outline" className="text-xs">Reversal</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell>{transaction.description}</TableCell>
-                          <TableCell className={`text-right font-semibold ${
-                            transaction.type === 'payment' ? 'text-success' : 'text-destructive'
-                          }`}>
-                            {transaction.type === 'payment' ? '+' : '-'}₹{transaction.amount.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => openNotes(transaction)} title="Notes">
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => generateInvoicePDF(transaction, subscriber)} title="Download invoice">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              {!isVoided && !isReversal && !isSubscriptionSourced && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  title="Void transaction"
-                                  onClick={() => openVoid(transaction)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-
-                  </TableBody>
-                </Table>
-              )}
+              {(() => {
+                // Phase 5.5 — passbook. Convert raw rows into business events
+                // via the shared rendering model. Same model feeds the PDF.
+                const rawTxs: LedgerRawTransaction[] = visibleTransactions.map((t: any) => ({
+                  id: t.id,
+                  date: t.date,
+                  type: t.type,
+                  amount: Number(t.amount) || 0,
+                  description: t.description ?? null,
+                  service_type: (t.service_type as any) ?? null,
+                  source: t.source ?? 'manual_charge',
+                  status: t.status ?? 'posted',
+                  payment_method: t.payment_method ?? null,
+                  subscription_id: t.subscription_id ?? null,
+                  reverses_transaction_id: t.reverses_transaction_id ?? null,
+                  void_reason: t.void_reason ?? null,
+                  void_reason_code: t.void_reason_code ?? null,
+                }));
+                const entries = buildLedgerEntries(rawTxs, subsById, allocByTx);
+                return (
+                  <TransactionLedger
+                    entries={entries}
+                    onOpenNotes={(txId) => {
+                      const tx = transactions.find((t) => t.id === txId);
+                      if (tx) openNotes(tx);
+                    }}
+                    onVoid={(txId) => {
+                      const tx = transactions.find((t) => t.id === txId);
+                      if (tx) openVoid(tx);
+                    }}
+                    canVoid={(e) =>
+                      !e.voided &&
+                      e.kind !== 'subscription_activated' &&
+                      e.kind !== 'subscription_renewed' &&
+                      e.kind !== 'subscription_refund'
+                    }
+                  />
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
