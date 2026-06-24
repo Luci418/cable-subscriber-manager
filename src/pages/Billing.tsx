@@ -190,7 +190,9 @@ export const Billing = ({ onBack }: BillingProps) => {
               Back
             </Button>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Billing</h1>
-            <p className="text-sm text-muted-foreground">Subscription management</p>
+            <p className="text-sm text-muted-foreground">
+              Cross-subscriber worklist — service lines expiring soon, active subscriptions, and inactive accounts. The per-subscriber profile remains the source of truth.
+            </p>
           </div>
 
           {bothEnabled && (
