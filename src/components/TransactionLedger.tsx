@@ -82,14 +82,18 @@ export const TransactionLedger = ({ entries, onOpenNotes, onVoid, canVoid }: Pro
           e.sourceTransactionIds.length > 1;
         const open = !!expanded[e.id];
         const muted = e.voided ? 'opacity-60' : '';
-        const amountClass =
-          e.voided
-            ? 'text-muted-foreground line-through'
-            : e.sign === 'credit'
-              ? 'text-green-700 dark:text-green-400'
-              : 'text-red-700 dark:text-red-400';
+        // Phase 5.6 visual pass — amounts render in neutral foreground.
+        // Voided rows strike through; refund rows (kind=subscription_refund)
+        // are the only state-colored amount because they represent money
+        // physically going back to the customer.
+        const isRefund = e.kind === 'subscription_refund';
+        const amountClass = e.voided
+          ? 'text-muted-foreground line-through'
+          : isRefund
+            ? 'text-green-700 dark:text-green-400'
+            : 'text-foreground';
         const amountPrefix = e.voided ? '' : e.sign === 'credit' ? '−' : '+';
-        // Sign convention shown to operator: + adds debt to customer, − reduces debt.
+        // Sign convention: + adds debt to customer, − reduces debt.
 
         return (
           <li key={e.id} className={`py-3 ${muted}`}>
