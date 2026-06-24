@@ -57,6 +57,9 @@ export const SubscriberList = ({
   const [packFilter, setPackFilter] = useState<string>(initialPackFilter || 'all');
   const [regionFilter, setRegionFilter] = useState<string>(initialRegionFilter || 'all');
   const [balanceFilter, setBalanceFilter] = useState<string>(initialBalanceFilter || 'all');
+  // Item 5 — next-action chip filter. Lets an operator narrow the list to
+  // just the rows that need today's attention without scrolling.
+  const [actionFilter, setActionFilter] = useState<'all' | 'collect' | 'renew' | 'expiring' | 'settled'>('all');
 
   // Use database field names: current_pack and stb_number
   const packs = Array.from(new Set(subscribers.map(s => (s as any).current_pack || s.pack).filter(Boolean)));
