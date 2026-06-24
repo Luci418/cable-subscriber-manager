@@ -69,23 +69,34 @@ export const SubscriberList = ({
     const searchLower = search.toLowerCase().trim();
     const stbNum = (s as any).stb_number || s.stbNumber || '';
     const pack = (s as any).current_pack || s.pack || '';
-    
-    const matchesSearch = !searchLower || 
+
+    const matchesSearch = !searchLower ||
       s.name.toLowerCase().includes(searchLower) ||
       s.mobile.toLowerCase().includes(searchLower) ||
       stbNum.toLowerCase().includes(searchLower) ||
       s.id.toLowerCase().includes(searchLower);
-    
+
     const matchesPack = packFilter === 'all' || pack === packFilter;
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
-    
+
     const totalBalance = (s.cable_balance || 0) + ((s as any).internet_balance || 0);
     let matchesBalance = true;
     if (balanceFilter === 'positive') matchesBalance = totalBalance > 0;
     else if (balanceFilter === 'negative') matchesBalance = totalBalance < 0;
     else if (balanceFilter === 'zero') matchesBalance = totalBalance === 0;
-    
-    return matchesSearch && matchesPack && matchesRegion && matchesBalance;
+
+    // Action-chip filter (Item 5). We re-compute the chip here so list
+    // filtering stays consistent with the chip rendered on each card.
+    let matchesAction = true;
+    if (actionFilter !== 'all') {
+      const chipLabel = computeNextActionChip(s).label.toLowerCase();
+      if (actionFilter === 'collect')  matchesAction = chipLabel.startsWith('collect');
+      else if (actionFilter === 'renew')    matchesAction = chipLabel.startsWith('renew');
+      else if (actionFilter === 'expiring') matchesAction = chipLabel.includes('renewal due');
+      else if (actionFilter === 'settled')  matchesAction = chipLabel === 'no action required';
+    }
+
+    return matchesSearch && matchesPack && matchesRegion && matchesBalance && matchesAction;
   });
 
   const getBalanceColor = (balance: number) => {
