@@ -35,14 +35,17 @@ interface Props {
   canVoid?: (entry: LedgerEntry) => boolean;
 }
 
+// Visual pass (Phase 5.6 scope): icons stay subtle and monochromatic.
+// Color is reserved for state (voided, refund). Direction is communicated
+// by the +/− prefix and the icon glyph, not by hue.
 const kindIcon: Record<LedgerEntryKind, JSX.Element> = {
-  subscription_activated: <ArrowUpCircle className="h-4 w-4 text-red-600" />,
-  subscription_renewed:   <RefreshCw    className="h-4 w-4 text-red-600" />,
+  subscription_activated: <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />,
+  subscription_renewed:   <RefreshCw    className="h-4 w-4 text-muted-foreground" />,
   subscription_refund:    <Undo2        className="h-4 w-4 text-green-600" />,
-  payment_received:       <ArrowDownCircle className="h-4 w-4 text-green-600" />,
-  manual_charge:          <ArrowUpCircle className="h-4 w-4 text-red-600" />,
-  service_credit:         <Gift         className="h-4 w-4 text-blue-600" />,
-  service_charge:         <ArrowUpCircle className="h-4 w-4 text-amber-600" />,
+  payment_received:       <ArrowDownCircle className="h-4 w-4 text-muted-foreground" />,
+  manual_charge:          <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />,
+  service_credit:         <Gift         className="h-4 w-4 text-muted-foreground" />,
+  service_charge:         <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />,
   voided_pair:            <XCircle      className="h-4 w-4 text-muted-foreground" />,
   unknown:                <Receipt      className="h-4 w-4 text-muted-foreground" />,
 };
