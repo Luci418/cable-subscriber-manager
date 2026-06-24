@@ -57,6 +57,9 @@ export const SubscriberList = ({
   const [packFilter, setPackFilter] = useState<string>(initialPackFilter || 'all');
   const [regionFilter, setRegionFilter] = useState<string>(initialRegionFilter || 'all');
   const [balanceFilter, setBalanceFilter] = useState<string>(initialBalanceFilter || 'all');
+  // Item 5 — next-action chip filter. Lets an operator narrow the list to
+  // just the rows that need today's attention without scrolling.
+  const [actionFilter, setActionFilter] = useState<'all' | 'collect' | 'renew' | 'expiring' | 'settled'>('all');
 
   // Use database field names: current_pack and stb_number
   const packs = Array.from(new Set(subscribers.map(s => (s as any).current_pack || s.pack).filter(Boolean)));
@@ -66,23 +69,34 @@ export const SubscriberList = ({
     const searchLower = search.toLowerCase().trim();
     const stbNum = (s as any).stb_number || s.stbNumber || '';
     const pack = (s as any).current_pack || s.pack || '';
-    
-    const matchesSearch = !searchLower || 
+
+    const matchesSearch = !searchLower ||
       s.name.toLowerCase().includes(searchLower) ||
       s.mobile.toLowerCase().includes(searchLower) ||
       stbNum.toLowerCase().includes(searchLower) ||
       s.id.toLowerCase().includes(searchLower);
-    
+
     const matchesPack = packFilter === 'all' || pack === packFilter;
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
-    
+
     const totalBalance = (s.cable_balance || 0) + ((s as any).internet_balance || 0);
     let matchesBalance = true;
     if (balanceFilter === 'positive') matchesBalance = totalBalance > 0;
     else if (balanceFilter === 'negative') matchesBalance = totalBalance < 0;
     else if (balanceFilter === 'zero') matchesBalance = totalBalance === 0;
-    
-    return matchesSearch && matchesPack && matchesRegion && matchesBalance;
+
+    // Action-chip filter (Item 5). We re-compute the chip here so list
+    // filtering stays consistent with the chip rendered on each card.
+    let matchesAction = true;
+    if (actionFilter !== 'all') {
+      const chipLabel = computeNextActionChip(s).label.toLowerCase();
+      if (actionFilter === 'collect')  matchesAction = chipLabel.startsWith('collect');
+      else if (actionFilter === 'renew')    matchesAction = chipLabel.startsWith('renew');
+      else if (actionFilter === 'expiring') matchesAction = chipLabel.includes('renewal due');
+      else if (actionFilter === 'settled')  matchesAction = chipLabel === 'no action required';
+    }
+
+    return matchesSearch && matchesPack && matchesRegion && matchesBalance && matchesAction;
   });
 
   const getBalanceColor = (balance: number) => {
@@ -140,6 +154,19 @@ export const SubscriberList = ({
               <SelectItem value="positive">Credit</SelectItem>
               <SelectItem value="negative">Debit</SelectItem>
               <SelectItem value="zero">Zero</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as any)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Next action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="collect">Collect</SelectItem>
+              <SelectItem value="renew">Renew</SelectItem>
+              <SelectItem value="expiring">Expiring soon</SelectItem>
+              <SelectItem value="settled">Settled</SelectItem>
             </SelectContent>
           </Select>
 

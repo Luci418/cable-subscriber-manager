@@ -60,6 +60,13 @@ export const Billing = ({ onBack }: BillingProps) => {
       return;
     }
     setPaySaving(true);
+    // Bug 1 fix: when the operator clicks Record Payment against a specific
+    // service line that has an active subscription, pin the payment to that
+    // subscription so the FIFO trigger does targeted allocation (added in the
+    // 2026-06-24 migration). Without subscription_id, the same payment would
+    // fall through to FIFO and be misclassified as advance credit when the
+    // outstanding lives on a different (older) subscription on the same line.
+    const targetSubscriptionId: string | null = payLine.sub?.subscriptionId ?? null;
     const { error } = await (supabase.from('transactions') as any).insert({
       user_id: user.id,
       subscriber_id: payLine.subscriber.id,
@@ -67,6 +74,7 @@ export const Billing = ({ onBack }: BillingProps) => {
       amount,
       service_type: payLine.service,
       source: 'manual_payment',
+      subscription_id: targetSubscriptionId,
       provider_id: payLine.service === 'cable'
         ? (payLine.subscriber as any).cable_provider_id
         : (payLine.subscriber as any).internet_provider_id,
@@ -182,7 +190,9 @@ export const Billing = ({ onBack }: BillingProps) => {
               Back
             </Button>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Billing</h1>
-            <p className="text-sm text-muted-foreground">Subscription management</p>
+            <p className="text-sm text-muted-foreground">
+              Cross-subscriber worklist — service lines expiring soon, active subscriptions, and inactive accounts. The per-subscriber profile remains the source of truth.
+            </p>
           </div>
 
           {bothEnabled && (

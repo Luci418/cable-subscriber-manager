@@ -35,14 +35,17 @@ interface Props {
   canVoid?: (entry: LedgerEntry) => boolean;
 }
 
+// Visual pass (Phase 5.6 scope): icons stay subtle and monochromatic.
+// Color is reserved for state (voided, refund). Direction is communicated
+// by the +/− prefix and the icon glyph, not by hue.
 const kindIcon: Record<LedgerEntryKind, JSX.Element> = {
-  subscription_activated: <ArrowUpCircle className="h-4 w-4 text-red-600" />,
-  subscription_renewed:   <RefreshCw    className="h-4 w-4 text-red-600" />,
+  subscription_activated: <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />,
+  subscription_renewed:   <RefreshCw    className="h-4 w-4 text-muted-foreground" />,
   subscription_refund:    <Undo2        className="h-4 w-4 text-green-600" />,
-  payment_received:       <ArrowDownCircle className="h-4 w-4 text-green-600" />,
-  manual_charge:          <ArrowUpCircle className="h-4 w-4 text-red-600" />,
-  service_credit:         <Gift         className="h-4 w-4 text-blue-600" />,
-  service_charge:         <ArrowUpCircle className="h-4 w-4 text-amber-600" />,
+  payment_received:       <ArrowDownCircle className="h-4 w-4 text-muted-foreground" />,
+  manual_charge:          <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />,
+  service_credit:         <Gift         className="h-4 w-4 text-muted-foreground" />,
+  service_charge:         <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />,
   voided_pair:            <XCircle      className="h-4 w-4 text-muted-foreground" />,
   unknown:                <Receipt      className="h-4 w-4 text-muted-foreground" />,
 };
@@ -79,14 +82,18 @@ export const TransactionLedger = ({ entries, onOpenNotes, onVoid, canVoid }: Pro
           e.sourceTransactionIds.length > 1;
         const open = !!expanded[e.id];
         const muted = e.voided ? 'opacity-60' : '';
-        const amountClass =
-          e.voided
-            ? 'text-muted-foreground line-through'
-            : e.sign === 'credit'
-              ? 'text-green-700 dark:text-green-400'
-              : 'text-red-700 dark:text-red-400';
+        // Phase 5.6 visual pass — amounts render in neutral foreground.
+        // Voided rows strike through; refund rows (kind=subscription_refund)
+        // are the only state-colored amount because they represent money
+        // physically going back to the customer.
+        const isRefund = e.kind === 'subscription_refund';
+        const amountClass = e.voided
+          ? 'text-muted-foreground line-through'
+          : isRefund
+            ? 'text-green-700 dark:text-green-400'
+            : 'text-foreground';
         const amountPrefix = e.voided ? '' : e.sign === 'credit' ? '−' : '+';
-        // Sign convention shown to operator: + adds debt to customer, − reduces debt.
+        // Sign convention: + adds debt to customer, − reduces debt.
 
         return (
           <li key={e.id} className={`py-3 ${muted}`}>

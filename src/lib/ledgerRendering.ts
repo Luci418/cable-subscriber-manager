@@ -196,14 +196,38 @@ export function buildLedgerEntries(
     } else if (t.source === 'subscription_refund' && sub) {
       kind = 'subscription_refund';
       title = `Refund issued — ${sub.pack_name_snapshot} cancelled`;
-      subtitle = sub.cancelled_at
-        ? `Cancelled on ${fmtDate(sub.cancelled_at)}` +
-          (sub.cancel_reason_note ? ` · ${sub.cancel_reason_note}` : '')
-        : sub.cancel_reason_note || undefined;
+      // Bug 2 — show the cancel date AND how long the subscription ran
+      // before cancellation so disputes are self-explanatory.
+      const cancelBits: string[] = [];
+      if (sub.cancelled_at) {
+        cancelBits.push(`Cancelled on ${fmtDate(sub.cancelled_at)}`);
+        try {
+          const days = Math.max(
+            0,
+            Math.round(
+              (new Date(sub.cancelled_at).getTime() - new Date(sub.start_date).getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          );
+          cancelBits.push(
+            `Cancelled after ${days} day${days === 1 ? '' : 's'} of ${fmtDateShort(sub.start_date)}–${fmtDateShort(sub.end_date)} validity`,
+          );
+        } catch { /* ignore date parse errors */ }
+      }
+      if (sub.cancel_reason_note) cancelBits.push(sub.cancel_reason_note);
+      subtitle = cancelBits.join(' · ') || undefined;
       sign = 'credit';
     } else if (t.type === 'payment') {
       kind = 'payment_received';
-      title = `Payment received — ${paymentMethodLabel(t.payment_method)}`;
+      // Bug 1 (description overwrite) — if the operator wrote a meaningful
+      // description (anything other than the bare default), prefer their
+      // wording. Falls back to the canonical "Payment received — [method]"
+      // line so older rows still read cleanly.
+      const opDesc = (t.description || '').trim();
+      const looksGeneric = !opDesc || /^payment(\s+received)?$/i.test(opDesc);
+      title = looksGeneric
+        ? `Payment received — ${paymentMethodLabel(t.payment_method)}`
+        : opDesc;
       sign = 'credit';
     } else if (t.source === 'adjustment' || t.type === 'adjustment') {
       const reducesDebt = (t.type as string) === 'payment' || t.amount < 0;

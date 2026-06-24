@@ -122,6 +122,68 @@ export const Settings = ({ onBack }: SettingsProps) => {
           </CardContent>
         </Card>
 
+        {/* Payment Settings — operator-facing fields that affect Collect Payment. */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5" />
+              Payment Settings
+            </CardTitle>
+            <CardDescription>
+              Operator UPI ID for receiving payments, and how far back transactions may be dated.
+              Persisted alongside company details in local company settings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveCompanySettings(settings);
+                toast.success('Payment settings saved');
+              }}
+              className="space-y-4"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="upi_vpa">Operator UPI ID (VPA)</Label>
+                  <Input
+                    id="upi_vpa"
+                    placeholder="yourname@bank"
+                    value={settings.operator_upi_vpa ?? ''}
+                    onChange={(e) => setSettings({ ...settings, operator_upi_vpa: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Required to accept UPI in Collect Payment. Leave blank to disable UPI.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="backdating">Backdating window (days)</Label>
+                  <Input
+                    id="backdating"
+                    type="number"
+                    min={0}
+                    max={90}
+                    value={settings.backdating_window_days ?? 7}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        backdating_window_days: Math.max(0, Math.min(90, Number(e.target.value) || 0)),
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    0 = today only. Operators cannot date a transaction earlier than this window.
+                  </p>
+                </div>
+              </div>
+              <Button type="submit">
+                <Save className="mr-2 h-4 w-4" />
+                Save Payment Settings
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
         {/* Service Modules — toggle Cable / Internet at any time. Disabling does NOT delete data. */}
         <Card className="md:col-span-2">
           <CardHeader>
