@@ -157,6 +157,19 @@ export const SubscriberList = ({
             </SelectContent>
           </Select>
 
+          <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as any)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Next action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="collect">Collect</SelectItem>
+              <SelectItem value="renew">Renew</SelectItem>
+              <SelectItem value="expiring">Expiring soon</SelectItem>
+              <SelectItem value="settled">Settled</SelectItem>
+            </SelectContent>
+          </Select>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
