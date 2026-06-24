@@ -408,6 +408,9 @@ export const getCompanySettings = (): CompanySettings => {
   if (!parsed.enabledServices || parsed.enabledServices.length === 0) {
     parsed.enabledServices = ['cable'];
   }
+  // Backfill operator-payment defaults so the Settings UI is always controlled.
+  if (parsed.operator_upi_vpa === undefined) parsed.operator_upi_vpa = '';
+  if (parsed.backdating_window_days === undefined) parsed.backdating_window_days = 7;
   return parsed;
 };
 
