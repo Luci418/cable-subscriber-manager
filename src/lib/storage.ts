@@ -77,6 +77,10 @@ export interface CompanySettings {
   logo?: string;
   /** Which service modules are enabled in the UI. Defaults to ['cable']. */
   enabledServices?: ServiceType[];
+  /** Operator's UPI VPA shown on receipts and used by the Collect Payment dialog. */
+  operator_upi_vpa?: string;
+  /** How many days back an operator may date a transaction. 0 disables backdating. */
+  backdating_window_days?: number;
 }
 
 export interface BillingHistory {
