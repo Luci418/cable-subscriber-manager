@@ -413,7 +413,7 @@ export const createBackup = () => {
       packs: getPacks(),
       regions: getRegions(),
       complaints: getComplaints(),
-      companySettings: getCompanySettings(),
+      // companySettings: business config now lives in DB (`public.settings`).
       billingHistory: getBillingHistory(),
       counter: localStorage.getItem(COUNTER_KEY),
     },
@@ -452,7 +452,8 @@ export const restoreBackup = (file: File): Promise<void> => {
         if (backup.data.packs) savePacks(backup.data.packs);
         if (backup.data.regions) saveRegions(backup.data.regions);
         if (backup.data.complaints) saveComplaints(backup.data.complaints);
-        if (backup.data.companySettings) saveCompanySettings(backup.data.companySettings);
+        // backup.data.companySettings is intentionally ignored: business
+        // configuration is DB-authoritative and survives independently.
         if (backup.data.billingHistory) saveBillingHistory(backup.data.billingHistory);
         if (backup.data.counter) localStorage.setItem(COUNTER_KEY, backup.data.counter);
         
