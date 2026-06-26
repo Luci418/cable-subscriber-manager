@@ -17,6 +17,7 @@ import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Penc
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 // Tooltip import removed in Phase 5.2/5.3 — no remaining tooltip usages.
 import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { useSettings, settingsToCompany } from '@/contexts/SettingsContext';
 import { AddTransactionDialog } from './AddTransactionDialog';
 import { EditSubscriberDialog } from './EditSubscriberDialog';
 import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
@@ -137,6 +138,10 @@ export const SubscriberDetail = ({
 
 
   const { cableEnabled, internetEnabled } = useEnabledServices();
+  const { settings: businessSettings } = useSettings();
+  const companyForPdf = businessSettings
+    ? settingsToCompany(businessSettings)
+    : { name: '', address: '', phone: '', email: '', receipt_footer: '' };
   const subscriberServices = subscriber.services && subscriber.services.length > 0
     ? subscriber.services
     : ['cable'];
@@ -995,6 +1000,7 @@ export const SubscriberDetail = ({
                         entries,
                         positionLabel: position.label,
                         grossComponents: gross,
+                        company: companyForPdf,
                       });
                     }}
                   >

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
-import { Transaction, Subscriber, getCompanySettings } from './storage';
+import { Transaction, Subscriber } from './storage';
+import type { CompanyForPdf } from '@/contexts/SettingsContext';
 
 // Types for subscription invoice
 interface SubscriptionInvoiceData {
@@ -19,10 +20,11 @@ interface SubscriptionInvoiceData {
 
 export const generateInvoicePDF = (
   transaction: Transaction,
-  subscriber: Subscriber
+  subscriber: Subscriber,
+  companySettings: CompanyForPdf,
 ) => {
   const doc = new jsPDF();
-  const companySettings = getCompanySettings();
+  
   
   // Set font
   doc.setFont('helvetica');
@@ -123,8 +125,10 @@ export const generateInvoicePDF = (
 };
 
 // Thermal Receipt - 58mm width (approx 48mm printable = 136 points)
-export const generateThermalReceipt = (data: SubscriptionInvoiceData) => {
-  const companySettings = getCompanySettings();
+export const generateThermalReceipt = (
+  data: SubscriptionInvoiceData,
+  companySettings: CompanyForPdf,
+) => {
   // 58mm thermal paper width
   const doc = new jsPDF({
     unit: 'mm',
@@ -238,9 +242,12 @@ export const generateThermalReceipt = (data: SubscriptionInvoiceData) => {
 };
 
 // Full A4 Subscription Invoice
-export const generateSubscriptionInvoice = (data: SubscriptionInvoiceData) => {
+export const generateSubscriptionInvoice = (
+  data: SubscriptionInvoiceData,
+  companySettings: CompanyForPdf,
+) => {
   const doc = new jsPDF();
-  const companySettings = getCompanySettings();
+  
   
   doc.setFont('helvetica');
   
