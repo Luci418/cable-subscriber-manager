@@ -69,17 +69,19 @@ export interface Complaint {
 
 export type ServiceType = 'cable' | 'internet';
 
+/**
+ * @deprecated Business configuration now lives in `public.settings` and is
+ * accessed exclusively via `useSettings()` / `SettingsContext`. This type
+ * remains only so legacy backup payloads still parse.
+ */
 export interface CompanySettings {
   name: string;
   address: string;
   phone: string;
   email: string;
   logo?: string;
-  /** Which service modules are enabled in the UI. Defaults to ['cable']. */
   enabledServices?: ServiceType[];
-  /** Operator's UPI VPA shown on receipts and used by the Collect Payment dialog. */
   operator_upi_vpa?: string;
-  /** How many days back an operator may date a transaction. 0 disables backdating. */
   backdating_window_days?: number;
 }
 
@@ -395,28 +397,10 @@ export const deleteComplaint = (id: string) => {
   saveComplaints(complaints);
 };
 
-// Company Settings
-export const getCompanySettings = (): CompanySettings => {
-  const data = localStorage.getItem(COMPANY_SETTINGS_KEY);
-  const parsed: CompanySettings = data ? JSON.parse(data) : {
-    name: 'Cable TV Company',
-    address: 'Your Address Here',
-    phone: '+91 XXXXXXXXXX',
-    email: 'info@cabletv.com',
-  };
-  // Backfill enabledServices for older saves so the toggle UI has a defined state.
-  if (!parsed.enabledServices || parsed.enabledServices.length === 0) {
-    parsed.enabledServices = ['cable'];
-  }
-  // Backfill operator-payment defaults so the Settings UI is always controlled.
-  if (parsed.operator_upi_vpa === undefined) parsed.operator_upi_vpa = '';
-  if (parsed.backdating_window_days === undefined) parsed.backdating_window_days = 7;
-  return parsed;
-};
-
-export const saveCompanySettings = (settings: CompanySettings) => {
-  localStorage.setItem(COMPANY_SETTINGS_KEY, JSON.stringify(settings));
-};
+// Company Settings have moved to the database (`public.settings`).
+// Access via `useSettings()` from '@/contexts/SettingsContext'.
+// Legacy localStorage key `cable_company_settings` is imported once on first
+// hydrate and then deleted — see SettingsContext.maybeImportLegacy.
 
 // Backup & Restore
 export const createBackup = () => {
