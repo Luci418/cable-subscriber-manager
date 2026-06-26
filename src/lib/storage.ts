@@ -103,7 +103,7 @@ const PACKS_KEY = 'cable_packs';
 const REGIONS_KEY = 'cable_regions';
 const COUNTER_KEY = 'cable_subscriber_counter';
 const COMPLAINTS_KEY = 'cable_complaints';
-const COMPANY_SETTINGS_KEY = 'cable_company_settings';
+// COMPANY_SETTINGS_KEY removed — business config lives in `public.settings`.
 const BILLING_HISTORY_KEY = 'cable_billing_history';
 
 // Initialize default packs if none exist
