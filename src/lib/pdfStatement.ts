@@ -10,8 +10,9 @@
  * subscriber for dispute resolution or audit support.
  */
 import jsPDF from 'jspdf';
-import { getCompanySettings, type Subscriber } from './storage';
+import { type Subscriber } from './storage';
 import type { LedgerEntry, GrossComponentLine } from './ledgerRendering';
+import type { CompanyForPdf } from '@/contexts/SettingsContext';
 
 const fmtINR = (n: number) => `Rs.${Math.round(n).toLocaleString('en-IN')}`;
 const fmtDate = (iso: string) =>
@@ -22,6 +23,7 @@ interface StatementInput {
   entries: LedgerEntry[];
   positionLabel: string;     // e.g. "Outstanding ₹98" — from financialPosition
   grossComponents: GrossComponentLine[];
+  company: CompanyForPdf;
 }
 
 export const generateAccountStatementPDF = ({
@@ -29,8 +31,8 @@ export const generateAccountStatementPDF = ({
   entries,
   positionLabel,
   grossComponents,
+  company,
 }: StatementInput) => {
-  const company = getCompanySettings();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageW = 210;
   const margin = 14;
