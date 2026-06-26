@@ -367,23 +367,53 @@ export type Database = {
       }
       settings: {
         Row: {
+          address: string
           backdating_window_days: number
           created_at: string
+          default_currency: string
+          default_timezone: string
+          email: string
+          enabled_services: string[]
+          name: string
           operator_upi_vpa: string | null
+          phone: string
+          receipt_footer: string
+          receipt_prefix: string
+          settings_version: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          address?: string
           backdating_window_days?: number
           created_at?: string
+          default_currency?: string
+          default_timezone?: string
+          email?: string
+          enabled_services?: string[]
+          name?: string
           operator_upi_vpa?: string | null
+          phone?: string
+          receipt_footer?: string
+          receipt_prefix?: string
+          settings_version?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          address?: string
           backdating_window_days?: number
           created_at?: string
+          default_currency?: string
+          default_timezone?: string
+          email?: string
+          enabled_services?: string[]
+          name?: string
           operator_upi_vpa?: string | null
+          phone?: string
+          receipt_footer?: string
+          receipt_prefix?: string
+          settings_version?: number
           updated_at?: string
           user_id?: string
         }
@@ -996,6 +1026,32 @@ export type Database = {
           p_subscriber_id: string
         }
         Returns: Json
+      }
+      ensure_settings_row: {
+        Args: never
+        Returns: {
+          address: string
+          backdating_window_days: number
+          created_at: string
+          default_currency: string
+          default_timezone: string
+          email: string
+          enabled_services: string[]
+          name: string
+          operator_upi_vpa: string | null
+          phone: string
+          receipt_footer: string
+          receipt_prefix: string
+          settings_version: number
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       expire_lapsed_subscriptions: { Args: never; Returns: number }
       generate_subscriber_id: {
