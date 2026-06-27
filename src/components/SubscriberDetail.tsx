@@ -488,58 +488,7 @@ export const SubscriberDetail = ({
       (a) => !a.subscriptionId || !matchedActiveIds.has(a.subscriptionId)
     );
 
-  // History item rendering — Bug 2 fix. For cancelled subscriptions show the
-  // ACTUAL service period (start_date → cancelled_at) rather than the
-  // originally scheduled validity, and surface the original validity as a
-  // separate reference line so operators see both. Expired/superseded subs
-  // continue to use the validity window since end_date IS the actual end.
-  const renderHistoryItem = (sub: SubscriptionBlob) => {
-    const start = new Date(sub.startDate);
-    const isCancelled = sub.status === 'cancelled';
-    const cancelledAt = sub.cancelledAt ? new Date(sub.cancelledAt) : null;
-    const scheduledEnd = new Date(sub.endDate);
-    const actualEnd = isCancelled && cancelledAt ? cancelledAt : scheduledEnd;
-    const dayMs = 1000 * 60 * 60 * 24;
-    const actualDays = Math.max(0, Math.floor((actualEnd.getTime() - start.getTime()) / dayMs));
-    const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const fmtShort = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    const statusLabel = isCancelled
-      ? `Cancelled after ${actualDays} day${actualDays === 1 ? '' : 's'}`
-      : sub.status === 'expired' ? 'Expired' : 'Ended';
-    const statusTone = isCancelled
-      ? 'bg-red-500/10 text-red-700 dark:text-red-400'
-      : 'bg-muted text-muted-foreground';
     return (
-      <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm space-y-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="font-medium">{sub.packName}</span>
-          <span className={`text-xs px-2 py-1 rounded-full ${statusTone}`}>
-            {isCancelled ? 'Cancelled' : 'Expired'}
-          </span>
-        </div>
-        {isCancelled && cancelledAt && (
-          <p className="text-xs text-muted-foreground">
-            Cancelled on <span className="font-medium text-foreground">{fmt(cancelledAt)}</span>
-          </p>
-        )}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <span className="block text-muted-foreground">Original validity</span>
-            <span className="font-medium text-foreground">
-              {fmtShort(start)} – {fmtShort(scheduledEnd)}
-            </span>
-          </div>
-          <div>
-            <span className="block text-muted-foreground">Status</span>
-            <span className="font-medium text-foreground">{statusLabel}</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-      <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5" />{title}</CardTitle>
