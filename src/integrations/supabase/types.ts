@@ -14,33 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      __qa_run_log: {
-        Row: {
-          at: string | null
-          detail: string | null
-          label: string | null
-          part: string | null
-          seq: number
-          status: string | null
-        }
-        Insert: {
-          at?: string | null
-          detail?: string | null
-          label?: string | null
-          part?: string | null
-          seq?: number
-          status?: string | null
-        }
-        Update: {
-          at?: string | null
-          detail?: string | null
-          label?: string | null
-          part?: string | null
-          seq?: number
-          status?: string | null
-        }
-        Relationships: []
-      }
       complaints: {
         Row: {
           category: string
