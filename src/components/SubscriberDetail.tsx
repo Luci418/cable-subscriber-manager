@@ -131,6 +131,7 @@ export const SubscriberDetail = ({
   // this subscriber. Computed from subscriptions.total_charged minus the
   // sum of payment_allocations against that subscription.
   const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
+  const [serviceCredit, setServiceCredit] = useState<{ cable: number; internet: number }>({ cable: 0, internet: 0 });
   // Phase 5.5 — passbook rendering. Subscriptions (full snapshots) and
   // allocations (per-transaction) feed the shared `buildLedgerEntries` model.
   const [subsById, setSubsById] = useState<Record<string, LedgerSubscription>>({});
