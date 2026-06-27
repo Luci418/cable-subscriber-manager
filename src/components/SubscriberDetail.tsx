@@ -166,13 +166,12 @@ export const SubscriberDetail = ({
     setPairedDevices((data as PairedDevice[]) || []);
   };
 
-  // Outstanding per active subscription = total_charged minus allocated cash.
-  // We compute this client-side (one round-trip) so each device card can show
-  // its own bill in Collect Payment. Reloaded whenever paired devices reload.
+  // Authoritative reconciliation: per-subscription outstanding, per-service
+  // net balance, and unallocated advance credit — all derived from the
+  // immutable ledger using `computeReconciliation`. This is the SINGLE
+  // source every UI surface reads, so device rows, service summaries, the
+  // overall position, and Billing can never disagree.
   const loadOutstanding = async () => {
-    // Pull every subscription this subscriber has ever had (active + history)
-    // so the passbook can resolve pack/dates for charge AND refund rows. The
-    // outstanding map below still keys only on `status='active'` rows.
     const { data: subs, error: subErr } = await (supabase as any)
       .from('subscriptions')
       .select('id,total_charged,status,service_type,pack_name_snapshot,start_date,end_date,device_serial_snapshot,previous_subscription_id,cancelled_at,cancel_reason_note,refund_amount')
@@ -195,24 +194,53 @@ export const SubscriberDetail = ({
     });
     setSubsById(subMap);
 
-    const activeIds = (subs as any[]).filter((s) => s.status === 'active').map((s) => s.id);
-    const out: Record<string, number> = {};
+    // Pull EVERY allocation for these subscriptions (not just active ones).
+    // We need cancelled/expired subs too so reconciliation sees their
+    // historical allocations when distinguishing live vs voided cash.
+    const subIds = (subs as any[]).map((s) => s.id);
     let allocs: any[] = [];
-    if (activeIds.length > 0) {
+    if (subIds.length > 0) {
       const { data } = await (supabase as any)
         .from('payment_allocations')
-        .select('subscription_id,amount')
-        .in('subscription_id', activeIds);
+        .select('subscription_id,amount,transaction_id')
+        .in('subscription_id', subIds);
       allocs = (data as any[]) || [];
     }
-    const allocBy: Record<string, number> = {};
-    allocs.forEach((a) => {
-      allocBy[a.subscription_id] = (allocBy[a.subscription_id] || 0) + Number(a.amount || 0);
-    });
-    (subs as any[]).filter((s) => s.status === 'active').forEach((s) => {
-      out[s.id] = Math.max(0, Number(s.total_charged || 0) - (allocBy[s.id] || 0));
+
+    // Reconcile using the authoritative computer. Excludes voided/reversal
+    // transactions from allocation totals so a void + reversal cancel out
+    // exactly the way the DB balance trigger expects.
+    const recon = computeReconciliation(
+      (subs as any[]).map((s) => ({
+        id: s.id,
+        service_type: s.service_type,
+        status: s.status,
+        total_charged: Number(s.total_charged) || 0,
+        refund_amount: s.refund_amount,
+      })),
+      allocs.map((a) => ({
+        subscription_id: a.subscription_id,
+        amount: Number(a.amount) || 0,
+        transaction_id: a.transaction_id,
+      })),
+      transactions.map((t: any) => ({
+        id: t.id,
+        type: t.type,
+        amount: Number(t.amount) || 0,
+        service_type: (t.service_type as any) || null,
+        status: t.status || 'posted',
+      })),
+    );
+
+    const out: Record<string, number> = {};
+    recon.services.forEach((svc) => {
+      svc.perSub.forEach((p) => { out[p.subscription_id] = p.remaining; });
     });
     setOutstandingBySub(out);
+    setServiceCredit({
+      cable: recon.services.find((s) => s.service === 'cable')?.unallocated_credit || 0,
+      internet: recon.services.find((s) => s.service === 'internet')?.unallocated_credit || 0,
+    });
 
     // All allocations keyed by transaction_id — drives "Applied to..." rows
     // in the passbook. Scope to this subscriber's transactions.
