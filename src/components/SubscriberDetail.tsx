@@ -896,21 +896,7 @@ export const SubscriberDetail = ({
                     {cableHistory
                       .slice()
                       .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                      .map((sub) => (
-                        <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{sub.packName}</span>
-                            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                              {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                            <div><span className="block">Duration</span><span className="font-medium text-foreground">{sub.duration}m</span></div>
-                            <div><span className="block">Started</span><span className="font-medium text-foreground">{new Date(sub.startDate).toLocaleDateString()}</span></div>
-                            <div><span className="block">Ended</span><span className="font-medium text-foreground">{new Date(sub.endDate).toLocaleDateString()}</span></div>
-                          </div>
-                        </div>
-                      ))}
+                      .map((sub) => renderHistoryItem(sub))}
                   </div>
                 </CardContent>
               </Card>
