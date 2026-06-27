@@ -61,6 +61,7 @@ import {
 } from '@/lib/ledgerRendering';
 import { TransactionLedger } from './TransactionLedger';
 import { generateAccountStatementPDF } from '@/lib/pdfStatement';
+import { computeReconciliation } from '@/lib/reconciliation';
 
 interface PairedDevice {
   id: string;
@@ -131,6 +132,7 @@ export const SubscriberDetail = ({
   // this subscriber. Computed from subscriptions.total_charged minus the
   // sum of payment_allocations against that subscription.
   const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
+  const [serviceCredit, setServiceCredit] = useState<{ cable: number; internet: number }>({ cable: 0, internet: 0 });
   // Phase 5.5 — passbook rendering. Subscriptions (full snapshots) and
   // allocations (per-transaction) feed the shared `buildLedgerEntries` model.
   const [subsById, setSubsById] = useState<Record<string, LedgerSubscription>>({});
@@ -165,13 +167,12 @@ export const SubscriberDetail = ({
     setPairedDevices((data as PairedDevice[]) || []);
   };
 
-  // Outstanding per active subscription = total_charged minus allocated cash.
-  // We compute this client-side (one round-trip) so each device card can show
-  // its own bill in Collect Payment. Reloaded whenever paired devices reload.
+  // Authoritative reconciliation: per-subscription outstanding, per-service
+  // net balance, and unallocated advance credit — all derived from the
+  // immutable ledger using `computeReconciliation`. This is the SINGLE
+  // source every UI surface reads, so device rows, service summaries, the
+  // overall position, and Billing can never disagree.
   const loadOutstanding = async () => {
-    // Pull every subscription this subscriber has ever had (active + history)
-    // so the passbook can resolve pack/dates for charge AND refund rows. The
-    // outstanding map below still keys only on `status='active'` rows.
     const { data: subs, error: subErr } = await (supabase as any)
       .from('subscriptions')
       .select('id,total_charged,status,service_type,pack_name_snapshot,start_date,end_date,device_serial_snapshot,previous_subscription_id,cancelled_at,cancel_reason_note,refund_amount')
@@ -194,24 +195,53 @@ export const SubscriberDetail = ({
     });
     setSubsById(subMap);
 
-    const activeIds = (subs as any[]).filter((s) => s.status === 'active').map((s) => s.id);
-    const out: Record<string, number> = {};
+    // Pull EVERY allocation for these subscriptions (not just active ones).
+    // We need cancelled/expired subs too so reconciliation sees their
+    // historical allocations when distinguishing live vs voided cash.
+    const subIds = (subs as any[]).map((s) => s.id);
     let allocs: any[] = [];
-    if (activeIds.length > 0) {
+    if (subIds.length > 0) {
       const { data } = await (supabase as any)
         .from('payment_allocations')
-        .select('subscription_id,amount')
-        .in('subscription_id', activeIds);
+        .select('subscription_id,amount,transaction_id')
+        .in('subscription_id', subIds);
       allocs = (data as any[]) || [];
     }
-    const allocBy: Record<string, number> = {};
-    allocs.forEach((a) => {
-      allocBy[a.subscription_id] = (allocBy[a.subscription_id] || 0) + Number(a.amount || 0);
-    });
-    (subs as any[]).filter((s) => s.status === 'active').forEach((s) => {
-      out[s.id] = Math.max(0, Number(s.total_charged || 0) - (allocBy[s.id] || 0));
+
+    // Reconcile using the authoritative computer. Excludes voided/reversal
+    // transactions from allocation totals so a void + reversal cancel out
+    // exactly the way the DB balance trigger expects.
+    const recon = computeReconciliation(
+      (subs as any[]).map((s) => ({
+        id: s.id,
+        service_type: s.service_type,
+        status: s.status,
+        total_charged: Number(s.total_charged) || 0,
+        refund_amount: s.refund_amount,
+      })),
+      allocs.map((a) => ({
+        subscription_id: a.subscription_id,
+        amount: Number(a.amount) || 0,
+        transaction_id: a.transaction_id,
+      })),
+      transactions.map((t: any) => ({
+        id: t.id,
+        type: t.type,
+        amount: Number(t.amount) || 0,
+        service_type: (t.service_type as any) || null,
+        status: t.status || 'posted',
+      })),
+    );
+
+    const out: Record<string, number> = {};
+    recon.services.forEach((svc) => {
+      svc.perSub.forEach((p) => { out[p.subscription_id] = p.remaining; });
     });
     setOutstandingBySub(out);
+    setServiceCredit({
+      cable: recon.services.find((s) => s.service === 'cable')?.unallocated_credit || 0,
+      internet: recon.services.find((s) => s.service === 'internet')?.unallocated_credit || 0,
+    });
 
     // All allocations keyed by transaction_id — drives "Applied to..." rows
     // in the passbook. Scope to this subscriber's transactions.
@@ -634,6 +664,56 @@ export const SubscriberDetail = ({
     );
   };
 
+  // History item rendering — Bug 2 fix. For cancelled subscriptions show the
+  // ACTUAL service period (start_date → cancelled_at) rather than the
+  // originally scheduled validity, and surface the original validity as a
+  // separate reference line so operators see both. Expired subs continue to
+  // use the validity window since end_date IS the actual end for those.
+  const renderHistoryItem = (sub: SubscriptionBlob) => {
+    const start = new Date(sub.startDate);
+    const isCancelled = sub.status === 'cancelled';
+    const cancelledAt = sub.cancelledAt ? new Date(sub.cancelledAt) : null;
+    const scheduledEnd = new Date(sub.endDate);
+    const actualEnd = isCancelled && cancelledAt ? cancelledAt : scheduledEnd;
+    const dayMs = 1000 * 60 * 60 * 24;
+    const actualDays = Math.max(0, Math.floor((actualEnd.getTime() - start.getTime()) / dayMs));
+    const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fmtShort = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const statusLabel = isCancelled
+      ? `Cancelled after ${actualDays} day${actualDays === 1 ? '' : 's'}`
+      : sub.status === 'expired' ? 'Expired' : 'Ended';
+    const statusTone = isCancelled
+      ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+      : 'bg-muted text-muted-foreground';
+    return (
+      <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="font-medium">{sub.packName}</span>
+          <span className={`text-xs px-2 py-1 rounded-full ${statusTone}`}>
+            {isCancelled ? 'Cancelled' : 'Expired'}
+          </span>
+        </div>
+        {isCancelled && cancelledAt && (
+          <p className="text-xs text-muted-foreground">
+            Cancelled on <span className="font-medium text-foreground">{fmt(cancelledAt)}</span>
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <span className="block text-muted-foreground">Original validity</span>
+            <span className="font-medium text-foreground">
+              {fmtShort(start)} – {fmtShort(scheduledEnd)}
+            </span>
+          </div>
+          <div>
+            <span className="block text-muted-foreground">Status</span>
+            <span className="font-medium text-foreground">{statusLabel}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -866,21 +946,7 @@ export const SubscriberDetail = ({
                     {cableHistory
                       .slice()
                       .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                      .map((sub) => (
-                        <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{sub.packName}</span>
-                            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                              {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                            <div><span className="block">Duration</span><span className="font-medium text-foreground">{sub.duration}m</span></div>
-                            <div><span className="block">Started</span><span className="font-medium text-foreground">{new Date(sub.startDate).toLocaleDateString()}</span></div>
-                            <div><span className="block">Ended</span><span className="font-medium text-foreground">{new Date(sub.endDate).toLocaleDateString()}</span></div>
-                          </div>
-                        </div>
-                      ))}
+                      .map((sub) => renderHistoryItem(sub))}
                   </div>
                 </CardContent>
               </Card>
@@ -905,21 +971,7 @@ export const SubscriberDetail = ({
                     {internetHistory
                       .slice()
                       .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                      .map((sub) => (
-                        <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{sub.packName}</span>
-                            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                              {sub.status === 'expired' ? 'Expired' : 'Cancelled'}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                            <div><span className="block">Duration</span><span className="font-medium text-foreground">{sub.duration}m</span></div>
-                            <div><span className="block">Started</span><span className="font-medium text-foreground">{new Date(sub.startDate).toLocaleDateString()}</span></div>
-                            <div><span className="block">Ended</span><span className="font-medium text-foreground">{new Date(sub.endDate).toLocaleDateString()}</span></div>
-                          </div>
-                        </div>
-                      ))}
+                      .map((sub) => renderHistoryItem(sub))}
                   </div>
                 </CardContent>
               </Card>
