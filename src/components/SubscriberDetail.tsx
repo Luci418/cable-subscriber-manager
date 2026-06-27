@@ -61,6 +61,7 @@ import {
 } from '@/lib/ledgerRendering';
 import { TransactionLedger } from './TransactionLedger';
 import { generateAccountStatementPDF } from '@/lib/pdfStatement';
+import { computeReconciliation } from '@/lib/reconciliation';
 
 interface PairedDevice {
   id: string;
