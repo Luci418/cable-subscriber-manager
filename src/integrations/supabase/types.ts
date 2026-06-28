@@ -1085,6 +1085,7 @@ export type Database = {
         | "reversal"
         | "adjustment"
         | "subscription_payment"
+        | "opening_balance"
       transaction_status: "posted" | "voided" | "reversal"
       void_reason_code:
         | "data_entry_error"
@@ -1230,6 +1231,7 @@ export const Constants = {
         "reversal",
         "adjustment",
         "subscription_payment",
+        "opening_balance",
       ],
       transaction_status: ["posted", "voided", "reversal"],
       void_reason_code: [
