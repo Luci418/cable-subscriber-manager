@@ -62,6 +62,10 @@ import {
 import { TransactionLedger } from './TransactionLedger';
 import { generateAccountStatementPDF } from '@/lib/pdfStatement';
 import { computeReconciliation } from '@/lib/reconciliation';
+import { ArchiveCustomerDialog } from './ArchiveCustomerDialog';
+import { ReactivateCustomerDialog } from './ReactivateCustomerDialog';
+import { AssetTimelineCustomer } from './AssetTimelineCustomer';
+import { Archive, RotateCcw } from 'lucide-react';
 
 interface PairedDevice {
   id: string;
@@ -92,6 +96,9 @@ export const SubscriberDetail = ({
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
+  const isArchived = (subscriber as any).customer_status === 'archived';
   const [showAddPackage, setShowAddPackage] = useState(false);
   const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
   // Phase 5.1 multi-device fix: when the operator clicks Renew on a per-device
@@ -722,10 +729,21 @@ export const SubscriberDetail = ({
           Back to List
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} disabled={isArchived}>
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
+          {isArchived ? (
+            <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reactivate
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
+              <Archive className="h-4 w-4 mr-2" />
+              Archive
+            </Button>
+          )}
           <Button variant="destructive" size="sm" onClick={openDeleteDialog}>
             <Trash2 className="h-4 w-4 mr-2" />
             Delete
@@ -927,6 +945,10 @@ export const SubscriberDetail = ({
 
             </CardContent>
           </Card>
+
+          {/* Asset Timeline — previous devices (history). Currently paired
+              devices remain rendered as their own cards in the service tabs. */}
+          <AssetTimelineCustomer subscriberId={subscriber.id} />
         </TabsContent>
 
         {/* CABLE TAB — STB info + package subscription + history */}
@@ -1183,6 +1205,21 @@ export const SubscriberDetail = ({
           loadOutstanding();
           onReload?.();
         }}
+      />
+
+      <ArchiveCustomerDialog
+        open={showArchiveDialog}
+        onOpenChange={setShowArchiveDialog}
+        subscriber={subscriber as any}
+        outstandingTotal={(subscriber.cable_balance || 0) + ((subscriber as any).internet_balance || 0)}
+        activeSubscriptionCount={pairedDevices.length /* approximate; archive RPC re-counts authoritatively */}
+        onArchived={() => { onReload?.(); onBack(); }}
+      />
+      <ReactivateCustomerDialog
+        open={showReactivateDialog}
+        onOpenChange={setShowReactivateDialog}
+        subscriber={subscriber as any}
+        onReactivated={() => { onReload?.(); }}
       />
 
       {collectTarget && (

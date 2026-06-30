@@ -1,98 +1,98 @@
-## Goal
+## Scope confirmation
 
-Make the database the single source of truth for Business Configuration. Remove the localStorage cache for company/payment/service-module settings, replace it with a React context hydrated from `public.settings` after login, and reserve localStorage strictly for transient UI state.
+Phase 5.6 (Archive) + Asset Timeline + Phase 6 role foundation. Field-ops interfaces and refund/cancel permissions are gated on your confirmations and will not be built in this batch.
 
-## 1. Schema migration — extend `public.settings`
+## Discrepancies / gates to resolve before I code
 
-Add columns (all nullable except where noted, with sensible defaults):
+1. **Audit mechanism for archive/reactivate.** There is no general-purpose audit table today. The closest immutable log is `device_assignment_log` (device-scoped) and the immutable `transactions` ledger (financial-scoped). Neither fits subscriber lifecycle events. Smallest honest extension:
+   - Add columns to `subscribers`: `archived_at timestamptz`, `archived_by uuid`, `archive_reason text`, `archive_reason_code text`.
+   - Add a small append-only `subscriber_status_log` table (subscriber_id, from_status, to_status, reason_code, reason_note, actor, at) with an immutability trigger mirroring `transaction_notes_enforce_immutability`. Reused later for any future status transitions.
+   - Confirm this is acceptable, or tell me to skip the log table and rely only on the columns + transactions ledger.
 
-```text
-name                  text          NOT NULL DEFAULT 'My Cable Company'
-address               text          NOT NULL DEFAULT ''
-phone                 text          NOT NULL DEFAULT ''
-email                 text          NOT NULL DEFAULT ''
-enabled_services      text[]        NOT NULL DEFAULT ARRAY['cable']
-receipt_prefix        text          NOT NULL DEFAULT 'RCP'
-receipt_footer        text          NOT NULL DEFAULT 'Thank you for your business.'
-default_currency      text          NOT NULL DEFAULT 'INR'
-default_timezone      text          NOT NULL DEFAULT 'Asia/Kolkata'
-settings_version      integer       NOT NULL DEFAULT 1
--- existing: backdating_window_days, operator_upi_vpa, updated_at
-```
+2. **Cancel-subscription permission** — per your instruction I will STOP here and ask:
+   - Option A: Admin-only (Owner + Admin Office can cancel directly).
+   - Option B: Approval workflow (Collection Agent can request; Owner/Admin approves).
+   - I will not gate `cancel_subscription` until you choose.
 
-Add CHECK: `array_length(enabled_services,1) >= 1` and each element in (`cable`,`internet`).
+3. **`performed_by` attribution audit.** Verified before role work:
+   - `pair_device`, `unpair_device`, `replace_device` → write `opened_by` / `closed_by = auth.uid()` on `device_assignment_log`. ✓
+   - `create_subscription` → `created_by = auth.uid()` on `subscriptions`. ✓
+   - `transactions` → `created_by`, `voided_by`, `edited_by` stamped by trigger. ✓
+   - `cancel_subscription` → does NOT stamp a `cancelled_by`. **Gap.** I will add `cancelled_by uuid` to `subscriptions` and set it in the RPC as part of the role foundation migration.
+   - `settings`, `ensure_settings_row` → scoped by `auth.uid()` but no actor column needed (single-row per user).
 
-Add an RPC `ensure_settings_row()` (SECURITY DEFINER) that inserts a defaults row for `auth.uid()` if missing and returns it. Called once on app load.
+4. **Equipment sales / `device_id` on transactions.** Existing `AddTransactionDialog` already supports `manual_charge` with `subscription_id = NULL` and a free-text description — confirmed sufficient. Adding `device_id` to `transactions` is NOT trivial (schema + RLS + immutability trigger + types regen + UI picker). Recommend skipping per your "do not expand scope" rule. Confirm.
 
-No backfill in SQL — legacy localStorage import is a one-time client-side operation gated on "row still at defaults".
+## Implementation order (after gates resolved)
 
-## 2. New `SettingsContext`
+### Batch 1 — Archive Customer (Phase 5.6)
 
-`src/contexts/SettingsContext.tsx`:
+**Migration**
+- Add `archived_at`, `archived_by`, `archive_reason`, `archive_reason_code` to `subscribers`.
+- Add `subscriber_status_log` table (append-only, RLS scoped to `auth.uid()`, GRANTs to authenticated + service_role, immutability trigger).
+- New RPC `archive_subscriber(p_id, p_reason_code, p_reason_note)`:
+  - Loops active subscriptions → calls existing cancel logic (no refund unless caller passed one; archive UI will compute refund per-sub via existing dialog before invoking).
+  - Loops assigned devices → calls `unpair_device(..., reason='customer_closed', return_status='available')`.
+  - Sets `customer_status='archived'` + archive columns.
+  - Inserts `subscriber_status_log` row.
+- New RPC `reactivate_subscriber(p_id, p_reason_note)` → restores to `active` or `inactive` based on whether any non-archived subscriptions remain (none → `inactive`), logs event.
 
-- Provider mounted in `App.tsx` *inside* `BrowserRouter`, wrapping authenticated routes.
-- On mount (when `user` is present): call `ensure_settings_row()`, then `select * from settings`.
-- Exposes `{ settings, loading, updateSettings(patch), enabledServices, cableEnabled, internetEnabled, bothEnabled }`.
-- `updateSettings` does optimistic update + `update ... where user_id = auth.uid()` + toast on error rollback.
-- Clears state on sign-out.
-- No localStorage reads or writes anywhere in this module.
+**UI**
+- `ArchiveCustomerDialog.tsx`: two-step (warnings → reason picker + free-text → confirm). Reason codes: `moved_away`, `switched_provider`, `duplicate`, `non_payment`, `other`.
+- `ReactivateCustomerDialog.tsx`.
+- `SubscriberDetail.tsx`: replace Delete with Archive when `customer_status != 'archived'`; show Reactivate otherwise. Banner on archived profiles.
+- `SubscriberList.tsx`: filter out `customer_status='archived'` by default; add "Show archived" toggle.
+- `Billing.tsx` collection/renewal lists: exclude archived.
+- Analytics, mobile search, revenue history: leave archived visible (already query all rows).
 
-Replace `useEnabledServices` with a thin re-export from this context so existing call sites keep working with one import change.
+### Batch 2 — Asset Timeline (read-only, no schema change)
 
-## 3. One-time legacy import (client-side, idempotent)
+- New `src/lib/assetTimeline.ts` — pure query helpers over `device_assignment_log`.
+- `AssetTimelineCustomer.tsx` — collapsible "Previous Devices" section on `SubscriberDetail` (excludes rows where `closed_at IS NULL` — those are the current device cards). Newest first by `opened_at`.
+- `AssetTimelineDevice.tsx` — "Asset Timeline" section on `StbInventoryDialog` device detail. Top row tagged **Current Customer** when `closed_at IS NULL`; all others historical with duration.
+- Heading copy uses "Asset Timeline" per your naming guidance.
 
-In the Provider, after first fetch:
+### Batch 3 — Phase 6 role foundation
 
-```text
-if (row.settings_version === 1 && row matches all defaults
-    && localStorage has 'cable_company_settings') {
-  parse legacy JSON, map fields, call updateSettings(patch + settings_version=2),
-  then localStorage.removeItem('cable_company_settings').
-}
-```
+**Migration**
+- Enum `app_role` = `owner`, `admin_office`, `collection_agent`, `technician`.
+- `user_roles` table per the canonical pattern (GRANTs, RLS, `has_role()` SECURITY DEFINER).
+- Seed: every existing `auth.users` row → `owner` (one-operator-business assumption).
+- Permission helpers (SQL, all `STABLE SECURITY DEFINER`):
+  - `can_void_transaction()`, `can_archive_customer()`, `can_modify_settings()`, `can_pair_device()`, `can_replace_device()`, `can_collect_payment()`.
+  - Each wraps `has_role()` with role sets per your spec.
+- Gate RPCs:
+  - `void_transaction` → `can_void_transaction()`.
+  - `archive_subscriber` / `reactivate_subscriber` → `can_archive_customer()`.
+  - `pair_device` / `unpair_device` / `replace_device` → `can_pair_device()`.
+  - Settings writes → `can_modify_settings()` (enforced via RLS policy on `settings`).
+  - **`cancel_subscription` NOT gated yet** (awaits gate #2).
+  - Add `cancelled_by` column + stamp in `cancel_subscription` (closes attribution gap #3).
+- TS helper `src/lib/permissions.ts` mirroring server-side helpers for UI button-hiding (defence in depth, not the security boundary).
 
-Guard: never overwrite a row whose any business field differs from defaults. After successful import bump `settings_version` to 2 so re-runs no-op. Wrapped in try/catch — failure logs a console warning and leaves DB untouched.
+### Batch 4 — DEFERRED until you confirm
 
-## 4. Refactor call sites
+- Cancel-subscription gating (gate #2).
+- Refund permissions.
+- Collection Agent map interface.
+- Technician job interface.
+- Equipment sales `device_id` column (recommend permanent skip).
 
-- `src/lib/storage.ts`: delete `getCompanySettings` / `saveCompanySettings` / `CompanySettings` interface / `COMPANY_SETTINGS_KEY`. Keep the other localStorage helpers (legacy subscriber/transaction/pack caches) untouched — out of scope.
-- `src/lib/pdf.ts`, `src/lib/pdfStatement.ts`: accept a `company` argument from the caller rather than reading storage. Update every invoker (`SubscriberDetail`, `CollectPaymentDialog`, `Billing`, etc.) to pull from `useSettings()` and pass it in.
-- `src/pages/Settings.tsx`: read & write through `useSettings()`. Add new fields (receipt prefix, footer, currency, timezone) to the form.
-- `src/hooks/useEnabledServices.tsx`: replace body with `const { enabledServices, ... } = useSettings(); return ...;` — keeps existing imports working.
-- Backup/restore (`src/lib/storage.ts`): drop `companySettings` from the backup payload (DB is authoritative); on restore, skip that key.
+## Out of scope (acknowledged, not touched)
 
-## 5. Repository-wide storage audit (deliverable in chat)
+Warranty, deployment events, repair lifecycle, warehouse, FreeRADIUS/GenieACS/LibreNMS, suspension automation, multi-tenant SaaS, separate PWAs.
 
-Classify every `localStorage` / `sessionStorage` reference:
+## Files touched (estimated)
 
-| Key | File | Classification | Action |
-|---|---|---|---|
-| `cable_company_settings` | storage.ts | Business Config | **Remove** (migrated) |
-| `cable_subscribers/transactions/packs/regions/complaints/billing_history` | storage.ts | Legacy caches (pre-Supabase) | Out of scope — leave for separate cleanup pass |
-| `cable_invoice_counter` | storage.ts | UI/local counter | Leave |
-| `sb-…-auth-token` | supabase client | Auth session | Leave (required) |
+Migrations: 2 (archive + roles).
+New files: `ArchiveCustomerDialog.tsx`, `ReactivateCustomerDialog.tsx`, `AssetTimelineCustomer.tsx`, `AssetTimelineDevice.tsx`, `assetTimeline.ts`, `permissions.ts`.
+Modified: `SubscriberDetail.tsx`, `SubscriberList.tsx`, `Billing.tsx`, `StbInventoryDialog.tsx`, `useSubscribers.tsx` (archived filter).
 
-If the audit surfaces any other Business Config keys, migrate them in this same pass.
+---
 
-## 6. Verification protocol
+**Please confirm:**
+- (a) Audit approach in gate #1 (status_log table OK, or columns-only).
+- (b) Cancel-subscription model in gate #2 (admin-only vs approval workflow).
+- (c) Skipping `device_id` on `transactions` per gate #4.
 
-After implementation, run these and report results before declaring done:
-
-1. **Fresh incognito**: log in → Settings shows DB defaults, not "Cable TV Company".
-2. **Cross-browser**: change company name in Browser A → reload Browser B (same user) → new name visible.
-3. **Cache cleared**: DevTools → Clear site data → reload → settings persist from DB.
-4. **Logout/login**: change a setting, sign out, sign in as same user → setting persists; sign in as different user → that user's own settings load.
-5. **Legacy import**: seed `localStorage['cable_company_settings']` with a known payload on a fresh user whose DB row is at defaults → reload → DB row updated, localStorage key removed, `settings_version=2`. Re-run: no overwrite.
-6. **`rg "localStorage|sessionStorage" src`** final grep: only auth-session, legacy non-business caches, and `cable_invoice_counter` remain.
-
-## 7. Out of scope (explicit)
-
-- Migrating the legacy subscriber/transaction/pack localStorage caches (those are dead-code reads behind Supabase hooks; cleanup tracked separately).
-- Phase 6 UI work.
-
-## Files touched
-
-New: `supabase/migrations/<ts>_settings_full_business_config.sql`, `src/contexts/SettingsContext.tsx`.
-Edited: `src/App.tsx`, `src/lib/storage.ts`, `src/lib/pdf.ts`, `src/lib/pdfStatement.ts`, `src/hooks/useEnabledServices.tsx`, `src/pages/Settings.tsx`, plus every caller of `getCompanySettings` (3 files) and any PDF caller that needs to pass `company` through.
-
-Confirm and I'll ship the migration first, then the context + refactor in one pass, then run the verification protocol.
+Once confirmed I'll ship Batch 1 → 2 → 3 in that order, with the migration tool surfacing each schema change for your approval.

@@ -142,6 +142,9 @@ export const Billing = ({ onBack }: BillingProps) => {
     };
 
     for (const s of subscribers) {
+      // Phase 5.6 — archived customers do not appear in collection or renewal
+      // worklists. They remain visible in analytics and per-profile views.
+      if ((s as any).customer_status === 'archived') continue;
       const services = (s as any).services?.length ? (s as any).services : ['cable'];
       if (cableEnabled && services.includes('cable')) emitFor(s, 'cable');
       if (internetEnabled && services.includes('internet')) emitFor(s, 'internet');

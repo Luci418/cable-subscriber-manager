@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Trash2, Plus, Wrench, RotateCcw, XCircle, Tv, Wifi } from 'lucide-react';
+import { Trash2, Plus, Wrench, RotateCcw, XCircle, Tv, Wifi, History } from 'lucide-react';
+import { DeviceTimelineDialog } from './DeviceTimelineDialog';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -49,6 +50,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   const [serialNumber, setSerialNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [deviceType, setDeviceType] = useState<DeviceType>('stb');
+  const [historySerial, setHistorySerial] = useState<string | null>(null);
 
   // Default device type when switching service tabs
   const handleServiceChange = (svc: DeviceServiceType) => {
@@ -134,6 +136,9 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
         </div>
         {showActions && (
           <div className="flex gap-1 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setHistorySerial(stb.serial_number)} title="Asset Timeline">
+              <History className="h-4 w-4" />
+            </Button>
             {stb.status === 'available' && (
               <>
                 <Button variant="outline" size="sm" onClick={() => handleMarkFaulty(stb.id)} title="Mark Faulty">
@@ -279,6 +284,13 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
           })}
         </Tabs>
       </DialogContent>
+      {historySerial && (
+        <DeviceTimelineDialog
+          open={!!historySerial}
+          onOpenChange={(o) => { if (!o) setHistorySerial(null); }}
+          deviceSerial={historySerial}
+        />
+      )}
     </Dialog>
   );
 };
