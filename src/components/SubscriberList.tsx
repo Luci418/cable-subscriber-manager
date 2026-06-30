@@ -65,7 +65,21 @@ export const SubscriberList = ({
   const packs = Array.from(new Set(subscribers.map(s => (s as any).current_pack || s.pack).filter(Boolean)));
   const regions = Array.from(new Set(subscribers.map(s => s.region).filter(Boolean)));
 
+  // Phase 5.6 — hide archived customers from the day-to-day worklist.
+  // They remain in analytics, mobile search by mobile number, and the
+  // reactivation workflow (open via search; we expose a toggle below).
+  const [showArchived, setShowArchived] = useState(false);
+
   const filteredSubscribers = subscribers.filter(s => {
+    if (!showArchived && (s as any).customer_status === 'archived') {
+      // Allow archived rows through only when the search explicitly matches —
+      // mobile lookup must still find them.
+      const term = search.toLowerCase().trim();
+      const matchesArchivedBySearch = term &&
+        (s.name.toLowerCase().includes(term) ||
+         s.mobile.toLowerCase().includes(term));
+      if (!matchesArchivedBySearch) return false;
+    }
     const searchLower = search.toLowerCase().trim();
     const stbNum = (s as any).stb_number || s.stbNumber || '';
     const pack = (s as any).current_pack || s.pack || '';
