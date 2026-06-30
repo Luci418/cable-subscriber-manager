@@ -446,8 +446,59 @@ export type Database = {
           },
         ]
       }
+      subscriber_status_log: {
+        Row: {
+          actor: string | null
+          at: string
+          created_at: string
+          from_status: string
+          id: string
+          reason_code: string | null
+          reason_note: string | null
+          subscriber_id: string
+          to_status: string
+          user_id: string
+        }
+        Insert: {
+          actor?: string | null
+          at?: string
+          created_at?: string
+          from_status: string
+          id?: string
+          reason_code?: string | null
+          reason_note?: string | null
+          subscriber_id: string
+          to_status: string
+          user_id: string
+        }
+        Update: {
+          actor?: string | null
+          at?: string
+          created_at?: string
+          from_status?: string
+          id?: string
+          reason_code?: string | null
+          reason_note?: string | null
+          subscriber_id?: string
+          to_status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriber_status_log_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscribers: {
         Row: {
+          archive_reason: string | null
+          archive_reason_code: string | null
+          archived_at: string | null
+          archived_by: string | null
           cable_balance: number
           cable_provider_id: string | null
           created_at: string
@@ -475,6 +526,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archive_reason?: string | null
+          archive_reason_code?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
@@ -502,6 +557,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archive_reason?: string | null
+          archive_reason_code?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
@@ -566,6 +625,7 @@ export type Database = {
           cancel_reason_code: string | null
           cancel_reason_note: string | null
           cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string | null
           days_remaining_at_suspend: number | null
@@ -598,6 +658,7 @@ export type Database = {
           cancel_reason_code?: string | null
           cancel_reason_note?: string | null
           cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           days_remaining_at_suspend?: number | null
@@ -630,6 +691,7 @@ export type Database = {
           cancel_reason_code?: string | null
           cancel_reason_note?: string | null
           cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string | null
           days_remaining_at_suspend?: number | null
@@ -976,6 +1038,14 @@ export type Database = {
       }
     }
     Functions: {
+      archive_subscriber: {
+        Args: {
+          p_reason_code: string
+          p_reason_note?: string
+          p_subscriber_id: string
+        }
+        Returns: Json
+      }
       cancel_subscription: {
         Args: {
           p_reason?: string
@@ -1040,6 +1110,10 @@ export type Database = {
           p_reason?: string
           p_subscriber_id: string
         }
+        Returns: Json
+      }
+      reactivate_subscriber: {
+        Args: { p_reason_note?: string; p_subscriber_id: string }
         Returns: Json
       }
       recalc_subscriber_balance: {
