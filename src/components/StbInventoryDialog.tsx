@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,6 +51,9 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   const [notes, setNotes] = useState('');
   const [deviceType, setDeviceType] = useState<DeviceType>('stb');
   const [historySerial, setHistorySerial] = useState<string | null>(null);
+  const [faultyTarget, setFaultyTarget] = useState<StbInventoryItem | null>(null);
+  const [faultyReason, setFaultyReason] = useState('');
+  const [faultySubmitting, setFaultySubmitting] = useState(false);
 
   // Default device type when switching service tabs
   const handleServiceChange = (svc: DeviceServiceType) => {
@@ -85,14 +88,23 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
     }
   };
 
-  const handleMarkFaulty = async (id: string) => {
-    // `prompt` returns null when the user clicks Cancel — abort entirely so
-    // we don't silently mark the device faulty. Empty string ("OK" with no
-    // text) is treated as "no reason provided" and proceeds.
-    const reason = prompt('Reason (optional):');
-    if (reason === null) return;
-    const ok = await markAsFaulty(id, reason || undefined);
-    if (ok) toast.success('Marked as faulty');
+  const openMarkFaulty = (stb: StbInventoryItem) => {
+    setFaultyReason('');
+    setFaultyTarget(stb);
+  };
+
+  const confirmMarkFaulty = async () => {
+    if (!faultyTarget) return;
+    setFaultySubmitting(true);
+    try {
+      const ok = await markAsFaulty(faultyTarget.id, faultyReason.trim() || undefined);
+      if (ok) {
+        toast.success('Marked as faulty');
+        setFaultyTarget(null);
+      }
+    } finally {
+      setFaultySubmitting(false);
+    }
   };
 
 
@@ -136,12 +148,12 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
         </div>
         {showActions && (
           <div className="flex gap-1 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setHistorySerial(stb.serial_number)} title="Asset Timeline">
+            <Button variant="outline" size="sm" onClick={() => setHistorySerial(stb.serial_number)} title="Device History">
               <History className="h-4 w-4" />
             </Button>
             {stb.status === 'available' && (
               <>
-                <Button variant="outline" size="sm" onClick={() => handleMarkFaulty(stb.id)} title="Mark Faulty">
+                <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty">
                   <Wrench className="h-4 w-4" />
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(stb.id)} title="Delete">
@@ -160,7 +172,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
               </>
             )}
             {stb.status === 'assigned' && (
-              <Button variant="outline" size="sm" onClick={() => handleMarkFaulty(stb.id)} title="Mark Faulty (will unassign)">
+              <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty (will unassign)">
                 <Wrench className="h-4 w-4" />
               </Button>
             )}
@@ -291,6 +303,35 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
           deviceSerial={historySerial}
         />
       )}
+      <Dialog open={!!faultyTarget} onOpenChange={(o) => { if (!o && !faultySubmitting) setFaultyTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mark device faulty</DialogTitle>
+            <DialogDescription>
+              {faultyTarget?.status === 'assigned'
+                ? `${faultyTarget?.serial_number} is currently assigned. Marking it faulty will unassign it.`
+                : `Move ${faultyTarget?.serial_number} to the faulty bucket.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Reason (optional)</Label>
+            <Input
+              value={faultyReason}
+              onChange={(e) => setFaultyReason(e.target.value)}
+              placeholder="e.g. no signal, physical damage"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaultyTarget(null)} disabled={faultySubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={confirmMarkFaulty} disabled={faultySubmitting}>
+              {faultySubmitting ? 'Marking…' : 'Mark faulty'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };

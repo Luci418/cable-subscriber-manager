@@ -4,10 +4,11 @@ Phase 5.6 (Archive) + Asset Timeline + Phase 6 role foundation. Field-ops interf
 
 ## Discrepancies / gates to resolve before I code
 
-1. **Audit mechanism for archive/reactivate.** There is no general-purpose audit table today. The closest immutable log is `device_assignment_log` (device-scoped) and the immutable `transactions` ledger (financial-scoped). Neither fits subscriber lifecycle events. Smallest honest extension:
-   - Add columns to `subscribers`: `archived_at timestamptz`, `archived_by uuid`, `archive_reason text`, `archive_reason_code text`.
-   - Add a small append-only `subscriber_status_log` table (subscriber_id, from_status, to_status, reason_code, reason_note, actor, at) with an immutability trigger mirroring `transaction_notes_enforce_immutability`. Reused later for any future status transitions.
-   - Confirm this is acceptable, or tell me to skip the log table and rely only on the columns + transactions ledger.
+1. **Audit mechanism for archive/reactivate — RESOLVED (user-approved).** Three existing patterns were evaluated first and each ruled out:
+   - `device_assignment_log` — append-only and immutable, but scoped to a single device↔subscriber pairing. Records why a device left, not why a customer left. An archive with no devices produces zero rows.
+   - `transactions` ledger — append-only, immutable, actor-stamped, but every row must have a signed financial amount. Overloading it with non-financial "archived" events would break every reconciliation query (`reconciliation.ts`, `ledgerRendering.ts`) that assumes rows represent money.
+   - `transaction_notes` — immutable but bound to a transaction row. Same failure mode: no transaction, nowhere to hang the note.
+   None answer "who archived this customer, when, and why" for a customer with no devices and no outstanding balance. `subscriber_status_log` is the smallest extension that fills the gap and reuses the immutability-trigger pattern from `transaction_notes`.
 
 2. **Cancel-subscription permission** — per your instruction I will STOP here and ask:
    - Option A: Admin-only (Owner + Admin Office can cancel directly).
