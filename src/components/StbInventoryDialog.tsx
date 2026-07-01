@@ -172,7 +172,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
               </>
             )}
             {stb.status === 'assigned' && (
-              <Button variant="outline" size="sm" onClick={() => handleMarkFaulty(stb.id)} title="Mark Faulty (will unassign)">
+              <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty (will unassign)">
                 <Wrench className="h-4 w-4" />
               </Button>
             )}
