@@ -303,6 +303,35 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
           deviceSerial={historySerial}
         />
       )}
+      <Dialog open={!!faultyTarget} onOpenChange={(o) => { if (!o && !faultySubmitting) setFaultyTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mark device faulty</DialogTitle>
+            <DialogDescription>
+              {faultyTarget?.status === 'assigned'
+                ? `${faultyTarget?.serial_number} is currently assigned. Marking it faulty will unassign it.`
+                : `Move ${faultyTarget?.serial_number} to the faulty bucket.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Reason (optional)</Label>
+            <Input
+              value={faultyReason}
+              onChange={(e) => setFaultyReason(e.target.value)}
+              placeholder="e.g. no signal, physical damage"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaultyTarget(null)} disabled={faultySubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={confirmMarkFaulty} disabled={faultySubmitting}>
+              {faultySubmitting ? 'Marking…' : 'Mark faulty'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };
