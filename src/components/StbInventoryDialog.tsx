@@ -51,6 +51,9 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   const [notes, setNotes] = useState('');
   const [deviceType, setDeviceType] = useState<DeviceType>('stb');
   const [historySerial, setHistorySerial] = useState<string | null>(null);
+  const [faultyTarget, setFaultyTarget] = useState<StbInventoryItem | null>(null);
+  const [faultyReason, setFaultyReason] = useState('');
+  const [faultySubmitting, setFaultySubmitting] = useState(false);
 
   // Default device type when switching service tabs
   const handleServiceChange = (svc: DeviceServiceType) => {
