@@ -136,7 +136,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
         </div>
         {showActions && (
           <div className="flex gap-1 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setHistorySerial(stb.serial_number)} title="Asset Timeline">
+            <Button variant="outline" size="sm" onClick={() => setHistorySerial(stb.serial_number)} title="Device History">
               <History className="h-4 w-4" />
             </Button>
             {stb.status === 'available' && (
