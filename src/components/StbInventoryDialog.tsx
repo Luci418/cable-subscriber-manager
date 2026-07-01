@@ -153,7 +153,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
             </Button>
             {stb.status === 'available' && (
               <>
-                <Button variant="outline" size="sm" onClick={() => handleMarkFaulty(stb.id)} title="Mark Faulty">
+                <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty">
                   <Wrench className="h-4 w-4" />
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(stb.id)} title="Delete">
