@@ -88,14 +88,23 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
     }
   };
 
-  const handleMarkFaulty = async (id: string) => {
-    // `prompt` returns null when the user clicks Cancel — abort entirely so
-    // we don't silently mark the device faulty. Empty string ("OK" with no
-    // text) is treated as "no reason provided" and proceeds.
-    const reason = prompt('Reason (optional):');
-    if (reason === null) return;
-    const ok = await markAsFaulty(id, reason || undefined);
-    if (ok) toast.success('Marked as faulty');
+  const openMarkFaulty = (stb: StbInventoryItem) => {
+    setFaultyReason('');
+    setFaultyTarget(stb);
+  };
+
+  const confirmMarkFaulty = async () => {
+    if (!faultyTarget) return;
+    setFaultySubmitting(true);
+    try {
+      const ok = await markAsFaulty(faultyTarget.id, faultyReason.trim() || undefined);
+      if (ok) {
+        toast.success('Marked as faulty');
+        setFaultyTarget(null);
+      }
+    } finally {
+      setFaultySubmitting(false);
+    }
   };
 
 
