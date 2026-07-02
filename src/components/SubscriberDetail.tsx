@@ -1299,6 +1299,50 @@ export const SubscriberDetail = ({
         />
       )}
 
+      {/* Item #8 — confirm adding a new service category to this subscriber. */}
+      <AlertDialog
+        open={!!addServiceTarget}
+        onOpenChange={(o) => { if (!o && !addingService) setAddServiceTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Add {addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} service?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will enable {addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} for {subscriber.name}.
+              No device will be paired — you can pair a device from the{' '}
+              {addServiceTarget === 'cable' ? 'Cable' : 'Internet'} tab afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={addingService}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={addingService}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!addServiceTarget) return;
+                setAddingService(true);
+                try {
+                  const next = Array.from(new Set([...(subscriberServices || []), addServiceTarget]));
+                  await onEdit({ services: next } as any);
+                  toast.success(`${addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} added`);
+                  setAddServiceTarget(null);
+                  setActiveTab(addServiceTarget);
+                  onReload?.();
+                } catch (err: any) {
+                  toast.error(err?.message || 'Failed to add service');
+                } finally {
+                  setAddingService(false);
+                }
+              }}
+            >
+              {addingService ? 'Adding…' : 'Add service'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
