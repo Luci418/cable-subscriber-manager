@@ -121,6 +121,11 @@ export const SubscriberDetail = ({
   const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
   const [deleteChecking, setDeleteChecking] = useState(false);
+  // Item #8 — Add Service: confirmation for adding a missing service category
+  // (cable / internet) to an existing subscriber. No device is paired here;
+  // that remains the separate Pair Device workflow.
+  const [addServiceTarget, setAddServiceTarget] = useState<'cable' | 'internet' | null>(null);
+  const [addingService, setAddingService] = useState(false);
 
   // Pair / Unpair / Replace / Collect dialog state — Phase 5.1–5.3 workflow actions.
   const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
@@ -949,6 +954,45 @@ export const SubscriberDetail = ({
           {/* Asset Timeline — previous devices (history). Currently paired
               devices remain rendered as their own cards in the service tabs. */}
           <AssetTimelineCustomer subscriberId={subscriber.id} />
+
+          {/* Item #8 — Add Service: regression fix for Phase 5.1 removal of the
+              services[] checkboxes from EditSubscriberDialog. Only shown when
+              the customer is missing a globally-enabled service category. */}
+          {(() => {
+            const missing: ('cable' | 'internet')[] = [];
+            if (cableEnabled && !subscriberServices.includes('cable')) missing.push('cable');
+            if (internetEnabled && !subscriberServices.includes('internet')) missing.push('internet');
+            if (missing.length === 0 || isArchived) return null;
+            return (
+              <Card>
+                <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Add another service</p>
+                    <p className="text-xs text-muted-foreground">
+                      This customer does not have {missing.map((m) => (m === 'cable' ? 'Cable TV' : 'Internet')).join(' or ')} yet.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {missing.map((svc) => {
+                      const SvcIcon = svc === 'cable' ? Tv : Wifi;
+                      return (
+                        <Button
+                          key={svc}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAddServiceTarget(svc)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          <SvcIcon className="h-4 w-4 mr-1" />
+                          Add {svc === 'cable' ? 'Cable TV' : 'Internet'}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         {/* CABLE TAB — STB info + package subscription + history */}
@@ -1254,6 +1298,50 @@ export const SubscriberDetail = ({
           onConfirm={handleCancelSubscription}
         />
       )}
+
+      {/* Item #8 — confirm adding a new service category to this subscriber. */}
+      <AlertDialog
+        open={!!addServiceTarget}
+        onOpenChange={(o) => { if (!o && !addingService) setAddServiceTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Add {addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} service?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will enable {addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} for {subscriber.name}.
+              No device will be paired — you can pair a device from the{' '}
+              {addServiceTarget === 'cable' ? 'Cable' : 'Internet'} tab afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={addingService}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={addingService}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!addServiceTarget) return;
+                setAddingService(true);
+                try {
+                  const next = Array.from(new Set([...(subscriberServices || []), addServiceTarget]));
+                  await onEdit({ services: next } as any);
+                  toast.success(`${addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} added`);
+                  setAddServiceTarget(null);
+                  setActiveTab(addServiceTarget);
+                  onReload?.();
+                } catch (err: any) {
+                  toast.error(err?.message || 'Failed to add service');
+                } finally {
+                  setAddingService(false);
+                }
+              }}
+            >
+              {addingService ? 'Adding…' : 'Add service'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
