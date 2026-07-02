@@ -121,6 +121,11 @@ export const SubscriberDetail = ({
   const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
   const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
   const [deleteChecking, setDeleteChecking] = useState(false);
+  // Item #8 — Add Service: confirmation for adding a missing service category
+  // (cable / internet) to an existing subscriber. No device is paired here;
+  // that remains the separate Pair Device workflow.
+  const [addServiceTarget, setAddServiceTarget] = useState<'cable' | 'internet' | null>(null);
+  const [addingService, setAddingService] = useState(false);
 
   // Pair / Unpair / Replace / Collect dialog state — Phase 5.1–5.3 workflow actions.
   const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
