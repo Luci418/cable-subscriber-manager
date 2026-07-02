@@ -164,13 +164,14 @@ const Index = () => {
     }
   };
 
-  const handleEditSubscriber = async (updates: any) => {
-    if (!selectedSubscriberId) return;
-    
+  const handleEditSubscriber = async (updates: any): Promise<boolean> => {
+    if (!selectedSubscriberId) return false;
+
     const success = await updateSubscriber(selectedSubscriberId, updates);
     if (success) {
       toast.success('Subscriber updated successfully!');
     }
+    return success;
   };
 
   const handleDeleteSubscriber = async () => {
