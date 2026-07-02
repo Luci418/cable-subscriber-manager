@@ -954,6 +954,45 @@ export const SubscriberDetail = ({
           {/* Asset Timeline — previous devices (history). Currently paired
               devices remain rendered as their own cards in the service tabs. */}
           <AssetTimelineCustomer subscriberId={subscriber.id} />
+
+          {/* Item #8 — Add Service: regression fix for Phase 5.1 removal of the
+              services[] checkboxes from EditSubscriberDialog. Only shown when
+              the customer is missing a globally-enabled service category. */}
+          {(() => {
+            const missing: ('cable' | 'internet')[] = [];
+            if (cableEnabled && !subscriberServices.includes('cable')) missing.push('cable');
+            if (internetEnabled && !subscriberServices.includes('internet')) missing.push('internet');
+            if (missing.length === 0 || isArchived) return null;
+            return (
+              <Card>
+                <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Add another service</p>
+                    <p className="text-xs text-muted-foreground">
+                      This customer does not have {missing.map((m) => (m === 'cable' ? 'Cable TV' : 'Internet')).join(' or ')} yet.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {missing.map((svc) => {
+                      const SvcIcon = svc === 'cable' ? Tv : Wifi;
+                      return (
+                        <Button
+                          key={svc}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAddServiceTarget(svc)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          <SvcIcon className="h-4 w-4 mr-1" />
+                          Add {svc === 'cable' ? 'Cable TV' : 'Internet'}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         {/* CABLE TAB — STB info + package subscription + history */}
