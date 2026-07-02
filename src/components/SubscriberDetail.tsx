@@ -1325,7 +1325,14 @@ export const SubscriberDetail = ({
                 setAddingService(true);
                 try {
                   const next = Array.from(new Set([...(subscriberServices || []), addServiceTarget]));
-                  await onEdit({ services: next } as any);
+                  const result = await onEdit({ services: next } as any);
+                  // onEdit returns false when the DB write is rejected (e.g. by an
+                  // invariants trigger). Treat only an explicit `false` as failure —
+                  // legacy callers return void, which we optimistically accept.
+                  if (result === false) {
+                    // The hook already surfaced a specific error toast.
+                    return;
+                  }
                   toast.success(`${addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} added`);
                   setAddServiceTarget(null);
                   setActiveTab(addServiceTarget);
