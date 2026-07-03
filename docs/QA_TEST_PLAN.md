@@ -460,3 +460,63 @@ OPERATOR_WORKFLOW_UI_REVIEW.md v1.1.*
 in chat — Lovable can start on these while the view SQL is being shared.
 Part D6 (FIFO discovery) should be resolved before Phase 5 implementation
 begins, not just before Phase 4b completes.*
+
+---
+
+# Part H — Error-Propagation Gate [STANDING CODE REVIEW RULE]
+
+**Rule:** The UI must never show a success state when the database
+rejected (or silently no-op'd) the operation.
+
+Applies to every new or modified call site that invokes an RPC, an
+`insert` / `update` / `delete`, or any hook wrapping one.
+
+### Author checklist — must be satisfied before merge
+
+1. **Return-value inspection.** If the underlying helper returns
+   `false | null | undefined` on failure, the caller MUST branch on it:
+   ```ts
+   const ok = await someRpcOrHookCall(...);
+   if (!ok) return;                // no toast, no navigation, no state pivot
+   toast.success('…');
+   ```
+   Do NOT `await` and then unconditionally fire `toast.success`.
+2. **Error-throw inspection.** If the helper throws on failure, the
+   success path must be *after* the awaited call in the same try block,
+   and the catch must not fall through into it. Do not wrap the success
+   toast in a `finally`.
+3. **`maybeSingle()` writes.** An UPDATE/DELETE returning `maybeSingle()`
+   with `data === null` is a silent failure (RLS block, wrong id, race).
+   The hook MUST translate this into `return false` and a `toast.error`.
+   Never assume "no error = success" for a `maybeSingle()` write.
+4. **RPC boolean/void returns.** For RPCs that return `void`, only
+   `error` is available — check it. For RPCs that return a status row,
+   check both `error` and the returned value.
+5. **Optimistic UI.** If the caller mutates local state before the
+   awaited write, it MUST roll back on failure before any success toast
+   would fire.
+
+### Reviewer checklist
+
+- Grep the diff for `toast.success` and confirm each is preceded by a
+  guard against the specific failure mode of the call above it.
+- Grep the diff for `.rpc(`, `.insert(`, `.update(`, `.delete(`,
+  `.maybeSingle()` and confirm every caller of the surrounding function
+  handles the sentinel return.
+- Reject any patch where a new hook writes to Postgres and returns
+  `true` unconditionally after `if (error) return false` — the
+  no-rows-matched case must also return `false`.
+
+### Known references
+
+- `src/hooks/useSubscribers.ts :: updateSubscriber` — canonical example
+  of the `maybeSingle()` fix (returns `false` when `data === null`).
+- `src/pages/Index.tsx :: handleEditSubscriber` — canonical example of
+  propagating the boolean up to a dialog so the dialog can suppress its
+  own success toast when the write was rejected.
+- `src/components/SubscriberDetail.tsx :: handleAddService` — canonical
+  example of a dialog-level guard: `if (result === false) return;`
+  before `toast.success` and tab pivot.
+
+Add this gate to every PR description that touches a write path.
+
