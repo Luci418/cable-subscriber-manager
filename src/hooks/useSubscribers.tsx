@@ -141,26 +141,34 @@ export const useSubscribers = (userId: string | undefined) => {
       return false;
     }
 
-    if (data) {
-      setSubscribers((prev) =>
-        prev.map((s) =>
-          s.id === id
-            ? {
-                ...s,
-                ...data,
-                // Preserve the normalised arrays — they aren't returned by
-                // an UPDATE on the subscribers table.
-                _activeCable: s._activeCable,
-                _activeInternet: s._activeInternet,
-                _timelineCable: s._timelineCable,
-                _timelineInternet: s._timelineInternet,
-              }
-            : s
-        )
-      );
+    if (!data) {
+      // No row matched — RLS blocked the update, the id was wrong, or the
+      // row was deleted mid-flight. Postgres does NOT surface this as an
+      // error, so we must translate it ourselves. Returning true here would
+      // let callers show a false "saved" toast (see Add-Service regression).
+      toast.error("Update did not apply — the record may have been removed or you may not have permission.");
+      return false;
     }
+
+    setSubscribers((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              ...data,
+              // Preserve the normalised arrays — they aren't returned by
+              // an UPDATE on the subscribers table.
+              _activeCable: s._activeCable,
+              _activeInternet: s._activeInternet,
+              _timelineCable: s._timelineCable,
+              _timelineInternet: s._timelineInternet,
+            }
+          : s
+      )
+    );
     return true;
   };
+
 
   const deleteSubscriber = async (id: string) => {
     const { error } = await supabase
