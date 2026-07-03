@@ -936,6 +936,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_subscriber_active_subscription: {
@@ -1046,6 +1070,13 @@ export type Database = {
         }
         Returns: Json
       }
+      can_archive_customer: { Args: { _uid?: string }; Returns: boolean }
+      can_cancel_subscription: { Args: { _uid?: string }; Returns: boolean }
+      can_collect_payment: { Args: { _uid?: string }; Returns: boolean }
+      can_modify_settings: { Args: { _uid?: string }; Returns: boolean }
+      can_pair_device: { Args: { _uid?: string }; Returns: boolean }
+      can_replace_device: { Args: { _uid?: string }; Returns: boolean }
+      can_void_transaction: { Args: { _uid?: string }; Returns: boolean }
       cancel_subscription: {
         Args: {
           p_reason?: string
@@ -1101,6 +1132,13 @@ export type Database = {
         Args: { p_region_name: string }
         Returns: string
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
       is_provider_in_use: { Args: { provider_uuid: string }; Returns: boolean }
       is_region_in_use: { Args: { region_name: string }; Returns: boolean }
@@ -1149,6 +1187,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "owner" | "admin_office" | "collection_agent" | "technician"
       customer_status: "prospect" | "active" | "archived"
       stb_status: "available" | "assigned" | "faulty" | "decommissioned"
       transaction_source:
@@ -1295,6 +1334,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["owner", "admin_office", "collection_agent", "technician"],
       customer_status: ["prospect", "active", "archived"],
       stb_status: ["available", "assigned", "faulty", "decommissioned"],
       transaction_source: [
