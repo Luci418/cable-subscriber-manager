@@ -9,6 +9,8 @@ import { ArrowLeft, Save, Download, Upload, Building2, Tv, Wifi, Receipt } from 
 import { createBackup, restoreBackup } from '@/lib/storage';
 import { useSettings, type ServiceType, type BusinessSettings } from '@/contexts/SettingsContext';
 import { toast } from 'sonner';
+import { usePermissions } from '@/lib/permissions';
+import { RolesManagement } from '@/components/RolesManagement';
 
 interface SettingsProps {
   onBack: () => void;
