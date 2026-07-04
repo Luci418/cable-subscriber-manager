@@ -94,6 +94,7 @@ export const SubscriberDetail = ({
   onDelete,
   onReload,
 }: SubscriberDetailProps) => {
+  const perms = usePermissions();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
