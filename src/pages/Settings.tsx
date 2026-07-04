@@ -24,7 +24,9 @@ interface SettingsProps {
  */
 export const Settings = ({ onBack }: SettingsProps) => {
   const { settings, loading, updateSettings, setEnabledServices } = useSettings();
+  const perms = usePermissions();
   const [draft, setDraft] = useState<BusinessSettings | null>(settings);
+  const readOnly = !perms.canModifySettings;
 
   useEffect(() => {
     if (settings) setDraft(settings);
