@@ -107,3 +107,43 @@ and any accepted risks.
 - [ ] CHANGELOG updated to `v1.0.0` with go-live date.
 - [ ] Operator trained on: add subscriber → assign pack → record payment →
       print receipt → handle complaint.
+
+---
+
+## RBAC (Phase 6)
+
+See [PERMISSION_MATRIX.md](./PERMISSION_MATRIX.md) and
+[ROLE_DESIGN.md](./ROLE_DESIGN.md) for the full model.
+
+### Pre-production checklist
+
+- [ ] **Replace the bootstrap trigger.** `grant_owner_on_signup()` currently
+      auto-grants `owner` to the FIRST signup only. Before opening signup to
+      the public (if ever), drop the trigger entirely and provision the first
+      owner manually via a one-off SQL insert into `public.user_roles`.
+      This trigger is tagged `TODO(pre-production)` in migration
+      `20260704…` — do not ship as-is if the `/auth` page is publicly
+      reachable.
+- [ ] **First owner creation.** On a fresh deployment the first person to
+      sign up becomes Owner automatically. Verify this happened for the
+      intended person by checking `SELECT * FROM public.user_roles`.
+- [ ] **Employee onboarding.** New staff sign up via `/auth` with their own
+      email. The Owner then opens Settings → Roles & Access and grants the
+      appropriate role. No email invitation flow exists — this is manual by
+      design for a single-tenant operator.
+- [ ] **RBAC verification.** For each role, sign in as a test user with that
+      role and confirm:
+    - Buttons for actions they cannot perform are hidden.
+    - Directly calling a gated RPC (via the browser console) returns
+      SQLSTATE `42501` — never silently succeeds.
+- [ ] **RLS verification.** Run `SELECT tablename FROM pg_tables WHERE
+      schemaname='public'` and confirm each table has `ENABLE ROW LEVEL
+      SECURITY` and at least one policy. The `user_roles` and `settings`
+      tables must only allow writes when `has_role(auth.uid(),'owner')` /
+      `can_modify_settings(auth.uid())` returns true.
+- [ ] **No zero-owner state.** Confirm the UI blocks an Owner from revoking
+      their own Owner role. As a belt-and-braces check, run
+      `SELECT count(*) FROM public.user_roles WHERE role='owner'` — must
+      be ≥ 1 at all times.
+
+
