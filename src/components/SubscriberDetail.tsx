@@ -741,15 +741,19 @@ export const SubscriberDetail = ({
             Edit
           </Button>
           {isArchived ? (
-            <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reactivate
-            </Button>
+            perms.canArchiveCustomer && (
+              <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reactivate
+              </Button>
+            )
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
-              <Archive className="h-4 w-4 mr-2" />
-              Archive
-            </Button>
+            perms.canArchiveCustomer && (
+              <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
+                <Archive className="h-4 w-4 mr-2" />
+                Archive
+              </Button>
+            )
           )}
           <Button variant="destructive" size="sm" onClick={openDeleteDialog}>
             <Trash2 className="h-4 w-4 mr-2" />
