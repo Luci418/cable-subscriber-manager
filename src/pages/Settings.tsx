@@ -101,9 +101,15 @@ export const Settings = ({ onBack }: SettingsProps) => {
         </Button>
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Business configuration is stored in your account database.</p>
+        {readOnly && (
+          <div className="mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm">
+            You have read-only access to Settings. Only an <span className="font-medium">Owner</span> can change business configuration.
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        <RolesManagement />
         {/* Company Information */}
         <Card className="md:col-span-2">
           <CardHeader>
