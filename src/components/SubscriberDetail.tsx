@@ -1177,6 +1177,7 @@ export const SubscriberDetail = ({
                       if (tx) openVoid(tx);
                     }}
                     canVoid={(e) =>
+                      perms.canVoidTransaction &&
                       !e.voided &&
                       e.kind !== 'subscription_activated' &&
                       e.kind !== 'subscription_renewed' &&
