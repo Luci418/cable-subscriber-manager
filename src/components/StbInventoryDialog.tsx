@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStbInventory, StbStatus, DeviceType, DeviceServiceType, StbInventoryItem } from '@/hooks/useStbInventory';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { usePermissions } from '@/lib/permissions';
 
 interface StbInventoryDialogProps {
   open: boolean;
