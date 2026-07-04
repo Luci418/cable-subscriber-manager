@@ -35,6 +35,7 @@ const deviceLabel: Record<DeviceType, string> = {
 
 export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogProps) => {
   const { user } = useAuth();
+  const perms = usePermissions();
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const {
     stbs,
