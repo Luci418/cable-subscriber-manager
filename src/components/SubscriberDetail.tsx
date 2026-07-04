@@ -66,6 +66,7 @@ import { ArchiveCustomerDialog } from './ArchiveCustomerDialog';
 import { ReactivateCustomerDialog } from './ReactivateCustomerDialog';
 import { AssetTimelineCustomer } from './AssetTimelineCustomer';
 import { Archive, RotateCcw } from 'lucide-react';
+import { usePermissions } from '@/lib/permissions';
 
 interface PairedDevice {
   id: string;
