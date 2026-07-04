@@ -1142,6 +1142,15 @@ export type Database = {
       is_pack_in_use: { Args: { pack_name: string }; Returns: boolean }
       is_provider_in_use: { Args: { provider_uuid: string }; Returns: boolean }
       is_region_in_use: { Args: { region_name: string }; Returns: boolean }
+      list_users_with_roles: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          roles: Database["public"]["Enums"]["app_role"][]
+          user_id: string
+        }[]
+      }
       pair_device: {
         Args: {
           p_device_id: string
