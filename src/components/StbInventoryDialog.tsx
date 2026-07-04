@@ -219,46 +219,48 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
             if (!enabled) return null;
             return (
               <TabsContent key={svc} value={svc} className="mt-4 space-y-4">
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Device Type</Label>
-                      <Select value={deviceType} onValueChange={(v) => setDeviceType(v as DeviceType)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {svc === 'cable' ? (
-                            <SelectItem value="stb">Set-Top Box (STB)</SelectItem>
-                          ) : (
-                            <>
-                              <SelectItem value="onu">ONU</SelectItem>
-                              <SelectItem value="router">Router</SelectItem>
-                            </>
-                          )}
-                        </SelectContent>
-                      </Select>
+                {perms.canReplaceDevice && (
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Device Type</Label>
+                        <Select value={deviceType} onValueChange={(v) => setDeviceType(v as DeviceType)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {svc === 'cable' ? (
+                              <SelectItem value="stb">Set-Top Box (STB)</SelectItem>
+                            ) : (
+                              <>
+                                <SelectItem value="onu">ONU</SelectItem>
+                                <SelectItem value="router">Router</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Serial / MAC</Label>
+                        <Input
+                          value={serialNumber}
+                          onChange={(e) => setSerialNumber(e.target.value)}
+                          placeholder="Enter serial number"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Notes</Label>
+                        <Input
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="Optional"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Serial / MAC</Label>
-                      <Input
-                        value={serialNumber}
-                        onChange={(e) => setSerialNumber(e.target.value)}
-                        placeholder="Enter serial number"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Notes</Label>
-                      <Input
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add to Inventory
-                  </Button>
-                </form>
+                    <Button type="submit" className="w-full">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add to Inventory
+                    </Button>
+                  </form>
+                )}
 
                 <div className="grid grid-cols-4 gap-2 text-center text-sm">
                   <div className="p-2 rounded bg-muted">
