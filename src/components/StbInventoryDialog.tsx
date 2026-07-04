@@ -155,15 +155,19 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
             </Button>
             {stb.status === 'available' && (
               <>
-                <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty">
-                  <Wrench className="h-4 w-4" />
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(stb.id)} title="Delete">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {perms.canReplaceDevice && (
+                  <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty">
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                )}
+                {perms.isAdmin && (
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(stb.id)} title="Delete">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </>
             )}
-            {stb.status === 'faulty' && (
+            {stb.status === 'faulty' && perms.canReplaceDevice && (
               <>
                 <Button variant="outline" size="sm" onClick={() => handleRepair(stb.id)} title="Mark Repaired">
                   <RotateCcw className="h-4 w-4" />
@@ -173,7 +177,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
                 </Button>
               </>
             )}
-            {stb.status === 'assigned' && (
+            {stb.status === 'assigned' && perms.canReplaceDevice && (
               <Button variant="outline" size="sm" onClick={() => openMarkFaulty(stb)} title="Mark Faulty (will unassign)">
                 <Wrench className="h-4 w-4" />
               </Button>
