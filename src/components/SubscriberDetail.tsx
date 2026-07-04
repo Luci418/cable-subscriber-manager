@@ -66,6 +66,7 @@ import { ArchiveCustomerDialog } from './ArchiveCustomerDialog';
 import { ReactivateCustomerDialog } from './ReactivateCustomerDialog';
 import { AssetTimelineCustomer } from './AssetTimelineCustomer';
 import { Archive, RotateCcw } from 'lucide-react';
+import { usePermissions } from '@/lib/permissions';
 
 interface PairedDevice {
   id: string;
@@ -93,6 +94,7 @@ export const SubscriberDetail = ({
   onDelete,
   onReload,
 }: SubscriberDetailProps) => {
+  const perms = usePermissions();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -578,6 +580,8 @@ export const SubscriberDetail = ({
                       <Button
                         variant="outline"
                         size="sm"
+                        disabled={!perms.canCollectPayment}
+                        title={!perms.canCollectPayment ? 'You do not have permission to collect payments' : undefined}
                         onClick={() => {
                           // Phase 5.3: bill-first Collect Payment. Pass the
                           // exact subscription on THIS device card so the
@@ -610,25 +614,28 @@ export const SubscriberDetail = ({
                         {sub ? 'Renew' : 'Subscribe'}
                       </Button>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setReplaceDevice(dev)}
-                      >
-                        <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
-                      </Button>
+                      {perms.canReplaceDevice && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReplaceDevice(dev)}
+                        >
+                          <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
+                        </Button>
+                      )}
 
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setUnpairDevice(dev)}
-                      >
-                        <Link2Off className="h-3.5 w-3.5 mr-1.5" />Unpair
-                      </Button>
+                      {perms.canPairDevice && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUnpairDevice(dev)}
+                        >
+                          <Link2Off className="h-3.5 w-3.5 mr-1.5" />Unpair
+                        </Button>
+                      )}
                     </div>
 
-                    {sub && (
+                    {sub && perms.canCancelSubscription && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -662,15 +669,17 @@ export const SubscriberDetail = ({
             </>
           )}
 
-          <Button
-            variant="default"
-            size="sm"
-            className="w-full"
-            onClick={() => setPairDialogService(service)}
-          >
-            <Link2 className="h-4 w-4 mr-1.5" />
-            {devicesForService.length === 0 ? 'Pair Device' : 'Pair Another Device'}
-          </Button>
+          {perms.canPairDevice && (
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full"
+              onClick={() => setPairDialogService(service)}
+            >
+              <Link2 className="h-4 w-4 mr-1.5" />
+              {devicesForService.length === 0 ? 'Pair Device' : 'Pair Another Device'}
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -739,15 +748,19 @@ export const SubscriberDetail = ({
             Edit
           </Button>
           {isArchived ? (
-            <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reactivate
-            </Button>
+            perms.canArchiveCustomer && (
+              <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reactivate
+              </Button>
+            )
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
-              <Archive className="h-4 w-4 mr-2" />
-              Archive
-            </Button>
+            perms.canArchiveCustomer && (
+              <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
+                <Archive className="h-4 w-4 mr-2" />
+                Archive
+              </Button>
+            )
           )}
           <Button variant="destructive" size="sm" onClick={openDeleteDialog}>
             <Trash2 className="h-4 w-4 mr-2" />
@@ -1164,6 +1177,7 @@ export const SubscriberDetail = ({
                       if (tx) openVoid(tx);
                     }}
                     canVoid={(e) =>
+                      perms.canVoidTransaction &&
                       !e.voided &&
                       e.kind !== 'subscription_activated' &&
                       e.kind !== 'subscription_renewed' &&
