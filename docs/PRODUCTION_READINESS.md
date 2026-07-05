@@ -146,4 +146,44 @@ See [PERMISSION_MATRIX.md](./PERMISSION_MATRIX.md) and
       `SELECT count(*) FROM public.user_roles WHERE role='owner'` — must
       be ≥ 1 at all times.
 
+---
+
+## Technical Debt
+
+Absorbs the summary previously in `LEGACY_COLUMN_AUDIT_2026-06.md`
+(now under `archive/`). Full retirement plan lives in
+`LEGACY_DEPENDENCY_AUDIT.md`; deferred-work register lives in
+`PROJECT_STATUS.md`.
+
+### Legacy column retirement — status
+
+| Batch | Columns | Status | Milestone |
+|---|---|---|---|
+| A | `current_pack_id`, `current_internet_pack_id` | ✅ Dropped 2026-06-20 | — |
+| B | `current_pack`, `current_internet_pack` | ⏳ Ready | Phase 6.5 tail |
+| C | `current_subscription`, `internet_subscription` (jsonb) | ⏳ Blocked on server rewrite | Phase 7 |
+| D | `stb_number` (+ `sync_stb_inventory_on_subscriber_change` trigger) | ⏳ Highest risk | Phase 8 |
+| n/a | `services[]` | 🟢 **Keep** — reframed as declared-intent cache | No planned removal |
+
+### Other debt
+
+- **Balance drift** (ADR-003): stored `cable_balance` / `internet_balance`
+  can drift under concurrent writes. Reconciler + audit table planned.
+  Interim: weekly manual SQL check per runbook §3.
+- **`grant_owner_on_signup()` trigger** must be dropped before public
+  signup is ever enabled (tagged `TODO(pre-production)`).
+- **`is_pack_in_use` misses historical subscriptions** — see
+  `DESTRUCTIVE_OPERATIONS_AUDIT.md#findings` (HIGH).
+- **`deleteSubscriber` bypasses `check_subscriber_deletable`** — see
+  same audit (MEDIUM).
+- **Devices deletable while assigned** — same (MEDIUM).
+- **Immutability triggers missing** on `subscriptions`,
+  `payment_allocations`, `device_assignment_log` — same (LOW).
+- **`src/lib/storage.ts`** (585 LoC pre-Supabase helpers) still imported
+  by 7 files. Retire opportunistically.
+
+Each item is tracked in `PROJECT_STATUS.md#technical-debt-register`
+with a severity and suggested milestone.
+
+
 
