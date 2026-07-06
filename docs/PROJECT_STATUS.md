@@ -4,14 +4,16 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-05 (Consolidation Sprint)
+Last updated: 2026-07-06 (Phase 6.5 Batch A)
 
 ---
 
 ## Current milestone
 
-**Phase 6 — RBAC foundation: COMPLETE.**
-Next: **Phase 6.5 — UX & Navigation Refinement** (not yet started).
+**Phase 6.5 — Consolidation Sprint & UX Foundation: IN PROGRESS.**
+Batch A (correctness) shipped. Batches B (legacy pack columns retirement),
+C (encrypted technician credentials), D (navigation IA + Device Detail
+worked example) still to come.
 
 ## Completed milestones
 
