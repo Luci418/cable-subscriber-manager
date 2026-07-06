@@ -122,6 +122,27 @@ export const useStbInventory = (userId: string | undefined) => {
       return false;
     }
 
+    // Phase 6.5 Batch A: gate through check_device_deletable. Devices with
+    // any historical assignment (device_assignment_log rows) may NEVER be
+    // physically deleted — the audit trail must remain intact. A richer
+    // "retire" lifecycle state ships with the future Asset Lifecycle work.
+    const { data: gate, error: gateError } = await (supabase as any).rpc(
+      "check_device_deletable",
+      { p_device_id: id }
+    );
+    if (gateError) {
+      toast.error(friendlyDbError(gateError, "Failed to verify device can be deleted"));
+      console.error(gateError);
+      return false;
+    }
+    if (gate?.can_delete !== true) {
+      const first = Array.isArray(gate?.blockers) && gate.blockers.length
+        ? gate.blockers[0]
+        : "Device cannot be deleted.";
+      toast.error(first);
+      return false;
+    }
+
     const { error } = await supabase
       .from("stb_inventory")
       .delete()
