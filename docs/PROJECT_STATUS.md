@@ -4,14 +4,16 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-05 (Consolidation Sprint)
+Last updated: 2026-07-06 (Phase 6.5 Batch A)
 
 ---
 
 ## Current milestone
 
-**Phase 6 — RBAC foundation: COMPLETE.**
-Next: **Phase 6.5 — UX & Navigation Refinement** (not yet started).
+**Phase 6.5 — Consolidation Sprint & UX Foundation: IN PROGRESS.**
+Batch A (correctness) shipped. Batches B (legacy pack columns retirement),
+C (encrypted technician credentials), D (navigation IA + Device Detail
+worked example) still to come.
 
 ## Completed milestones
 
@@ -27,6 +29,7 @@ Next: **Phase 6.5 — UX & Navigation Refinement** (not yet started).
 | 5.2 | Add-Service flow on subscriber profile (Cable⇄Internet symmetry fix) | ✅ |
 | 5.3 | Error-propagation audit + `updateSubscriber` maybeSingle() fix + QA gate | ✅ |
 | 6 | `app_role` enum, `user_roles`, `has_role()`, `can_*` gates on all RPCs, RolesManagement UI, PERMISSION_MATRIX + ROLE_DESIGN docs | ✅ |
+| 6.5-A | `is_pack_in_use` canonical rewrite, `check_device_deletable` RPC + UI gate, `deleteSubscriber` routed through `check_subscriber_deletable`, immutability triggers on `subscriptions` / `payment_allocations` / `device_assignment_log` | ✅ |
 
 ## Active work
 

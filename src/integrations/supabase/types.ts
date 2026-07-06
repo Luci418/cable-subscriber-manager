@@ -1087,6 +1087,7 @@ export type Database = {
         }
         Returns: Json
       }
+      check_device_deletable: { Args: { p_device_id: string }; Returns: Json }
       check_subscriber_deletable: {
         Args: { p_subscriber_id: string }
         Returns: Json
