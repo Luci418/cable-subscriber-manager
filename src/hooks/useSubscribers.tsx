@@ -171,6 +171,31 @@ export const useSubscribers = (userId: string | undefined) => {
 
 
   const deleteSubscriber = async (id: string) => {
+    // Phase 6.5 Batch A: always route through the check_subscriber_deletable
+    // RPC gate. Bypassing it here would let the UI hit raw FK errors and
+    // surface historical financial records as "delete failed" instead of
+    // "cannot delete — archive instead". If any blocker exists we surface
+    // the first one to the operator and suggest archiving.
+    const { data: gate, error: gateError } = await (supabase as any).rpc(
+      "check_subscriber_deletable",
+      { p_subscriber_id: id }
+    );
+
+    if (gateError) {
+      toast.error(friendlyDbError(gateError, "Failed to verify subscriber can be deleted"));
+      console.error(gateError);
+      return false;
+    }
+
+    const canDelete = gate?.can_delete === true;
+    const blockers: string[] = Array.isArray(gate?.blockers) ? gate.blockers : [];
+
+    if (!canDelete) {
+      const first = blockers[0] ?? "Subscriber cannot be deleted.";
+      toast.error(`${first} Archive the customer instead to preserve history.`);
+      return false;
+    }
+
     const { error } = await supabase
       .from("subscribers")
       .delete()
