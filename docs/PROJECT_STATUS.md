@@ -29,6 +29,7 @@ worked example) still to come.
 | 5.2 | Add-Service flow on subscriber profile (Cable⇄Internet symmetry fix) | ✅ |
 | 5.3 | Error-propagation audit + `updateSubscriber` maybeSingle() fix + QA gate | ✅ |
 | 6 | `app_role` enum, `user_roles`, `has_role()`, `can_*` gates on all RPCs, RolesManagement UI, PERMISSION_MATRIX + ROLE_DESIGN docs | ✅ |
+| 6.5-A | `is_pack_in_use` canonical rewrite, `check_device_deletable` RPC + UI gate, `deleteSubscriber` routed through `check_subscriber_deletable`, immutability triggers on `subscriptions` / `payment_allocations` / `device_assignment_log` | ✅ |
 
 ## Active work
 
