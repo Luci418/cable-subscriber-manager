@@ -291,34 +291,38 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   }, [subsScoped, service]);
 
   // ---------- pack performance ----------
+  // Batch B: source pack names from active-subscription arrays instead of the
+  // retired current_pack / current_internet_pack cached labels. Multi-device
+  // subscribers correctly contribute one count per active pack.
   const packPerf = useMemo(() => {
     const map = new Map<string, { subs: number; revenue: number }>();
+    const bump = (k: string, dSubs: number, dRev: number) => {
+      const cur = map.get(k) || { subs: 0, revenue: 0 };
+      cur.subs += dSubs; cur.revenue += dRev;
+      map.set(k, cur);
+    };
     subsScoped.forEach(s => {
-      const svcs = (s as any).services?.length ? (s as any).services : ['cable'];
-      if ((service === 'all' || service === 'cable') && svcs.includes('cable') && s.current_pack) {
-        const k = `${s.current_pack} · Cable`;
-        const cur = map.get(k) || { subs: 0, revenue: 0 };
-        cur.subs += 1; map.set(k, cur);
+      if (service === 'all' || service === 'cable') {
+        ((s as any)._activeCable || []).forEach((sub: any) => {
+          if (sub?.packName) bump(`${sub.packName} · Cable`, 1, 0);
+        });
       }
-      if ((service === 'all' || service === 'internet') && svcs.includes('internet') && (s as any).current_internet_pack) {
-        const k = `${(s as any).current_internet_pack} · Internet`;
-        const cur = map.get(k) || { subs: 0, revenue: 0 };
-        cur.subs += 1; map.set(k, cur);
+      if (service === 'all' || service === 'internet') {
+        ((s as any)._activeInternet || []).forEach((sub: any) => {
+          if (sub?.packName) bump(`${sub.packName} · Internet`, 1, 0);
+        });
       }
     });
-    // attribute revenue by pack via transaction descriptions when possible isn't reliable;
-    // approximate revenue per pack by spreading payments to subscribers' current pack.
+    // Approximate revenue per pack by attributing payments to the subscriber's
+    // primary active pack on the same service.
     txnsInRange.filter(t => t.type === 'payment' && isLive(t)).forEach(t => {
-
       const s = subsById.get(t.subscriber_id);
       if (!s) return;
       const svc = (t as any).service_type || 'cable';
-      const packName = svc === 'internet' ? (s as any).current_internet_pack : s.current_pack;
+      const actives: any[] = svc === 'internet' ? ((s as any)._activeInternet || []) : ((s as any)._activeCable || []);
+      const packName = actives[0]?.packName;
       if (!packName) return;
-      const k = `${packName} · ${svc === 'internet' ? 'Internet' : 'Cable'}`;
-      const cur = map.get(k) || { subs: 0, revenue: 0 };
-      cur.revenue += Number(t.amount || 0);
-      map.set(k, cur);
+      bump(`${packName} · ${svc === 'internet' ? 'Internet' : 'Cable'}`, 0, Number(t.amount || 0));
     });
     return Array.from(map.entries())
       .map(([name, v]) => ({ name, ...v, arpu: v.subs ? v.revenue / v.subs : 0 }))

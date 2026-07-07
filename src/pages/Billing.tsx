@@ -103,7 +103,7 @@ export const Billing = ({ onBack }: BillingProps) => {
     subscriber: Subscriber;
     service: 'cable' | 'internet';
     sub: any | null;        // one active-subscription blob from the view, or null
-    pack: string | null;    // current_pack / current_internet_pack (cached label)
+    pack: string | null;    // active pack name, or most-recent timeline pack for inactive lines
     balance: number;        // service balance is per-subscriber, not per-subscription
     daysUntil: number | null;
     isActive: boolean;
@@ -120,11 +120,13 @@ export const Billing = ({ onBack }: BillingProps) => {
 
     const emitFor = (s: any, service: 'cable' | 'internet') => {
       const actives: any[] = (service === 'cable' ? s._activeCable : s._activeInternet) || [];
+      const timeline: any[] = (service === 'cable' ? s._timelineCable : s._timelineInternet) || [];
       const balance = Number(service === 'cable' ? s.cable_balance || 0 : s.internet_balance || 0);
-      const pack = service === 'cable' ? s.current_pack : s.current_internet_pack;
       if (actives.length === 0) {
+        // Batch B: no cached label — surface the most recent timeline pack instead.
+        const lastPack = timeline[0]?.packName ?? null;
         out.push({
-          subscriber: s, service, sub: null, pack, balance,
+          subscriber: s, service, sub: null, pack: lastPack, balance,
           daysUntil: null, isActive: false,
           key: `${s.id}-${service}-none`,
         });
@@ -133,7 +135,7 @@ export const Billing = ({ onBack }: BillingProps) => {
       for (const sub of actives) {
         const du = sub?.endDate ? daysLeft(sub.endDate) : null;
         out.push({
-          subscriber: s, service, sub, pack, balance,
+          subscriber: s, service, sub, pack: sub?.packName ?? null, balance,
           daysUntil: du,
           isActive: du !== null && du > 0,
           key: `${s.id}-${service}-${sub.subscriptionId}`,

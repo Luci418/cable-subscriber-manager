@@ -15,8 +15,8 @@ keep working while callers migrate.
 |---|---|---|---|---|---|
 | `subscribers.current_subscription` (jsonb) | Cache of the ACTIVE cable subscription blob | ✅ Yes — 3 server dependencies | `subscribers_enforce_invariants`, `check_subscriber_deletable`, `expire_lapsed_subscriptions`, `cancel_subscription`, `replace_device` | ❌ No | Batch C (Phase 7) |
 | `subscribers.internet_subscription` (jsonb) | Same, internet side | ✅ Same 3 server deps | Same files | ❌ No | Batch C (Phase 7) |
-| `subscribers.current_pack` (text) | Cached pack name for the active cable sub | ✅ Yes — 5 UI sites + 1 SQL fn | `Billing.tsx:124`, `Analytics.tsx:298,299,316`, `SubscriberList.tsx:65,85,255`, `is_pack_in_use` | 🟡 After UI migration | **Batch B — Phase 6.5** |
-| `subscribers.current_internet_pack` (text) | Same, internet side | ✅ Yes — 3 UI sites + 1 SQL fn | `Billing.tsx:124`, `Analytics.tsx:303,304,316`, `SubscriberList.tsx:256`, `is_pack_in_use` | 🟡 After UI migration | **Batch B — Phase 6.5** |
+| `subscribers.current_pack` (text) | Cached pack name for the active cable sub | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch B (2026-07-07)** |
+| `subscribers.current_internet_pack` (text) | Same, internet side | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch B (2026-07-07)** |
 | `subscribers.current_pack_id` (uuid FK) | FK form of `current_pack` | ❌ No frontend readers | `types.ts` only | ✅ Yes | **DROPPED — Batch A (2026-06-20)** |
 | `subscribers.current_internet_pack_id` (uuid FK) | Same, internet | ❌ No frontend readers | `types.ts` only | ✅ Yes | **DROPPED — Batch A (2026-06-20)** |
 | `subscribers.stb_number` (text) | Cache of the single cable STB serial | ✅ Yes — invariant trigger + UI list + CSV | `subscribers_enforce_invariants`, `sync_stb_inventory_on_subscriber_change`, `reconcile_stb_inventory`, `SubscriberList.tsx`, `Index.tsx:75`, CSV export | ❌ No — highest blast radius | Batch D (Phase 8) |
@@ -33,17 +33,18 @@ keep working while callers migrate.
 
 - **Batch A — DONE (2026-06-20).** `current_pack_id` and
   `current_internet_pack_id` dropped along with their FKs and indexes.
-- **Batch B — READY for Phase 6.5.** Frontend migration only. Requires:
-  1. Rewrite `is_pack_in_use` to consult `subscriptions.pack_id` (and
-     also fix the historical-pack deletion bug documented in
-     `DESTRUCTIVE_OPERATIONS_AUDIT.md`).
-  2. Migrate `Billing.tsx`, `Analytics.tsx`, `SubscriberList.tsx`,
-     `SubscriberDetail.tsx` fallback to read `_activeCable[i].packName`
-     and `_activeInternet[i].packName` from the enriched subscriber.
-  3. Stop writing `current_pack` / `current_internet_pack` in
-     `create_subscription` / `cancel_subscription` /
-     `expire_lapsed_subscriptions`.
-  4. Drop the columns.
+- **Batch B — DONE (2026-07-07).** `current_pack` and
+  `current_internet_pack` dropped. `is_pack_in_use` rewritten to consult
+  `subscriptions.pack_id` exclusively (also closes the historical-pack
+  deletion loophole documented in `DESTRUCTIVE_OPERATIONS_AUDIT.md`).
+  `create_subscription`, `cancel_subscription`, and
+  `expire_lapsed_subscriptions` no longer maintain the retired label
+  columns; `expire_lapsed_subscriptions` also stopped writing the
+  already-dropped `current_pack_id` / `current_internet_pack_id` (a
+  latent bug from Batch A). `Billing.tsx`, `Analytics.tsx`, and
+  `SubscriberList.tsx` migrated to derive pack labels from
+  `_activeCable[i].packName` / `_activeInternet[i].packName` and (for
+  the Billing "inactive" tab) `_timelineCable[0].packName`.
 - **Batch C — Phase 7.** Rewrite `subscribers_enforce_invariants`,
   `check_subscriber_deletable`, `expire_lapsed_subscriptions`,
   `cancel_subscription`, `replace_device` to query `subscriptions`

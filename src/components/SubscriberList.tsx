@@ -61,8 +61,16 @@ export const SubscriberList = ({
   // just the rows that need today's attention without scrolling.
   const [actionFilter, setActionFilter] = useState<'all' | 'collect' | 'renew' | 'expiring' | 'settled'>('all');
 
-  // Use database field names: current_pack and stb_number
-  const packs = Array.from(new Set(subscribers.map(s => (s as any).current_pack || s.pack).filter(Boolean)));
+  // Batch B: derive available pack filter values from active subscriptions
+  // (both services) instead of the retired current_pack cached label.
+  const packs = Array.from(new Set(
+    subscribers.flatMap(s => {
+      const sAny = s as any;
+      const cable = (sAny._activeCable || []).map((a: any) => a?.packName).filter(Boolean);
+      const inet  = (sAny._activeInternet || []).map((a: any) => a?.packName).filter(Boolean);
+      return [...cable, ...inet];
+    })
+  ));
   const regions = Array.from(new Set(subscribers.map(s => s.region).filter(Boolean)));
 
   // Phase 5.6 — hide archived customers from the day-to-day worklist.
@@ -81,8 +89,12 @@ export const SubscriberList = ({
       if (!matchesArchivedBySearch) return false;
     }
     const searchLower = search.toLowerCase().trim();
-    const stbNum = (s as any).stb_number || s.stbNumber || '';
-    const pack = (s as any).current_pack || s.pack || '';
+    const stbNum = (s as any).stb_number || '';
+    const sAnyFilter = s as any;
+    const activePacks: string[] = [
+      ...((sAnyFilter._activeCable || []).map((a: any) => a?.packName).filter(Boolean)),
+      ...((sAnyFilter._activeInternet || []).map((a: any) => a?.packName).filter(Boolean)),
+    ];
 
     const matchesSearch = !searchLower ||
       s.name.toLowerCase().includes(searchLower) ||
@@ -90,7 +102,7 @@ export const SubscriberList = ({
       stbNum.toLowerCase().includes(searchLower) ||
       s.id.toLowerCase().includes(searchLower);
 
-    const matchesPack = packFilter === 'all' || pack === packFilter;
+    const matchesPack = packFilter === 'all' || activePacks.includes(packFilter);
     const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
 
     const totalBalance = (s.cable_balance || 0) + ((s as any).internet_balance || 0);
@@ -251,9 +263,10 @@ export const SubscriberList = ({
         ) : (
           filteredSubscribers.map(subscriber => {
             const sAny = subscriber as any;
-            const stbNum = sAny.stb_number || subscriber.stbNumber || '';
-            const cablePack = sAny.current_pack || subscriber.pack || '';
-            const internetPack = sAny.current_internet_pack || '';
+            const stbNum = sAny.stb_number || '';
+            // Batch B: pack labels come from the primary active subscription per service.
+            const cablePack = sAny._activeCable?.[0]?.packName || '';
+            const internetPack = sAny._activeInternet?.[0]?.packName || '';
             // Active subscriptions are arrays (Phase 4b). Multi-device
             // subscribers can have more than one entry per service. We
             // display the most-recent one as the primary expiry indicator

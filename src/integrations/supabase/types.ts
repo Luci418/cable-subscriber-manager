@@ -502,8 +502,6 @@ export type Database = {
           cable_balance: number
           cable_provider_id: string | null
           created_at: string
-          current_internet_pack: string | null
-          current_pack: string | null
           current_subscription: Json | null
           customer_status: Database["public"]["Enums"]["customer_status"]
           id: string
@@ -533,8 +531,6 @@ export type Database = {
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
-          current_internet_pack?: string | null
-          current_pack?: string | null
           current_subscription?: Json | null
           customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
@@ -564,8 +560,6 @@ export type Database = {
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
-          current_internet_pack?: string | null
-          current_pack?: string | null
           current_subscription?: Json | null
           customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
