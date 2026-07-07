@@ -73,7 +73,6 @@ const Index = () => {
       name: data.name,
       mobile: data.mobile,
       stb_number: data.stbNumber || null,
-      current_pack: null,
       region: data.region || null,
       latitude: data.latitude || null,
       longitude: data.longitude || null,
