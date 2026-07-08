@@ -502,13 +502,10 @@ export type Database = {
           cable_balance: number
           cable_provider_id: string | null
           created_at: string
-          current_subscription: Json | null
           customer_status: Database["public"]["Enums"]["customer_status"]
           id: string
           internet_balance: number
           internet_provider_id: string | null
-          internet_subscription: Json | null
-          internet_subscription_history: Json[] | null
           join_date: string
           latitude: number | null
           longitude: number | null
@@ -519,7 +516,6 @@ export type Database = {
           services: string[]
           stb_number: string | null
           subscriber_id: string
-          subscription_history: Json[] | null
           updated_at: string
           user_id: string
         }
@@ -531,13 +527,10 @@ export type Database = {
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
-          current_subscription?: Json | null
           customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
           internet_balance?: number
           internet_provider_id?: string | null
-          internet_subscription?: Json | null
-          internet_subscription_history?: Json[] | null
           join_date?: string
           latitude?: number | null
           longitude?: number | null
@@ -548,7 +541,6 @@ export type Database = {
           services?: string[]
           stb_number?: string | null
           subscriber_id: string
-          subscription_history?: Json[] | null
           updated_at?: string
           user_id: string
         }
@@ -560,13 +552,10 @@ export type Database = {
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
-          current_subscription?: Json | null
           customer_status?: Database["public"]["Enums"]["customer_status"]
           id?: string
           internet_balance?: number
           internet_provider_id?: string | null
-          internet_subscription?: Json | null
-          internet_subscription_history?: Json[] | null
           join_date?: string
           latitude?: number | null
           longitude?: number | null
@@ -577,7 +566,6 @@ export type Database = {
           services?: string[]
           stb_number?: string | null
           subscriber_id?: string
-          subscription_history?: Json[] | null
           updated_at?: string
           user_id?: string
         }
