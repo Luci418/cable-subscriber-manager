@@ -4,16 +4,16 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-06 (Phase 6.5 Batch A)
+Last updated: 2026-07-08 (Phase 6.5 Batch C)
 
 ---
 
 ## Current milestone
 
 **Phase 6.5 — Consolidation Sprint & UX Foundation: IN PROGRESS.**
-Batch A (correctness) shipped. Batches B (legacy pack columns retirement),
-C (encrypted technician credentials), D (navigation IA + Device Detail
-worked example) still to come.
+Batches A (correctness), B (legacy pack columns) and C (JSONB blob
+retirement) have shipped. Remaining: encrypted technician credentials
+and navigation IA + Device Detail worked example.
 
 ## Completed milestones
 
@@ -30,6 +30,9 @@ worked example) still to come.
 | 5.3 | Error-propagation audit + `updateSubscriber` maybeSingle() fix + QA gate | ✅ |
 | 6 | `app_role` enum, `user_roles`, `has_role()`, `can_*` gates on all RPCs, RolesManagement UI, PERMISSION_MATRIX + ROLE_DESIGN docs | ✅ |
 | 6.5-A | `is_pack_in_use` canonical rewrite, `check_device_deletable` RPC + UI gate, `deleteSubscriber` routed through `check_subscriber_deletable`, immutability triggers on `subscriptions` / `payment_allocations` / `device_assignment_log` | ✅ |
+| 6.5-B | Dropped `current_pack` / `current_internet_pack`; pruned all pack-label compat writes; frontend migrated to view-derived active/timeline pack names | ✅ |
+| 6.5-C | Dropped JSONB blob columns (`current_subscription`, `subscription_history`, `internet_subscription`, `internet_subscription_history`); rewrote `subscribers_enforce_invariants`, `check_subscriber_deletable`, `create_subscription`, `cancel_subscription`, `expire_lapsed_subscriptions` against the normalised `subscriptions` table | ✅ |
+
 
 ## Active work
 
