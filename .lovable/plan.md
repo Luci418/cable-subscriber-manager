@@ -1,99 +1,76 @@
-## Scope confirmation
+# Phase 6.5 — Product Experience Foundation
 
-Phase 5.6 (Archive) + Asset Timeline + Phase 6 role foundation. Field-ops interfaces and refund/cancel permissions are gated on your confirmations and will not be built in this batch.
+The current app is a single-page state machine (`Index.tsx` switches views via `useState`) with a modal-heavy interaction model, a legacy blue/slate shadcn theme, and pages that grew independently (`SubscriberDetail.tsx` alone is 1,412 LOC). To carry the domain into technician credentials, provider connectors, field ops, warehouse and asset lifecycle without another rewrite, this sprint rebuilds the foundation in four staged batches. Each batch is shippable and independently reviewable.
 
-## Discrepancies / gates to resolve before I code
+## Guiding architectural decisions
 
-1. **Audit mechanism for archive/reactivate — RESOLVED (user-approved).** Three existing patterns were evaluated first and each ruled out:
-   - `device_assignment_log` — append-only and immutable, but scoped to a single device↔subscriber pairing. Records why a device left, not why a customer left. An archive with no devices produces zero rows.
-   - `transactions` ledger — append-only, immutable, actor-stamped, but every row must have a signed financial amount. Overloading it with non-financial "archived" events would break every reconciliation query (`reconciliation.ts`, `ledgerRendering.ts`) that assumes rows represent money.
-   - `transaction_notes` — immutable but bound to a transaction row. Same failure mode: no transaction, nowhere to hang the note.
-   None answer "who archived this customer, when, and why" for a customer with no devices and no outstanding balance. `subscriber_status_log` is the smallest extension that fills the gap and reuses the immutability-trigger pattern from `transaction_notes`.
+**Real routes, not view state.** Replace `useState<View>` in `Index.tsx` with React Router routes under an `AppShell` layout. Enables deep links, browser back/forward, per-entity URLs (`/customers/:id`, `/equipment/:serial`), and lets future modules mount without touching a central switch statement. Fixes discoverability today and is the single biggest unlock for future modules.
 
-2. **Cancel-subscription permission** — per your instruction I will STOP here and ask:
-   - Option A: Admin-only (Owner + Admin Office can cancel directly).
-   - Option B: Approval workflow (Collection Agent can request; Owner/Admin approves).
-   - I will not gate `cancel_subscription` until you choose.
+**Persistent left rail (desktop) + bottom nav (mobile).** The current top-tab strip runs out of room fast (5 sections already); the reference screenshots use a left rail for the same reason. Left rail scales to 10+ modules, groups related items (Operations / Inventory / Admin), and mirrors Stripe/Linear/Supabase patterns the user cited.
 
-3. **`performed_by` attribution audit.** Verified before role work:
-   - `pair_device`, `unpair_device`, `replace_device` → write `opened_by` / `closed_by = auth.uid()` on `device_assignment_log`. ✓
-   - `create_subscription` → `created_by = auth.uid()` on `subscriptions`. ✓
-   - `transactions` → `created_by`, `voided_by`, `edited_by` stamped by trigger. ✓
-   - `cancel_subscription` → does NOT stamp a `cancelled_by`. **Gap.** I will add `cancelled_by uuid` to `subscriptions` and set it in the RPC as part of the role foundation migration.
-   - `settings`, `ensure_settings_row` → scoped by `auth.uid()` but no actor column needed (single-row per user).
+**Pages for viewing, dialogs for acting.** Convert to full pages: Subscriber Detail (already big, gains sub-tabs), Device Detail (new), Provider Detail (new). Keep as dialogs: Add/Edit Subscriber, Collect Payment, Add/Cancel Subscription, Pair/Replace/Unpair Device, Void Transaction, Archive/Reactivate. Rule: anything the operator returns to or shares a link to is a page; anything that mutates and closes is a dialog.
 
-4. **Equipment sales / `device_id` on transactions.** Existing `AddTransactionDialog` already supports `manual_charge` with `subscription_id = NULL` and a free-text description — confirmed sufficient. Adding `device_id` to `transactions` is NOT trivial (schema + RLS + immutability trigger + types regen + UI picker). Recommend skipping per your "do not expand scope" rule. Confirm.
+**Customer list overflow menu → inline primary action + overflow for the rest.** The most common action per row (View, or Collect Payment when balance is owed) surfaces as a button; edit/archive/delete stay in overflow. Applies the same rule to every table in the app.
 
-## Implementation order (after gates resolved)
+**Subscriber profile becomes a tabbed workspace.** Overview / Subscriptions / Devices / Ledger / Timeline / Credentials (Phase 6 Owner-only). Today's 1,412-line scroll becomes navigable and leaves each tab room to grow (PPPoE, ONU, complaints, field visits land in the right tab without a rewrite).
 
-### Batch 1 — Archive Customer (Phase 5.6)
+**Design tokens first, then components.** New neutral palette (warm off-white bg, near-black text, single primary accent, semantic success/warn/destructive tuned for badges), refined type scale, tighter radius, softer shadows. Introduced via `index.css` tokens + a small primitives layer (`PageHeader`, `StatCard`, `DataTable`, `EmptyState`, `SectionCard`, `Toolbar`, `Badge` variants) so future pages inherit look-and-feel free.
 
-**Migration**
-- Add `archived_at`, `archived_by`, `archive_reason`, `archive_reason_code` to `subscribers`.
-- Add `subscriber_status_log` table (append-only, RLS scoped to `auth.uid()`, GRANTs to authenticated + service_role, immutability trigger).
-- New RPC `archive_subscriber(p_id, p_reason_code, p_reason_note)`:
-  - Loops active subscriptions → calls existing cancel logic (no refund unless caller passed one; archive UI will compute refund per-sub via existing dialog before invoking).
-  - Loops assigned devices → calls `unpair_device(..., reason='customer_closed', return_status='available')`.
-  - Sets `customer_status='archived'` + archive columns.
-  - Inserts `subscriber_status_log` row.
-- New RPC `reactivate_subscriber(p_id, p_reason_note)` → restores to `active` or `inactive` based on whether any non-archived subscriptions remain (none → `inactive`), logs event.
+## Batch plan
 
-**UI**
-- `ArchiveCustomerDialog.tsx`: two-step (warnings → reason picker + free-text → confirm). Reason codes: `moved_away`, `switched_provider`, `duplicate`, `non_payment`, `other`.
-- `ReactivateCustomerDialog.tsx`.
-- `SubscriberDetail.tsx`: replace Delete with Archive when `customer_status != 'archived'`; show Reactivate otherwise. Banner on archived profiles.
-- `SubscriberList.tsx`: filter out `customer_status='archived'` by default; add "Show archived" toggle.
-- `Billing.tsx` collection/renewal lists: exclude archived.
-- Analytics, mobile search, revenue history: leave archived visible (already query all rows).
+### Batch 1 — Design system + shell (foundation)
 
-### Batch 2 — Asset Timeline (read-only, no schema change)
+- Rewrite `src/index.css` tokens (light + dark) toward a Linear/Stripe register: warmer neutrals, single accent, tuned semantic colors, refined radii/shadows. Keep all existing semantic token names so no component breaks.
+- Add typography scale via Tailwind (display, h1–h3, body, mono for IDs). Load one distinctive display + one neutral body (e.g. Instrument Sans + Inter, or similar) via `<link>` in `index.html`.
+- New primitives in `src/components/ui-ext/`:
+  - `PageHeader` (title, description, breadcrumbs slot, actions slot)
+  - `SectionCard` (title + description + optional actions)
+  - `StatCard` (label, value, delta, icon)
+  - `DataTable` (sticky header, zebra-off, row hover, primary action slot, overflow slot, empty state, loading skeleton)
+  - `Toolbar` (search + filters + right actions, responsive collapse)
+  - `EmptyState`, `LoadingState`, `ErrorState`
+  - `Metric`, `KeyValue`, `Money`, `RelativeDate` display helpers
+- New `AppShell` component: left rail (collapsible) + top bar (breadcrumbs, search, user menu) + mobile bottom nav. Nav config is data-driven so new modules register by adding one entry.
 
-- New `src/lib/assetTimeline.ts` — pure query helpers over `device_assignment_log`.
-- `AssetTimelineCustomer.tsx` — collapsible "Previous Devices" section on `SubscriberDetail` (excludes rows where `closed_at IS NULL` — those are the current device cards). Newest first by `opened_at`.
-- `AssetTimelineDevice.tsx` — "Asset Timeline" section on `StbInventoryDialog` device detail. Top row tagged **Current Customer** when `closed_at IS NULL`; all others historical with duration.
-- Heading copy uses "Asset Timeline" per your naming guidance.
+### Batch 2 — Routing migration
 
-### Batch 3 — Phase 6 role foundation
+- Introduce nested routes: `/`, `/customers`, `/customers/:id`, `/customers/:id/:tab`, `/billing`, `/equipment`, `/equipment/:serial`, `/analytics`, `/complaints`, `/settings`, `/settings/:section`.
+- Replace `Index.tsx` view-state machine with `<Outlet />` inside `AppShell`.
+- Rewrite each page to read/write URL params instead of parent-passed callbacks. Filter state (pack/region/balance) moves to search params so links are shareable.
+- Preserve current dialog components; they mount from the pages that own them.
 
-**Migration**
-- Enum `app_role` = `owner`, `admin_office`, `collection_agent`, `technician`.
-- `user_roles` table per the canonical pattern (GRANTs, RLS, `has_role()` SECURITY DEFINER).
-- Seed: every existing `auth.users` row → `owner` (one-operator-business assumption).
-- Permission helpers (SQL, all `STABLE SECURITY DEFINER`):
-  - `can_void_transaction()`, `can_archive_customer()`, `can_modify_settings()`, `can_pair_device()`, `can_replace_device()`, `can_collect_payment()`.
-  - Each wraps `has_role()` with role sets per your spec.
-- Gate RPCs:
-  - `void_transaction` → `can_void_transaction()`.
-  - `archive_subscriber` / `reactivate_subscriber` → `can_archive_customer()`.
-  - `pair_device` / `unpair_device` / `replace_device` → `can_pair_device()`.
-  - Settings writes → `can_modify_settings()` (enforced via RLS policy on `settings`).
-  - **`cancel_subscription` NOT gated yet** (awaits gate #2).
-  - Add `cancelled_by` column + stamp in `cancel_subscription` (closes attribution gap #3).
-- TS helper `src/lib/permissions.ts` mirroring server-side helpers for UI button-hiding (defence in depth, not the security boundary).
+### Batch 3 — Page redesigns
 
-### Batch 4 — DEFERRED until you confirm
+Rebuilt on the primitives from Batch 1:
+- **Dashboard** (new home at `/`): 4 KPI cards (customers, MRR, collection rate, overdue), revenue trend, subscription status donut, today's actions (overdue collections, expiring subs, unassigned devices) — designed as slots so provider/network cards drop in later.
+- **Customers**: rebuilt `DataTable`, inline "View" primary + overflow menu, sticky toolbar with search + status/region/balance filters bound to URL.
+- **Subscriber profile**: tabbed layout (Overview | Subscriptions | Devices | Ledger | Timeline | Credentials). Extract sections from the 1,412-line file into focused sub-components under `src/components/subscriber/`.
+- **Billing**: two-column layout — collections queue (overdue/pending/paid) on the left, selected invoice detail on the right at ≥lg; stacked on mobile.
+- **Equipment → Assets**: list + detail route. List gets filters (status, type, assigned/unassigned). Detail page has assignment history, current holder, actions.
+- **Settings**: sectioned via sub-routes (`/settings/profile`, `/settings/business`, `/settings/services`, `/settings/roles`, `/settings/notifications`, `/settings/security`) with a secondary nav.
 
-- Cancel-subscription gating (gate #2).
-- Refund permissions.
-- Collection Agent map interface.
-- Technician job interface.
-- Equipment sales `device_id` column (recommend permanent skip).
+### Batch 4 — Polish + documentation
 
-## Out of scope (acknowledged, not touched)
+- Consistency pass: badge variants, empty states, loading skeletons on every list.
+- Keyboard: `/` focuses global search, `g c` goes to customers, `g b` billing, etc. (Linear-style; low cost once shell exists).
+- Update `docs/OPERATOR_WORKFLOW_UI_REVIEW.md` and create `docs/DESIGN_SYSTEM.md` documenting tokens, primitives, and page-vs-dialog rules.
+- Update `docs/PROJECT_STATUS.md` marking Phase 6.5 foundation complete.
 
-Warranty, deployment events, repair lifecycle, warehouse, FreeRADIUS/GenieACS/LibreNMS, suspension automation, multi-tenant SaaS, separate PWAs.
+## Explicitly out of scope (per prompt)
 
-## Files touched (estimated)
+Technician credentials encryption (Batch C from prior sprint), GTPL/provider connectors, warehouse, complaints redesign, field ops, GIS, network mgmt, new business features. The layouts leave slots for these but no functionality is implemented.
 
-Migrations: 2 (archive + roles).
-New files: `ArchiveCustomerDialog.tsx`, `ReactivateCustomerDialog.tsx`, `AssetTimelineCustomer.tsx`, `AssetTimelineDevice.tsx`, `assetTimeline.ts`, `permissions.ts`.
-Modified: `SubscriberDetail.tsx`, `SubscriberList.tsx`, `Billing.tsx`, `StbInventoryDialog.tsx`, `useSubscribers.tsx` (archived filter).
+## Risk & sequencing
 
----
+- Batches 1 and 2 change infrastructure but preserve every existing feature; they can ship together safely.
+- Batch 3 is where the visible product changes; risk is per-page and reviewable independently.
+- I'll run a build after each batch and eyeball the preview via Playwright before moving on.
 
-**Please confirm:**
-- (a) Audit approach in gate #1 (status_log table OK, or columns-only).
-- (b) Cancel-subscription model in gate #2 (admin-only vs approval workflow).
-- (c) Skipping `device_id` on `transactions` per gate #4.
+## Approval question
 
-Once confirmed I'll ship Batch 1 → 2 → 3 in that order, with the migration tool surfacing each schema change for your approval.
+This is a large sprint (~2–3 batches worth of edits per turn). Two options:
+
+1. **Ship in sequence, one batch per turn**, so you can review after each. Recommended.
+2. **Ship all four batches back-to-back** in this thread; faster, less reviewable.
+
+Confirm which, and I'll start with Batch 1 (design system + shell).

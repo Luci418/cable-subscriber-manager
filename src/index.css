@@ -2,107 +2,135 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/*
+ * Design System (Phase 6.5 — Foundation)
+ *
+ * Register: Linear/Stripe/Vercel — warm neutrals, single accent, restrained
+ * semantic colors, tight radii, quiet shadows. Every color is defined as HSL
+ * so Tailwind can compose them via hsl(var(--token) / <alpha>).
+ *
+ * Do NOT hardcode colors in components. Use semantic tokens only.
+ */
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 222 47% 11%;
+    /* Surfaces — warm off-white background, pure white cards for contrast */
+    --background: 40 20% 98%;
+    --foreground: 220 20% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 220 20% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 220 20% 14%;
 
-    --primary: 217 91% 60%;
+    /* Primary — deep indigo/navy, professional, calm */
+    --primary: 224 71% 36%;
     --primary-foreground: 0 0% 100%;
+    --primary-muted: 224 71% 96%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    /* Secondary — soft neutral for chips/buttons */
+    --secondary: 40 15% 94%;
+    --secondary-foreground: 220 20% 20%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 40 15% 95%;
+    --muted-foreground: 220 10% 46%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 40 15% 94%;
+    --accent-foreground: 220 20% 20%;
 
-    --destructive: 0 84% 60%;
+    /* Semantic — tuned for badges & inline usage */
+    --destructive: 0 72% 46%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-muted: 0 72% 96%;
 
-    --success: 142 71% 45%;
+    --success: 142 55% 38%;
     --success-foreground: 0 0% 100%;
+    --success-muted: 142 55% 95%;
 
-    --warning: 38 92% 50%;
+    --warning: 32 90% 46%;
     --warning-foreground: 0 0% 100%;
+    --warning-muted: 32 90% 95%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --info: 210 85% 48%;
+    --info-foreground: 0 0% 100%;
+    --info-muted: 210 85% 96%;
 
-    --radius: 0.375rem;
+    /* Structure */
+    --border: 30 12% 89%;
+    --input: 30 12% 89%;
+    --ring: 224 71% 36%;
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 0.5rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Sidebar (shadcn) — a shade cooler than page bg so it sits back */
+    --sidebar-background: 40 20% 97%;
+    --sidebar-foreground: 220 15% 30%;
+    --sidebar-primary: 224 71% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 15% 92%;
+    --sidebar-accent-foreground: 220 20% 14%;
+    --sidebar-border: 30 12% 88%;
+    --sidebar-ring: 224 71% 36%;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Elevation — quiet, layered */
+    --shadow-xs: 0 1px 2px 0 hsl(220 20% 14% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(220 20% 14% / 0.06), 0 1px 2px -1px hsl(220 20% 14% / 0.04);
+    --shadow-md: 0 4px 8px -2px hsl(220 20% 14% / 0.08), 0 2px 4px -2px hsl(220 20% 14% / 0.04);
+    --shadow-lg: 0 12px 24px -6px hsl(220 20% 14% / 0.12), 0 4px 8px -4px hsl(220 20% 14% / 0.06);
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    --background: 220 25% 8%;
+    --foreground: 40 15% 94%;
 
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 22% 11%;
+    --card-foreground: 40 15% 94%;
 
-    --popover: 222 47% 15%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 22% 11%;
+    --popover-foreground: 40 15% 94%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 218 90% 66%;
+    --primary-foreground: 220 25% 8%;
+    --primary-muted: 218 60% 16%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 18% 16%;
+    --secondary-foreground: 40 15% 94%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 220 18% 15%;
+    --muted-foreground: 220 10% 62%;
 
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 220 18% 18%;
+    --accent-foreground: 40 15% 94%;
 
-    --destructive: 0 62% 50%;
+    --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-muted: 0 60% 18%;
 
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
+    --success: 142 55% 50%;
+    --success-foreground: 220 25% 8%;
+    --success-muted: 142 40% 16%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 32 90% 58%;
+    --warning-foreground: 220 25% 8%;
+    --warning-muted: 32 60% 18%;
 
-    --border: 217 33% 23%;
-    --input: 217 33% 23%;
-    --ring: 217 91% 60%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --info: 210 85% 60%;
+    --info-foreground: 220 25% 8%;
+    --info-muted: 210 60% 18%;
+
+    --border: 220 18% 20%;
+    --input: 220 18% 20%;
+    --ring: 218 90% 66%;
+
+    --sidebar-background: 220 25% 9%;
+    --sidebar-foreground: 40 12% 82%;
+    --sidebar-primary: 218 90% 66%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 220 18% 15%;
+    --sidebar-accent-foreground: 40 15% 94%;
+    --sidebar-border: 220 18% 18%;
+    --sidebar-ring: 218 90% 66%;
   }
 }
 
@@ -111,17 +139,42 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   }
-  
-  /* Hide scrollbar for mobile nav */
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-  
+
+  /* Tabular numerals for money, IDs, dates */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  /* Utilities */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+@layer utilities {
+  .shadow-xs { box-shadow: var(--shadow-xs); }
+  .shadow-elev-sm { box-shadow: var(--shadow-sm); }
+  .shadow-elev-md { box-shadow: var(--shadow-md); }
+  .shadow-elev-lg { box-shadow: var(--shadow-lg); }
+
+  /* Semantic soft backgrounds — use for badges/pills */
+  .bg-success-muted { background-color: hsl(var(--success-muted)); }
+  .bg-warning-muted { background-color: hsl(var(--warning-muted)); }
+  .bg-destructive-muted { background-color: hsl(var(--destructive-muted)); }
+  .bg-info-muted { background-color: hsl(var(--info-muted)); }
+  .bg-primary-muted { background-color: hsl(var(--primary-muted)); }
+
+  .text-success { color: hsl(var(--success)); }
+  .text-warning { color: hsl(var(--warning)); }
+  .text-info { color: hsl(var(--info)); }
 }
