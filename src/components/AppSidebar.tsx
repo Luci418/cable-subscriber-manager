@@ -1,4 +1,3 @@
-import { NavLink, useLocation } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -12,69 +11,89 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, CreditCard, Router, MessageSquare, BarChart3, Settings as SettingsIcon, Tv, Wifi, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, Router, MessageSquare, BarChart3, Settings as SettingsIcon, Tv, Wifi, LogOut, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 /**
- * AppSidebar — left-rail navigation for the operator app.
+ * Navigation registry. Adding a new module = one entry here. This drives
+ * both the desktop sidebar and mobile bottom nav so they never drift.
  *
- * Grouped intentionally so future modules slot in without a redesign:
- *   Operations — day-to-day workflows (Dashboard, Customers, Billing, Complaints)
- *   Inventory  — assets and catalog (Equipment; future: Warehouse, Providers)
- *   Insights   — reporting (Analytics; future: Provider P&L, Network health)
- *   Admin      — configuration (Settings)
- *
- * Nav items also drive the mobile bottom nav (see AppShell) — a single source
- * of truth for navigation registration.
+ * `id` is a stable string; the shell forwards it to the parent via
+ * `onNavigate`. Phase 6.5 Batch 1 keeps nav in local state; Batch 2 will
+ * swap this for real router routes without changing this registry.
  */
-export const NAV_GROUPS = [
+export type NavId =
+  | 'dashboard'
+  | 'customers'
+  | 'billing'
+  | 'complaints'
+  | 'equipment'
+  | 'analytics'
+  | 'settings';
+
+export interface NavItem {
+  id: NavId;
+  title: string;
+  icon: LucideIcon;
+}
+
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { title: 'Dashboard', url: '/', icon: LayoutDashboard, end: true },
-      { title: 'Customers', url: '/customers', icon: Users },
-      { title: 'Billing', url: '/billing', icon: CreditCard },
-      { title: 'Complaints', url: '/complaints', icon: MessageSquare },
+      { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard },
+      { id: 'customers', title: 'Customers', icon: Users },
+      { id: 'billing', title: 'Billing', icon: CreditCard },
+      { id: 'complaints', title: 'Complaints', icon: MessageSquare },
     ],
   },
   {
     label: 'Inventory',
-    items: [{ title: 'Equipment', url: '/equipment', icon: Router }],
+    items: [{ id: 'equipment', title: 'Equipment', icon: Router }],
   },
   {
     label: 'Insights',
-    items: [{ title: 'Analytics', url: '/analytics', icon: BarChart3 }],
+    items: [{ id: 'analytics', title: 'Analytics', icon: BarChart3 }],
   },
   {
     label: 'Admin',
-    items: [{ title: 'Settings', url: '/settings', icon: SettingsIcon }],
+    items: [{ id: 'settings', title: 'Settings', icon: SettingsIcon }],
   },
-] as const;
-
-// Flat list for the mobile bottom bar (only top workflows fit).
-export const MOBILE_NAV = [
-  { title: 'Home', url: '/', icon: LayoutDashboard, end: true },
-  { title: 'Customers', url: '/customers', icon: Users },
-  { title: 'Billing', url: '/billing', icon: CreditCard },
-  { title: 'Equipment', url: '/equipment', icon: Router },
-  { title: 'More', url: '/settings', icon: SettingsIcon },
 ];
 
-export function AppSidebar() {
+export const MOBILE_NAV: NavItem[] = [
+  { id: 'dashboard', title: 'Home', icon: LayoutDashboard },
+  { id: 'customers', title: 'Customers', icon: Users },
+  { id: 'billing', title: 'Billing', icon: CreditCard },
+  { id: 'equipment', title: 'Equipment', icon: Router },
+  { id: 'settings', title: 'More', icon: SettingsIcon },
+];
+
+interface AppSidebarProps {
+  active: NavId;
+  onNavigate: (id: NavId) => void;
+}
+
+export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { pathname } = useLocation();
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const { signOut, user } = useAuth();
 
-  const brand = bothEnabled ? 'Cable & Internet' : internetEnabled && !cableEnabled ? 'Internet Manager' : 'Cable TV Manager';
+  const brand = bothEnabled
+    ? 'Cable & Internet'
+    : internetEnabled && !cableEnabled
+      ? 'Internet Manager'
+      : 'Cable TV Manager';
   const BrandIcon = internetEnabled && !cableEnabled ? Wifi : Tv;
-
-  const isActive = (url: string, end?: boolean) =>
-    end ? pathname === url : pathname === url || pathname.startsWith(url + '/');
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -102,23 +121,18 @@ export function AppSidebar() {
             {!collapsed && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => {
-                  const active = isActive(item.url, (item as any).end);
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
-                        <NavLink
-                          to={item.url}
-                          end={(item as any).end}
-                          className={cn('flex items-center gap-2')}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      isActive={active === item.id}
+                      tooltip={item.title}
+                      onClick={() => onNavigate(item.id)}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
