@@ -3,7 +3,7 @@ import { Users, CreditCard, TrendingUp, AlertCircle, ArrowRight } from 'lucide-r
 import { PageHeader, StatCard, SectionCard, EmptyState, Money } from '@/components/ui-ext';
 import { Button } from '@/components/ui/button';
 import type { NavId } from '@/components/AppSidebar';
-import { getActiveSubs } from '@/lib/activeSubs';
+import { getActives } from '@/lib/activeSubs';
 
 interface DashboardProps {
   subscribers: any[];
@@ -44,8 +44,9 @@ export function Dashboard({ subscribers, transactions, onNavigate, onSelectSubsc
     soon.setDate(soon.getDate() + 7);
     return subscribers
       .flatMap((s) => {
-        const subs = getActiveSubs(s);
-        return subs
+        const cable = getActives(s, 'cable');
+        const internet = getActives(s, 'internet');
+        return [...cable, ...internet]
           .filter((sub: any) => sub.end_date && new Date(sub.end_date) <= soon)
           .map((sub: any) => ({ subscriber: s, end: sub.end_date, pack: sub.pack_name }));
       })
