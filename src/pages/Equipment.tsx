@@ -137,18 +137,10 @@ export default function Equipment() {
 
       <SectionCard padded={false}>
         <Toolbar
-          left={
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search serial, subscriber, notes…"
-                className="pl-9"
-                value={q}
-                onChange={(e) => setParam('q', e.target.value)}
-              />
-            </div>
-          }
-          right={
+          searchValue={q}
+          onSearchChange={(v) => setParam('q', v)}
+          searchPlaceholder="Search serial, subscriber, notes…"
+          filters={
             <Select value={status} onValueChange={(v) => setParam('status', v)}>
               <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Status" />
@@ -185,10 +177,11 @@ export default function Equipment() {
           />
         ) : (
           <DataTable
-            data={filtered}
+            rows={filtered}
+            rowKey={(d) => d.id}
             columns={[
               {
-                key: 'serial',
+                id: 'serial',
                 header: 'Serial',
                 cell: (d) => (
                   <div className="flex items-center gap-2">
@@ -202,16 +195,17 @@ export default function Equipment() {
                 ),
               },
               {
-                key: 'type',
+                id: 'type',
                 header: 'Type',
                 cell: (d) => (
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">
                     {d.device_type}
                   </span>
                 ),
+                hideBelow: 'sm',
               },
               {
-                key: 'status',
+                id: 'status',
                 header: 'Status',
                 cell: (d) => (
                   <Badge variant="outline" className={STATUS_TONE[d.status]}>
@@ -220,14 +214,14 @@ export default function Equipment() {
                 ),
               },
               {
-                key: 'holder',
+                id: 'holder',
                 header: 'Assigned to',
                 cell: (d) => {
                   const holder = d.subscriber_id ? subById.get(d.subscriber_id) : null;
                   if (!holder) return <span className="text-xs text-muted-foreground">—</span>;
                   return (
                     <button
-                      className="text-sm text-primary hover:underline text-left"
+                      className="text-left hover:underline"
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/customers/${holder.id}`);
@@ -242,32 +236,25 @@ export default function Equipment() {
                 },
               },
               {
-                key: 'notes',
+                id: 'notes',
                 header: 'Notes',
                 cell: (d) => (
                   <span className="text-xs text-muted-foreground line-clamp-1 max-w-[260px]">
                     {d.notes ?? '—'}
                   </span>
                 ),
-              },
-              {
-                key: 'actions',
-                header: '',
-                className: 'text-right',
-                cell: (d) => (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setHistorySerial(d.serial_number);
-                    }}
-                  >
-                    Timeline
-                  </Button>
-                ),
+                hideBelow: 'md',
               },
             ]}
+            rowActions={(d) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setHistorySerial(d.serial_number)}
+              >
+                Timeline
+              </Button>
+            )}
           />
         )}
       </SectionCard>
@@ -277,9 +264,10 @@ export default function Equipment() {
         <DeviceTimelineDialog
           open={!!historySerial}
           onOpenChange={(o) => !o && setHistorySerial(null)}
-          serialNumber={historySerial}
+          deviceSerial={historySerial}
         />
       )}
     </>
   );
 }
+
