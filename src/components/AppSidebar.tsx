@@ -11,33 +11,42 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, CreditCard, Router, MessageSquare, BarChart3, Settings as SettingsIcon, Tv, Wifi, LogOut, type LucideIcon } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  Router,
+  MessageSquare,
+  BarChart3,
+  Settings as SettingsIcon,
+  Tv,
+  Wifi,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { NavLink, useLocation } from 'react-router-dom';
 
 /**
- * Navigation registry. Adding a new module = one entry here. This drives
- * both the desktop sidebar and mobile bottom nav so they never drift.
+ * Navigation registry. Batch 2 (Phase 6.5) migrates the sidebar to real
+ * router-driven navigation using NavLink. Active-state highlighting is
+ * derived from the URL rather than a prop, so any code path — a link, a
+ * browser back button, a bookmark — keeps the sidebar in sync.
  *
- * `id` is a stable string; the shell forwards it to the parent via
- * `onNavigate`. Phase 6.5 Batch 1 keeps nav in local state; Batch 2 will
- * swap this for real router routes without changing this registry.
+ * We intentionally do NOT list routes for future modules (technician
+ * credentials, field ops, warehouse). Those will be added when they exist.
+ * "Equipment" stays as the label; the broader Asset Lifecycle rename waits
+ * on the warehouse module.
  */
-export type NavId =
-  | 'dashboard'
-  | 'customers'
-  | 'billing'
-  | 'complaints'
-  | 'equipment'
-  | 'analytics'
-  | 'settings';
-
 export interface NavItem {
-  id: NavId;
   title: string;
   icon: LucideIcon;
+  to: string;
+  /** Match when the current URL starts with this prefix (for nested routes). */
+  matchPrefix?: string;
 }
 
 export interface NavGroup {
@@ -49,44 +58,45 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard },
-      { id: 'customers', title: 'Customers', icon: Users },
-      { id: 'billing', title: 'Billing', icon: CreditCard },
-      { id: 'complaints', title: 'Complaints', icon: MessageSquare },
+      { to: '/', title: 'Dashboard', icon: LayoutDashboard },
+      { to: '/customers', title: 'Customers', icon: Users, matchPrefix: '/customers' },
+      { to: '/billing', title: 'Billing', icon: CreditCard },
+      { to: '/complaints', title: 'Complaints', icon: MessageSquare },
     ],
   },
   {
     label: 'Inventory',
-    items: [{ id: 'equipment', title: 'Equipment', icon: Router }],
+    items: [{ to: '/equipment', title: 'Equipment', icon: Router, matchPrefix: '/equipment' }],
   },
   {
     label: 'Insights',
-    items: [{ id: 'analytics', title: 'Analytics', icon: BarChart3 }],
+    items: [{ to: '/analytics', title: 'Analytics', icon: BarChart3 }],
   },
   {
     label: 'Admin',
-    items: [{ id: 'settings', title: 'Settings', icon: SettingsIcon }],
+    items: [{ to: '/settings', title: 'Settings', icon: SettingsIcon }],
   },
 ];
 
 export const MOBILE_NAV: NavItem[] = [
-  { id: 'dashboard', title: 'Home', icon: LayoutDashboard },
-  { id: 'customers', title: 'Customers', icon: Users },
-  { id: 'billing', title: 'Billing', icon: CreditCard },
-  { id: 'equipment', title: 'Equipment', icon: Router },
-  { id: 'settings', title: 'More', icon: SettingsIcon },
+  { to: '/', title: 'Home', icon: LayoutDashboard },
+  { to: '/customers', title: 'Customers', icon: Users, matchPrefix: '/customers' },
+  { to: '/billing', title: 'Billing', icon: CreditCard },
+  { to: '/equipment', title: 'Equipment', icon: Router, matchPrefix: '/equipment' },
+  { to: '/settings', title: 'More', icon: SettingsIcon },
 ];
 
-interface AppSidebarProps {
-  active: NavId;
-  onNavigate: (id: NavId) => void;
+function isActivePath(pathname: string, item: NavItem): boolean {
+  if (item.matchPrefix) return pathname === item.matchPrefix || pathname.startsWith(item.matchPrefix + '/');
+  return pathname === item.to;
 }
 
-export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
+export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const { signOut, user } = useAuth();
+  const { pathname } = useLocation();
 
   const brand = bothEnabled
     ? 'Cable & Internet'
@@ -122,14 +132,12 @@ export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      isActive={active === item.id}
-                      tooltip={item.title}
-                      onClick={() => onNavigate(item.id)}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton asChild isActive={isActivePath(pathname, item)} tooltip={item.title}>
+                      <NavLink to={item.to} end={!item.matchPrefix}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
