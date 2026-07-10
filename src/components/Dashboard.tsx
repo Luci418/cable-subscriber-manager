@@ -2,13 +2,13 @@ import { useMemo } from 'react';
 import { Users, CreditCard, TrendingUp, AlertCircle, ArrowRight } from 'lucide-react';
 import { PageHeader, StatCard, SectionCard, EmptyState, Money } from '@/components/ui-ext';
 import { Button } from '@/components/ui/button';
-import type { NavId } from '@/components/AppSidebar';
 import { getActives } from '@/lib/activeSubs';
 
 interface DashboardProps {
   subscribers: any[];
   transactions: any[];
-  onNavigate: (id: NavId) => void;
+  /** Legacy nav ids from Batch 1 — routes are resolved by the wrapping page. */
+  onNavigate: (id: string) => void;
   onSelectSubscriber: (id: string) => void;
 }
 
