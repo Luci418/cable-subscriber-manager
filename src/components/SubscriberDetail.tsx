@@ -168,9 +168,12 @@ export const SubscriberDetail = ({
     : ['cable'];
   const showCableTab = cableEnabled && subscriberServices.includes('cable');
   const showInternetTab = internetEnabled && subscriberServices.includes('internet');
-  const [activeTab, setActiveTab] = useState<string>('overview');
-
-  // Load ALL devices paired to this subscriber (Phase 5.1).
+  const [internalTab, setInternalTab] = useState<string>('overview');
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = (t: string) => {
+    if (onTabChange) onTabChange(t);
+    else setInternalTab(t);
+  };
   // Drives the per-device cards in the Cable and Internet tabs. Multi-device
   // ready: a subscriber may have 0, 1, or many devices per service.
   const loadPairedDevices = async () => {
