@@ -1340,7 +1340,7 @@ export const SubscriberDetail = ({
         subscriber={subscriber as any}
         outstandingTotal={(subscriber.cable_balance || 0) + ((subscriber as any).internet_balance || 0)}
         activeSubscriptionCount={pairedDevices.length /* approximate; archive RPC re-counts authoritatively */}
-        onArchived={() => { onReload?.(); onBack(); }}
+        onArchived={() => { onReload?.(); onBack?.(); }}
       />
       <ReactivateCustomerDialog
         open={showReactivateDialog}
