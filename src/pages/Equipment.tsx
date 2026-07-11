@@ -184,14 +184,20 @@ export default function Equipment() {
                 id: 'serial',
                 header: 'Serial',
                 cell: (d) => (
-                  <div className="flex items-center gap-2">
+                  <button
+                    className="flex items-center gap-2 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/equipment/${encodeURIComponent(d.serial_number)}`);
+                    }}
+                  >
                     {d.service_type === 'internet' ? (
                       <Wifi className="h-3.5 w-3.5 text-muted-foreground" />
                     ) : (
                       <Tv className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
                     <span className="font-mono text-sm">{d.serial_number}</span>
-                  </div>
+                  </button>
                 ),
               },
               {
@@ -250,9 +256,9 @@ export default function Equipment() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setHistorySerial(d.serial_number)}
+                onClick={() => navigate(`/equipment/${encodeURIComponent(d.serial_number)}`)}
               >
-                Timeline
+                Open
               </Button>
             )}
           />

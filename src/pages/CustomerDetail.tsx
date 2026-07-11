@@ -7,15 +7,25 @@ import { Button } from '@/components/ui/button';
 import { useAppData } from '@/contexts/AppDataContext';
 
 /**
- * "/customers/:id" — subscriber detail as a first-class page.
+ * "/customers/:id/:tab" — subscriber detail as a first-class page.
  *
- * Batch 2: routes replace the old parent-callback flow. Deep links
- * to a customer profile now work; the browser back button returns to
- * the filtered list they came from. The richer tabbed workspace
- * (Overview | Subscriptions | Devices | Ledger | Timeline) is Batch 3.
+ * Batch 3 additions:
+ *  - The active tab is driven from the URL (`:tab` segment). Tab changes
+ *    push a new URL entry, so browser back/forward moves between sections
+ *    of the profile.
+ *  - The onBack callback has been removed — the top-bar breadcrumb is now
+ *    the primary way back to the customer list.
+ *
+ * Mutation refresh: subscriber-side mutations (payment, cancel, pair)
+ * call the shared AppData reload functions so navigating back to
+ * /customers or /billing renders fresh balances. Verified as part of
+ * Batch 3 pre-flight — the AppDataProvider is the single source and
+ * both hooks it exposes are invalidated together.
  */
+const VALID_TABS = new Set(['overview', 'subscriptions', 'devices', 'ledger', 'credentials']);
+
 export default function CustomerDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id, tab } = useParams<{ id: string; tab: string }>();
   const navigate = useNavigate();
   const {
     subscribers,
@@ -27,6 +37,8 @@ export default function CustomerDetail() {
     reloadSubscribers,
     reloadTransactions,
   } = useAppData();
+
+  const activeTab = tab && VALID_TABS.has(tab) ? tab : 'overview';
 
   if (loading) {
     return (
@@ -53,7 +65,8 @@ export default function CustomerDetail() {
     <SubscriberDetail
       subscriber={subscriber as any}
       transactions={selectedTransactions as any}
-      onBack={() => navigate('/customers')}
+      activeTab={activeTab}
+      onTabChange={(next) => navigate(`/customers/${id}/${next}`, { replace: false })}
       onAddTransaction={async (data: any) => {
         const subAny: any = subscriber;
         const svc: 'cable' | 'internet' = data.service_type

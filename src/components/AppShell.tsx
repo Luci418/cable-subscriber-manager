@@ -95,6 +95,16 @@ const LABELS: Record<string, string> = {
   analytics: 'Analytics',
   settings: 'Settings',
   new: 'Add',
+  overview: 'Overview',
+  subscriptions: 'Subscriptions',
+  devices: 'Devices',
+  ledger: 'Ledger',
+  credentials: 'Credentials',
+  company: 'Company',
+  payment: 'Payment',
+  services: 'Services',
+  receipts: 'Receipts',
+  roles: 'Team & Roles',
 };
 
 function deriveBreadcrumbs(pathname: string): { label: string; to?: string }[] {

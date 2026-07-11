@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
  * Keeps type-scale + spacing consistent so future modules inherit for free.
  */
 interface PageHeaderProps {
-  title: string;
-  description?: string;
+  title: ReactNode;
+  description?: ReactNode;
   actions?: ReactNode;
   breadcrumbs?: ReactNode;
   back?: ReactNode;
