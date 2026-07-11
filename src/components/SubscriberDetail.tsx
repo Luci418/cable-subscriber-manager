@@ -743,47 +743,62 @@ export const SubscriberDetail = ({
     );
   };
 
+  // Tab structure (Batch 3): Overview | Subscriptions | Devices | Ledger | Credentials.
+  // Service-specific per-tab views were consolidated into "Devices" so the
+  // profile scales cleanly as future capabilities (credentials, complaints,
+  // provider integration, field visits) drop in as their own tabs.
+  const TABS = [
+    { value: 'overview',      label: 'Overview',      icon: User },
+    { value: 'subscriptions', label: 'Subscriptions', icon: Calendar },
+    { value: 'devices',       label: 'Devices',       icon: Tv },
+    { value: 'ledger',        label: 'Ledger',        icon: Receipt },
+    { value: 'credentials',   label: 'Credentials',   icon: FileText },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to List
+      {/* Header — the top-bar breadcrumb handles back navigation, so the
+          Back button was removed in Batch 3. Only workflow-critical actions
+          remain here (Edit / Archive / Delete). */}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} disabled={isArchived}>
+          <Edit className="h-4 w-4 mr-2" />
+          Edit
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} disabled={isArchived}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          {isArchived ? (
-            perms.canArchiveCustomer && (
-              <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reactivate
-              </Button>
-            )
-          ) : (
-            perms.canArchiveCustomer && (
-              <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
-                <Archive className="h-4 w-4 mr-2" />
-                Archive
-              </Button>
-            )
-          )}
-          <Button variant="destructive" size="sm" onClick={openDeleteDialog}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-        </div>
+        {isArchived ? (
+          perms.canArchiveCustomer && (
+            <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reactivate
+            </Button>
+          )
+        ) : (
+          perms.canArchiveCustomer && (
+            <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
+              <Archive className="h-4 w-4 mr-2" />
+              Archive
+            </Button>
+          )
+        )}
+        <Button variant="destructive" size="sm" onClick={openDeleteDialog}>
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${2 + (showCableTab ? 1 : 0) + (showInternetTab ? 1 : 0)}, minmax(0, 1fr))` }}>
-          <TabsTrigger value="overview"><User className="h-4 w-4 mr-1.5" />Overview</TabsTrigger>
-          {showCableTab && <TabsTrigger value="cable"><Tv className="h-4 w-4 mr-1.5" />Cable</TabsTrigger>}
-          {showInternetTab && <TabsTrigger value="internet"><Wifi className="h-4 w-4 mr-1.5" />Internet</TabsTrigger>}
-          <TabsTrigger value="transactions"><Receipt className="h-4 w-4 mr-1.5" />Transactions</TabsTrigger>
+        <TabsList
+          className="grid w-full"
+          style={{ gridTemplateColumns: `repeat(${TABS.length}, minmax(0, 1fr))` }}
+        >
+          {TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              <t.icon className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">{t.label}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
+
 
         {/* OVERVIEW TAB — subscriber profile + per-service balance summary */}
         <TabsContent value="overview" className="space-y-4 mt-4">
