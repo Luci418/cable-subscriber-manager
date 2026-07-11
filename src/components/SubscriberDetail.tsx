@@ -78,11 +78,14 @@ interface PairedDevice {
 interface SubscriberDetailProps {
   subscriber: Subscriber;
   transactions: Transaction[];
-  onBack: () => void;
+  onBack?: () => void;
   onAddTransaction: (transaction: { type: 'payment' | 'charge'; amount: number; description: string; service_type: 'cable' | 'internet' }) => void;
   onEdit: (updates: Partial<Subscriber>) => void | boolean | Promise<void | boolean>;
   onDelete: () => void;
   onReload?: () => void;
+  /** Controlled tab from URL (Batch 3). Falls back to internal state when omitted. */
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export const SubscriberDetail = ({
@@ -93,6 +96,8 @@ export const SubscriberDetail = ({
   onEdit,
   onDelete,
   onReload,
+  activeTab: controlledTab,
+  onTabChange,
 }: SubscriberDetailProps) => {
   const perms = usePermissions();
   const [showAddTransaction, setShowAddTransaction] = useState(false);
