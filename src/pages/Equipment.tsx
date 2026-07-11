@@ -256,9 +256,9 @@ export default function Equipment() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setHistorySerial(d.serial_number)}
+                onClick={() => navigate(`/equipment/${encodeURIComponent(d.serial_number)}`)}
               >
-                Timeline
+                Open
               </Button>
             )}
           />
