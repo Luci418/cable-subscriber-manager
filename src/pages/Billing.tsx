@@ -1,16 +1,24 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Calendar, CreditCard, Search, Tv, Wallet, Wifi } from 'lucide-react';
+import {
+  PageHeader,
+  SectionCard,
+  StatCard,
+  DataTable,
+  EmptyState,
+  Toolbar,
+  Money,
+  type DataTableColumn,
+} from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Calendar, CreditCard, History, Settings as SettingsIcon, Tv, Wifi, Wallet } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useSubscribers } from '@/hooks/useSubscribers';
-import { usePacks } from '@/hooks/usePacks';
+import { useAppData } from '@/contexts/AppDataContext';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,31 +26,53 @@ import { friendlyDbError } from '@/lib/dbErrors';
 import { RecentVoidsCard } from '@/components/RecentVoidsCard';
 import type { Subscriber } from '@/hooks/useSubscribers';
 
-
-
-interface BillingProps {
-  onBack: () => void;
-}
-
+/**
+ * Billing — cross-subscriber worklist.
+ *
+ * Batch 3 rebuild:
+ *  - "Needs attention today" section at the top: overdue balances +
+ *    subscriptions expiring in ≤7 days. This is the operator's morning view.
+ *  - Full billing table below with URL-bound search/filters. Built on the
+ *    shared DataTable primitive so future columns and empty states inherit
+ *    the same behaviour.
+ *  - Removed the tabbed layout, subscription plan cards, and back button —
+ *    the sidebar + breadcrumb handle navigation now.
+ *  - Reads through useAppData so payments recorded here refresh Home,
+ *    Customers, and the profile without a manual reload.
+ */
 type ServiceFilter = 'all' | 'cable' | 'internet';
+type StatusFilter = 'all' | 'overdue' | 'expiring' | 'active' | 'inactive';
 
-export const Billing = ({ onBack }: BillingProps) => {
+type ServiceLine = {
+  subscriber: Subscriber;
+  service: 'cable' | 'internet';
+  sub: any | null;
+  pack: string | null;
+  balance: number;
+  daysUntil: number | null;
+  isActive: boolean;
+  isOverdue: boolean;
+  isExpiring: boolean;
+  key: string;
+};
+
+export const Billing = () => {
   const { user } = useAuth();
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
-  const { subscribers, loading: subscribersLoading, reloadSubscribers } = useSubscribers(user?.id);
-  const { packs } = usePacks(user?.id);
-  const loading = false;
+  const { subscribers, loading, reloadSubscribers, reloadTransactions } = useAppData();
+  const [params, setParams] = useSearchParams();
 
-  // Service filter. Default to whatever is enabled. When both services are
-  // enabled we start with "All" so the operator sees the full picture first.
-  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>(() =>
-    bothEnabled ? 'all' : internetEnabled && !cableEnabled ? 'internet' : 'cable'
-  );
+  const service = (params.get('service') ?? (bothEnabled ? 'all' : cableEnabled ? 'cable' : 'internet')) as ServiceFilter;
+  const status = (params.get('status') ?? 'all') as StatusFilter;
+  const q = params.get('q') ?? '';
 
-  // "Record payment" flow — operator-facing alternative to manually opening
-  // a subscriber and adding a payment transaction. The ledger row created
-  // here is identical to a hand-entered manual payment (source=manual_payment),
-  // so the immutable ledger guarantees still apply.
+  const setParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(params);
+    if (value == null || value === '' || value === 'all') next.delete(key);
+    else next.set(key, value);
+    setParams(next, { replace: true });
+  };
+
   const [payLine, setPayLine] = useState<ServiceLine | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
   const [paySaving, setPaySaving] = useState(false);
@@ -60,12 +90,6 @@ export const Billing = ({ onBack }: BillingProps) => {
       return;
     }
     setPaySaving(true);
-    // Bug 1 fix: when the operator clicks Record Payment against a specific
-    // service line that has an active subscription, pin the payment to that
-    // subscription so the FIFO trigger does targeted allocation (added in the
-    // 2026-06-24 migration). Without subscription_id, the same payment would
-    // fall through to FIFO and be misclassified as advance credit when the
-    // outstanding lives on a different (older) subscription on the same line.
     const targetSubscriptionId: string | null = payLine.sub?.subscriptionId ?? null;
     const { error } = await (supabase.from('transactions') as any).insert({
       user_id: user.id,
@@ -88,64 +112,44 @@ export const Billing = ({ onBack }: BillingProps) => {
     }
     toast.success(`Payment of ₹${amount.toFixed(2)} recorded.`);
     setPayLine(null);
-    await reloadSubscribers();
-  };
-
-
-
-  // Per-subscriber view of one service line. Phase 4b: a subscriber can have
-  // multiple active subscriptions on the same service (one per device), so
-  // we emit ONE ServiceLine per active subscription. For subscribers with
-  // no active subscription on a service they're enabled for, we still emit
-  // a single placeholder line (sub=null) so they appear in the "Inactive"
-  // tab.
-  type ServiceLine = {
-    subscriber: Subscriber;
-    service: 'cable' | 'internet';
-    sub: any | null;        // one active-subscription blob from the view, or null
-    pack: string | null;    // active pack name, or most-recent timeline pack for inactive lines
-    balance: number;        // service balance is per-subscriber, not per-subscription
-    daysUntil: number | null;
-    isActive: boolean;
-    // Stable React key. Includes subscription_id when present so multi-device
-    // subscribers render as distinct rows.
-    key: string;
+    await Promise.all([reloadSubscribers(), reloadTransactions()]);
   };
 
   const allLines: ServiceLine[] = useMemo(() => {
     const out: ServiceLine[] = [];
-    const today = new Date();
+    const today = Date.now();
     const daysLeft = (endDate: string) =>
-      Math.ceil((new Date(endDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      Math.ceil((new Date(endDate).getTime() - today) / (1000 * 60 * 60 * 24));
 
-    const emitFor = (s: any, service: 'cable' | 'internet') => {
-      const actives: any[] = (service === 'cable' ? s._activeCable : s._activeInternet) || [];
-      const timeline: any[] = (service === 'cable' ? s._timelineCable : s._timelineInternet) || [];
-      const balance = Number(service === 'cable' ? s.cable_balance || 0 : s.internet_balance || 0);
+    const emitFor = (s: any, svc: 'cable' | 'internet') => {
+      const actives: any[] = (svc === 'cable' ? s._activeCable : s._activeInternet) || [];
+      const timeline: any[] = (svc === 'cable' ? s._timelineCable : s._timelineInternet) || [];
+      const balance = Number(svc === 'cable' ? s.cable_balance || 0 : s.internet_balance || 0);
       if (actives.length === 0) {
-        // Batch B: no cached label — surface the most recent timeline pack instead.
-        const lastPack = timeline[0]?.packName ?? null;
         out.push({
-          subscriber: s, service, sub: null, pack: lastPack, balance,
+          subscriber: s, service: svc, sub: null, pack: timeline[0]?.packName ?? null, balance,
           daysUntil: null, isActive: false,
-          key: `${s.id}-${service}-none`,
+          isOverdue: balance > 0,
+          isExpiring: false,
+          key: `${s.id}-${svc}-none`,
         });
         return;
       }
       for (const sub of actives) {
         const du = sub?.endDate ? daysLeft(sub.endDate) : null;
+        const isActive = du !== null && du > 0;
         out.push({
-          subscriber: s, service, sub, pack: sub?.packName ?? null, balance,
+          subscriber: s, service: svc, sub, pack: sub?.packName ?? null, balance,
           daysUntil: du,
-          isActive: du !== null && du > 0,
-          key: `${s.id}-${service}-${sub.subscriptionId}`,
+          isActive,
+          isOverdue: balance > 0,
+          isExpiring: du !== null && du >= 0 && du <= 7,
+          key: `${s.id}-${svc}-${sub.subscriptionId}`,
         });
       }
     };
 
     for (const s of subscribers) {
-      // Phase 5.6 — archived customers do not appear in collection or renewal
-      // worklists. They remain visible in analytics and per-profile views.
       if ((s as any).customer_status === 'archived') continue;
       const services = (s as any).services?.length ? (s as any).services : ['cable'];
       if (cableEnabled && services.includes('cable')) emitFor(s, 'cable');
@@ -154,320 +158,294 @@ export const Billing = ({ onBack }: BillingProps) => {
     return out;
   }, [subscribers, cableEnabled, internetEnabled]);
 
-  const filteredLines = useMemo(
-    () => (serviceFilter === 'all' ? allLines : allLines.filter(l => l.service === serviceFilter)),
-    [allLines, serviceFilter]
+  const bySvc = useMemo(
+    () => (service === 'all' ? allLines : allLines.filter((l) => l.service === service)),
+    [allLines, service],
   );
 
-  const activeLines = filteredLines.filter(l => l.isActive);
-  const inactiveLines = filteredLines.filter(l => !l.isActive);
-  const upcomingLines = filteredLines
-    .filter(l => l.daysUntil !== null && l.daysUntil >= 0 && l.daysUntil <= 30)
-    .sort((a, b) => (a.daysUntil! - b.daysUntil!));
-  const totalOutstanding = filteredLines
-    .filter(l => l.balance > 0)
-    .reduce((sum, l) => sum + l.balance, 0);
+  const needsAttention = useMemo(
+    () =>
+      bySvc
+        .filter((l) => l.isOverdue || l.isExpiring)
+        .sort((a, b) => {
+          // Overdue first, then soonest-expiring, then largest balance
+          if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+          if (a.isExpiring && b.isExpiring) return (a.daysUntil ?? 999) - (b.daysUntil ?? 999);
+          return b.balance - a.balance;
+        }),
+    [bySvc],
+  );
 
-  const serviceLabel = serviceFilter === 'all' ? 'service lines' : serviceFilter === 'cable' ? 'cable services' : 'internet services';
+  const worklist = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return bySvc.filter((l) => {
+      if (status === 'overdue' && !l.isOverdue) return false;
+      if (status === 'expiring' && !l.isExpiring) return false;
+      if (status === 'active' && !l.isActive) return false;
+      if (status === 'inactive' && l.isActive) return false;
+      if (!term) return true;
+      return (
+        l.subscriber.name.toLowerCase().includes(term) ||
+        (l.subscriber.mobile ?? '').toLowerCase().includes(term) ||
+        ((l.subscriber as any).subscriber_id ?? '').toLowerCase().includes(term) ||
+        (l.pack ?? '').toLowerCase().includes(term)
+      );
+    });
+  }, [bySvc, q, status]);
 
-  if (subscribersLoading || loading) {
+  const totalOutstanding = bySvc.filter((l) => l.balance > 0).reduce((s, l) => s + l.balance, 0);
+  const overdueCount = bySvc.filter((l) => l.isOverdue).length;
+  const expiringCount = bySvc.filter((l) => l.isExpiring).length;
+  const activeCount = bySvc.filter((l) => l.isActive).length;
+
+  const nextActionChip = (l: ServiceLine) => {
+    if (l.isOverdue && l.daysUntil !== null && l.daysUntil < 0) {
+      return <Badge variant="destructive">Overdue · expired {Math.abs(l.daysUntil)}d ago</Badge>;
+    }
+    if (l.isOverdue) return <Badge variant="destructive">Collect payment</Badge>;
+    if (l.isExpiring) {
+      return (
+        <Badge className="bg-warning/15 text-warning border-warning/30" variant="outline">
+          {l.daysUntil === 0 ? 'Expires today' : `Renew in ${l.daysUntil}d`}
+        </Badge>
+      );
+    }
+    if (!l.isActive) return <Badge variant="outline">No active subscription</Badge>;
+    return <Badge variant="outline" className="bg-success/15 text-success border-success/30">Current</Badge>;
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Loading billing data...</p>
-      </div>
+      <div className="py-12 text-center text-sm text-muted-foreground">Loading billing data…</div>
     );
   }
 
-  const ServiceBadge = ({ service }: { service: 'cable' | 'internet' }) => (
-    <Badge variant="outline" className="gap-1">
-      {service === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-      {service === 'internet' ? 'Internet' : 'Cable'}
-    </Badge>
-  );
+  const columns: DataTableColumn<ServiceLine>[] = [
+    {
+      id: 'subscriber',
+      header: 'Subscriber',
+      cell: (l) => (
+        <div className="min-w-0">
+          <Link
+            to={`/customers/${l.subscriber.id}`}
+            className="font-medium hover:underline truncate block max-w-[220px]"
+          >
+            {l.subscriber.name}
+          </Link>
+          <div className="text-xs text-muted-foreground font-mono">
+            {(l.subscriber as any).subscriber_id ?? l.subscriber.mobile}
+          </div>
+        </div>
+      ),
+    },
+    ...(bothEnabled
+      ? [
+          {
+            id: 'service',
+            header: 'Service',
+            cell: (l: ServiceLine) => (
+              <Badge variant="outline" className="gap-1">
+                {l.service === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
+                {l.service === 'internet' ? 'Internet' : 'Cable'}
+              </Badge>
+            ),
+            hideBelow: 'sm' as const,
+          },
+        ]
+      : []),
+    {
+      id: 'pack',
+      header: 'Pack',
+      cell: (l) => <span className="text-sm">{l.pack ?? '—'}</span>,
+      hideBelow: 'md',
+    },
+    {
+      id: 'endDate',
+      header: 'Ends',
+      cell: (l) =>
+        l.sub?.endDate ? (
+          <span className="text-xs tabular-nums">
+            {new Date(l.sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        ),
+      hideBelow: 'md',
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (l) => nextActionChip(l),
+    },
+    {
+      id: 'balance',
+      header: 'Balance',
+      cell: (l) => (
+        <Money
+          value={l.balance}
+          className={l.balance > 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}
+        />
+      ),
+      align: 'right',
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Billing</h1>
-            <p className="text-sm text-muted-foreground">
-              Cross-subscriber worklist — service lines expiring soon, active subscriptions, and inactive accounts. The per-subscriber profile remains the source of truth.
-            </p>
-          </div>
+    <>
+      <PageHeader
+        title="Billing"
+        description="Your daily collection worklist. Overdue and expiring first, everything else below."
+      />
 
-          {bothEnabled && (
-            <div className="inline-flex rounded-lg border p-1 bg-background self-start">
-              <Button
-                variant={serviceFilter === 'all' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setServiceFilter('all')}
-              >
-                All
-              </Button>
-              <Button
-                variant={serviceFilter === 'cable' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setServiceFilter('cable')}
-              >
-                <Tv className="h-3.5 w-3.5 mr-1" /> Cable
-              </Button>
-              <Button
-                variant={serviceFilter === 'internet' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setServiceFilter('internet')}
-              >
-                <Wifi className="h-3.5 w-3.5 mr-1" /> Internet
-              </Button>
-            </div>
-          )}
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <StatCard
+          label="Needs attention"
+          value={overdueCount + expiringCount}
+          hint={`${overdueCount} overdue · ${expiringCount} expiring`}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          onClick={() => setParam('status', overdueCount > 0 ? 'overdue' : 'expiring')}
+        />
+        <StatCard
+          label="Total outstanding"
+          value={<Money value={totalOutstanding} compact />}
+          hint="across service lines"
+          icon={<CreditCard className="h-4 w-4" />}
+          onClick={() => setParam('status', 'overdue')}
+        />
+        <StatCard
+          label="Active"
+          value={activeCount}
+          hint={`of ${bySvc.length} lines`}
+          icon={<Calendar className="h-4 w-4" />}
+          onClick={() => setParam('status', 'active')}
+        />
+        <StatCard
+          label="Inactive"
+          value={bySvc.length - activeCount}
+          hint="no active subscription"
+          icon={<Wallet className="h-4 w-4" />}
+          onClick={() => setParam('status', 'inactive')}
+        />
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <SettingsIcon className="h-4 w-4" />
-              Active
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeLines.length}</div>
-            <p className="text-xs text-muted-foreground">
-              of {filteredLines.length} {serviceLabel}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Expiring Soon
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{upcomingLines.length}</div>
-            <p className="text-xs text-muted-foreground">
-              within 30 days
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Total Outstanding
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ₹{totalOutstanding.toLocaleString('en-IN')}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              due across {serviceLabel}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Inactive
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{inactiveLines.length}</div>
-            <p className="text-xs text-muted-foreground">
-              no active subscription
-            </p>
-          </CardContent>
-        </Card>
+      {/* Priority worklist — overdue & expiring inside 7 days. */}
+      <SectionCard
+        title="Needs attention today"
+        description="Overdue balances and subscriptions expiring in the next 7 days. Act top-down."
+        className="mb-6"
+        padded={false}
+      >
+        {needsAttention.length === 0 ? (
+          <EmptyState
+            icon={<AlertTriangle className="h-5 w-5" />}
+            title="All caught up"
+            description="No overdue balances or subscriptions expiring in the next 7 days."
+          />
+        ) : (
+          <ul className="divide-y">
+            {needsAttention.slice(0, 12).map((l) => (
+              <li key={l.key} className="flex items-center justify-between gap-3 p-3 sm:px-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Link
+                      to={`/customers/${l.subscriber.id}`}
+                      className="font-medium truncate hover:underline"
+                    >
+                      {l.subscriber.name}
+                    </Link>
+                    {bothEnabled && (
+                      <Badge variant="outline" className="gap-1 shrink-0">
+                        {l.service === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
+                      </Badge>
+                    )}
+                    {nextActionChip(l)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {(l.subscriber as any).subscriber_id ?? l.subscriber.mobile}
+                    {l.pack ? ` · ${l.pack}` : ''}
+                    {l.sub?.endDate && ` · ends ${new Date(l.sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <Money
+                    value={l.balance}
+                    className={l.balance > 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}
+                  />
+                  {l.balance > 0 && (
+                    <div className="mt-1">
+                      <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
+                        <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+
+      <SectionCard title="All service lines" padded={false}>
+        <Toolbar
+          searchValue={q}
+          onSearchChange={(v) => setParam('q', v)}
+          searchPlaceholder="Search name, mobile, ID, pack…"
+          filters={
+            <>
+              {bothEnabled && (
+                <Select value={service} onValueChange={(v) => setParam('service', v)}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All services</SelectItem>
+                    <SelectItem value="cable">Cable</SelectItem>
+                    <SelectItem value="internet">Internet</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={status} onValueChange={(v) => setParam('status', v)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="expiring">Expiring ≤7d</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          }
+        />
+
+        {worklist.length === 0 ? (
+          <EmptyState
+            icon={<Search className="h-5 w-5" />}
+            title="No matching service lines"
+            description="Adjust the filters or search to see other lines."
+          />
+        ) : (
+          <DataTable
+            rows={worklist}
+            rowKey={(l) => l.key}
+            columns={columns}
+            rowActions={(l) =>
+              l.balance > 0 ? (
+                <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
+                  <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
+                </Button>
+              ) : null
+            }
+          />
+        )}
+      </SectionCard>
+
+      <div className="mt-6">
+        <RecentVoidsCard />
       </div>
 
-      <Tabs defaultValue="expiring" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="expiring">Expiring Soon</TabsTrigger>
-          <TabsTrigger value="active">Active Subscriptions</TabsTrigger>
-          <TabsTrigger value="inactive">Inactive</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="expiring" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Subscriptions Expiring (Next 30 Days)</CardTitle>
-              <CardDescription>Service lines ending soon</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {upcomingLines.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No subscriptions expiring in the next 30 days</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Subscriber</TableHead>
-                      {bothEnabled && <TableHead>Service</TableHead>}
-                      <TableHead>Package</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead>Days Left</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {upcomingLines.map(line => (
-                      <TableRow key={line.key}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{line.subscriber.name}</p>
-                            <p className="text-sm text-muted-foreground">{line.subscriber.subscriber_id}</p>
-                          </div>
-                        </TableCell>
-                        {bothEnabled && <TableCell><ServiceBadge service={line.service} /></TableCell>}
-                        <TableCell>{line.sub?.packName || line.pack || '—'}</TableCell>
-                        <TableCell>{line.sub?.endDate ? new Date(line.sub.endDate).toLocaleDateString('en-IN') : '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant={line.daysUntil! <= 7 ? 'destructive' : 'secondary'}>
-                            {line.daysUntil === 0 ? 'Today' : `${line.daysUntil} days`}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={line.balance > 0 ? 'text-destructive' : 'text-success'}>
-                            ₹{line.balance.toFixed(2)}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="active" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Subscriptions</CardTitle>
-              <CardDescription>Subscribers with active package subscriptions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {activeLines.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No active subscriptions</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Subscriber</TableHead>
-                      {bothEnabled && <TableHead>Service</TableHead>}
-                      <TableHead>Pack</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activeLines.map(line => (
-                      <TableRow key={line.key}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{line.subscriber.name}</p>
-                            <p className="text-sm text-muted-foreground">{line.subscriber.mobile}</p>
-                          </div>
-                        </TableCell>
-                        {bothEnabled && <TableCell><ServiceBadge service={line.service} /></TableCell>}
-                        <TableCell>{line.sub?.packName || line.pack}</TableCell>
-                        <TableCell>{line.sub?.startDate ? new Date(line.sub.startDate).toLocaleDateString('en-IN') : 'N/A'}</TableCell>
-                        <TableCell>{line.sub?.endDate ? new Date(line.sub.endDate).toLocaleDateString('en-IN') : 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{line.sub?.duration || 1} month(s)</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={line.balance > 0 ? 'text-destructive' : 'text-success'}>
-                            ₹{line.balance.toFixed(2)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {line.balance > 0 ? (
-                            <Button size="sm" variant="outline" onClick={() => openRecordPayment(line)}>
-                              <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
-                            </Button>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="inactive" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inactive Subscriptions</CardTitle>
-              <CardDescription>Service lines without an active subscription</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {inactiveLines.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">All {serviceLabel} have active subscriptions!</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Subscriber</TableHead>
-                      {bothEnabled && <TableHead>Service</TableHead>}
-                      <TableHead>Last Pack</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inactiveLines.map(line => (
-                      <TableRow key={line.key}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{line.subscriber.name}</p>
-                            <p className="text-sm text-muted-foreground">{line.subscriber.mobile}</p>
-                          </div>
-                        </TableCell>
-                        {bothEnabled && <TableCell><ServiceBadge service={line.service} /></TableCell>}
-                        <TableCell>{line.pack || 'None'}</TableCell>
-                        <TableCell>{line.subscriber.region || 'N/A'}</TableCell>
-                        <TableCell className="text-right">
-                          <span className={line.balance > 0 ? 'text-destructive' : 'text-success'}>
-                            ₹{line.balance.toFixed(2)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {line.balance > 0 ? (
-                            <Button size="sm" variant="outline" onClick={() => openRecordPayment(line)}>
-                              <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
-                            </Button>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <RecentVoidsCard />
-
-      {/* Record Payment dialog — creates an immutable manual_payment ledger row. */}
       <Dialog open={!!payLine} onOpenChange={(o) => { if (!o) setPayLine(null); }}>
         <DialogContent>
           <DialogHeader>
@@ -475,8 +453,8 @@ export const Billing = ({ onBack }: BillingProps) => {
             <DialogDescription>
               {payLine && (
                 <>
-                  {payLine.subscriber.name} • {payLine.service === 'cable' ? 'Cable' : 'Internet'} •
-                  {' '}Outstanding: <span className="font-medium text-destructive">₹{payLine.balance.toFixed(2)}</span>
+                  {payLine.subscriber.name} · {payLine.service === 'cable' ? 'Cable' : 'Internet'} ·{' '}
+                  Outstanding: <span className="font-medium text-destructive">₹{payLine.balance.toFixed(2)}</span>
                 </>
               )}
             </DialogDescription>
@@ -504,7 +482,6 @@ export const Billing = ({ onBack }: BillingProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
-
