@@ -1070,7 +1070,7 @@ export const SubscriberDetail = ({
                                 {new Date(sub.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 {' → '}
                                 {new Date(sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                {sub.deviceSerial && <> · <span className="font-mono">{sub.deviceSerial}</span></>}
+                                {sub.stbNumber && <> · <span className="font-mono">{sub.stbNumber}</span></>}
                               </p>
                             </div>
                           );
