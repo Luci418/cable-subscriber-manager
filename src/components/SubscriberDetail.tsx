@@ -1031,62 +1031,83 @@ export const SubscriberDetail = ({
           })()}
         </TabsContent>
 
-        {/* CABLE TAB — STB info + package subscription + history */}
-        {showCableTab && (
-          <TabsContent value="cable" className="space-y-4 mt-4">
-            {renderDevicesCard('cable')}
+        {/* SUBSCRIPTIONS TAB — consolidated timeline across services. Active
+            packs, cancellations, expirations. Renew/Cancel actions still
+            live on device cards in the Devices tab (they are per-device). */}
+        <TabsContent value="subscriptions" className="space-y-4 mt-4">
+          {[
+            { key: 'cable' as const, show: showCableTab, actives: cableActives, history: cableHistory, label: 'Cable', Icon: Tv },
+            { key: 'internet' as const, show: showInternetTab, actives: internetActives, history: internetHistory, label: 'Internet', Icon: Wifi },
+          ].filter(g => g.show).map(g => (
+            <Card key={g.key}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <g.Icon className="h-4 w-4" /> {g.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {g.actives.length === 0 && g.history.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No subscriptions on record.</p>
+                ) : (
+                  <>
+                    {g.actives.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Active</p>
+                        {g.actives.map((sub) => {
+                          const daysLeft = daysUntil(sub.endDate);
+                          return (
+                            <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="font-medium">{sub.packName}</span>
+                                <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10">
+                                  {daysLeft !== null && daysLeft < 0
+                                    ? `Expired ${Math.abs(daysLeft)}d ago`
+                                    : daysLeft === 0 ? 'Expires today'
+                                    : `${daysLeft}d remaining`}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(sub.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {' → '}
+                                {new Date(sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {sub.deviceSerial && <> · <span className="font-mono">{sub.deviceSerial}</span></>}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {g.history.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">History</p>
+                        {g.history
+                          .slice()
+                          .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+                          .map((sub) => renderHistoryItem(sub))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
 
-            {cableHistory.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <History className="h-4 w-4" /> Subscription History
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {cableHistory
-                      .slice()
-                      .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                      .map((sub) => renderHistoryItem(sub))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        )}
+        {/* DEVICES TAB — per-device cards for every enabled service, plus
+            Customer History (previous devices). Replace / Unpair / Renew /
+            Collect actions live on each device card. */}
+        <TabsContent value="devices" className="space-y-4 mt-4">
+          {showCableTab && renderDevicesCard('cable')}
+          {showInternetTab && renderDevicesCard('internet')}
+          <AssetTimelineCustomer subscriberId={subscriber.id} />
+        </TabsContent>
 
-        {/* INTERNET TAB — ONU/router device, current pack, history */}
-        {showInternetTab && (
-          <TabsContent value="internet" className="space-y-4 mt-4">
-            {renderDevicesCard('internet')}
-
-            {internetHistory.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <History className="h-4 w-4" /> Plan History
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {internetHistory
-                      .slice()
-                      .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                      .map((sub) => renderHistoryItem(sub))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        )}
-
-        {/* TRANSACTIONS TAB — service filter pivots between Cable / Internet / All */}
-        <TabsContent value="transactions" className="space-y-4 mt-4">
+        {/* LEDGER TAB — passbook. Business-event language, running balance. */}
+        <TabsContent value="ledger" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
               <div className="flex flex-wrap justify-between items-center gap-3">
-                <CardTitle>Transaction History</CardTitle>
+                <CardTitle>Ledger</CardTitle>
                 <div className="flex items-center gap-2">
                   {(showCableTab || showInternetTab) && (
                     <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
@@ -1170,8 +1191,6 @@ export const SubscriberDetail = ({
             </CardHeader>
             <CardContent>
               {(() => {
-                // Phase 5.5 — passbook. Convert raw rows into business events
-                // via the shared rendering model. Same model feeds the PDF.
                 const rawTxs: LedgerRawTransaction[] = visibleTransactions.map((t: any) => ({
                   id: t.id,
                   date: t.date,
@@ -1209,6 +1228,32 @@ export const SubscriberDetail = ({
                   />
                 );
               })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* CREDENTIALS TAB — placeholder in Batch 3. The technician
+            credentials workstream (encrypted BSNL PPPoE, ONU admin, etc.)
+            ships as an independent phase; the tab exists now so it drops
+            in without another profile redesign. */}
+        <TabsContent value="credentials" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4" /> Technician Credentials
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <FileText className="h-8 w-8 mx-auto text-muted-foreground/60 mb-3" />
+                <p className="text-sm font-medium">
+                  Technician credentials will appear here once configured.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                  PPPoE username, ONU admin, telephone number and other subscriber-scoped
+                  credentials for field engineers ship in a later phase.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
