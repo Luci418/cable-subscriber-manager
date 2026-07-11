@@ -987,9 +987,10 @@ export const SubscriberDetail = ({
             </CardContent>
           </Card>
 
-          {/* Asset Timeline — previous devices (history). Currently paired
-              devices remain rendered as their own cards in the service tabs. */}
-          <AssetTimelineCustomer subscriberId={subscriber.id} />
+          {/* Asset Timeline now lives on the Devices tab (Batch 3) — one
+              home for currently-paired devices and previous-device history. */}
+
+
 
           {/* Item #8 — Add Service: regression fix for Phase 5.1 removal of the
               services[] checkboxes from EditSubscriberDialog. Only shown when
