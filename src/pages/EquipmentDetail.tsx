@@ -169,7 +169,7 @@ export default function EquipmentDetail() {
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <Link
-                    to={`/customers/${holder.id}`}
+                    to={`/customers/${(holder as any).subscriber_id ?? holder.id}`}
                     className="text-base font-medium hover:underline"
                   >
                     {holder.name}
@@ -289,7 +289,7 @@ export default function EquipmentDetail() {
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="min-w-0">
                         {sub ? (
-                          <Link to={`/customers/${sub.id}`} className="font-medium hover:underline truncate">
+                          <Link to={`/customers/${sub.subscriber_id ?? sub.id}`} className="font-medium hover:underline truncate">
                             {sub.name}
                           </Link>
                         ) : (
