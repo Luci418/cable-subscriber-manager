@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Router, Tv, Wifi, Plus, Search, HardDrive, CheckCircle2, XCircle, Wrench } from 'lucide-react';
+import { Router, Tv, Wifi, Plus, HardDrive, CheckCircle2, Wrench } from 'lucide-react';
 import { PageHeader, StatCard, SectionCard, EmptyState, Toolbar, DataTable } from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppData } from '@/contexts/AppDataContext';
-import { useStbInventory, type StbStatus } from '@/hooks/useStbInventory';
-import { StbInventoryDialog } from '@/components/StbInventoryDialog';
-import { DeviceTimelineDialog } from '@/components/DeviceTimelineDialog';
+import { useStbInventory, type StbStatus, type DeviceType } from '@/hooks/useStbInventory';
+import { AddDeviceDialog } from '@/components/AddDeviceDialog';
 
 /**
  * Equipment — dedicated page for device inventory.
@@ -47,10 +45,10 @@ export default function Equipment() {
   const { subscribers } = useAppData();
   const { stbs, loading } = useStbInventory(user?.id);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [historySerial, setHistorySerial] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const status = (params.get('status') ?? 'all') as StbStatus | 'all';
+  const deviceType = (params.get('type') ?? 'all') as DeviceType | 'all';
   const q = params.get('q') ?? '';
 
   const subById = useMemo(() => {
@@ -75,6 +73,7 @@ export default function Equipment() {
     const term = q.trim().toLowerCase();
     return stbs.filter((d) => {
       if (status !== 'all' && d.status !== status) return false;
+      if (deviceType !== 'all' && d.device_type !== deviceType) return false;
       if (!term) return true;
       const holder = d.subscriber_id ? subById.get(d.subscriber_id) : null;
       return (
@@ -84,7 +83,7 @@ export default function Equipment() {
         (holder?.subscriber_id ?? '').toLowerCase().includes(term)
       );
     });
-  }, [stbs, status, q, subById]);
+  }, [stbs, status, deviceType, q, subById]);
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
@@ -99,8 +98,8 @@ export default function Equipment() {
         title="Equipment"
         description="Every set-top box, ONU, and router on your books — where it is, who has it, and what state it's in."
         actions={
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Manage inventory
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add device
           </Button>
         }
       />
@@ -141,18 +140,31 @@ export default function Equipment() {
           onSearchChange={(v) => setParam('q', v)}
           searchPlaceholder="Search serial, subscriber, notes…"
           filters={
-            <Select value={status} onValueChange={(v) => setParam('status', v)}>
-              <SelectTrigger className="w-[170px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="assigned">Assigned</SelectItem>
-                <SelectItem value="faulty">Faulty</SelectItem>
-                <SelectItem value="decommissioned">Decommissioned</SelectItem>
-              </SelectContent>
-            </Select>
+            <>
+              <Select value={status} onValueChange={(v) => setParam('status', v)}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="faulty">Faulty</SelectItem>
+                  <SelectItem value="decommissioned">Decommissioned</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={deviceType} onValueChange={(v) => setParam('type', v)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="stb">STB</SelectItem>
+                  <SelectItem value="onu">ONU</SelectItem>
+                  <SelectItem value="router">Router</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
           }
         />
 
@@ -169,7 +181,7 @@ export default function Equipment() {
             }
             action={
               stbs.length === 0 ? (
-                <Button onClick={() => setDialogOpen(true)}>
+                <Button onClick={() => setAddOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" /> Add device
                 </Button>
               ) : undefined
@@ -230,7 +242,7 @@ export default function Equipment() {
                       className="text-left hover:underline"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/customers/${holder.id}`);
+                        navigate(`/customers/${holder.subscriber_id}`);
                       }}
                     >
                       <div className="font-medium truncate max-w-[220px]">{holder.name}</div>
@@ -265,14 +277,7 @@ export default function Equipment() {
         )}
       </SectionCard>
 
-      <StbInventoryDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-      {historySerial && (
-        <DeviceTimelineDialog
-          open={!!historySerial}
-          onOpenChange={(o) => !o && setHistorySerial(null)}
-          deviceSerial={historySerial}
-        />
-      )}
+      <AddDeviceDialog open={addOpen} onOpenChange={setAddOpen} />
     </>
   );
 }

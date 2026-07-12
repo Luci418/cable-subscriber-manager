@@ -64,7 +64,7 @@ export default function CustomerNew() {
             .eq('id', data.internetDeviceId);
         }
         toast.success(`Subscriber ${subscriberId} added successfully!`);
-        navigate(`/customers/${row.id}`);
+        navigate(`/customers/${subscriberId}`);
         return;
       }
     } catch (e) {

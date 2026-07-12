@@ -48,7 +48,9 @@ export default function CustomerDetail() {
     );
   }
 
-  const subscriber = subscribers.find((s) => s.id === id);
+  // Route param `:id` carries the human-readable subscriber_id (e.g. NORTH-001)
+  // so URLs are shareable. Internal DB writes still use subscriber.id (UUID).
+  const subscriber = subscribers.find((s) => (s as any).subscriber_id === id);
   if (!subscriber) {
     return (
       <EmptyState
@@ -59,7 +61,7 @@ export default function CustomerDetail() {
     );
   }
 
-  const selectedTransactions = transactions.filter((t) => t.subscriber_id === id);
+  const selectedTransactions = transactions.filter((t) => t.subscriber_id === subscriber.id);
 
   return (
     <SubscriberDetail
