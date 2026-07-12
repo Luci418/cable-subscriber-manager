@@ -98,8 +98,8 @@ export default function Equipment() {
         title="Equipment"
         description="Every set-top box, ONU, and router on your books — where it is, who has it, and what state it's in."
         actions={
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Manage inventory
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add device
           </Button>
         }
       />
@@ -140,18 +140,31 @@ export default function Equipment() {
           onSearchChange={(v) => setParam('q', v)}
           searchPlaceholder="Search serial, subscriber, notes…"
           filters={
-            <Select value={status} onValueChange={(v) => setParam('status', v)}>
-              <SelectTrigger className="w-[170px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="assigned">Assigned</SelectItem>
-                <SelectItem value="faulty">Faulty</SelectItem>
-                <SelectItem value="decommissioned">Decommissioned</SelectItem>
-              </SelectContent>
-            </Select>
+            <>
+              <Select value={status} onValueChange={(v) => setParam('status', v)}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="faulty">Faulty</SelectItem>
+                  <SelectItem value="decommissioned">Decommissioned</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={deviceType} onValueChange={(v) => setParam('type', v)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="stb">STB</SelectItem>
+                  <SelectItem value="onu">ONU</SelectItem>
+                  <SelectItem value="router">Router</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
           }
         />
 
@@ -168,7 +181,7 @@ export default function Equipment() {
             }
             action={
               stbs.length === 0 ? (
-                <Button onClick={() => setDialogOpen(true)}>
+                <Button onClick={() => setAddOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" /> Add device
                 </Button>
               ) : undefined
@@ -264,14 +277,7 @@ export default function Equipment() {
         )}
       </SectionCard>
 
-      <StbInventoryDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-      {historySerial && (
-        <DeviceTimelineDialog
-          open={!!historySerial}
-          onOpenChange={(o) => !o && setHistorySerial(null)}
-          deviceSerial={historySerial}
-        />
-      )}
+      <AddDeviceDialog open={addOpen} onOpenChange={setAddOpen} />
     </>
   );
 }
