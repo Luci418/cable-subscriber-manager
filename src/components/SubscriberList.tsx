@@ -334,7 +334,7 @@ export const SubscriberList = ({
               <Card
                 key={subscriber.id}
                 className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => onSelectSubscriber(subscriber.subscriber_id)}
+                onClick={() => onSelectSubscriber((subscriber as any).subscriber_id)}
               >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start gap-3">
