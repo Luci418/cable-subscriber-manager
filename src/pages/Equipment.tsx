@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Router, Tv, Wifi, Plus, Search, HardDrive, CheckCircle2, XCircle, Wrench } from 'lucide-react';
+import { Router, Tv, Wifi, Plus, HardDrive, CheckCircle2, Wrench } from 'lucide-react';
 import { PageHeader, StatCard, SectionCard, EmptyState, Toolbar, DataTable } from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppData } from '@/contexts/AppDataContext';
-import { useStbInventory, type StbStatus } from '@/hooks/useStbInventory';
-import { StbInventoryDialog } from '@/components/StbInventoryDialog';
-import { DeviceTimelineDialog } from '@/components/DeviceTimelineDialog';
+import { useStbInventory, type StbStatus, type DeviceType } from '@/hooks/useStbInventory';
+import { AddDeviceDialog } from '@/components/AddDeviceDialog';
 
 /**
  * Equipment — dedicated page for device inventory.
@@ -47,10 +45,10 @@ export default function Equipment() {
   const { subscribers } = useAppData();
   const { stbs, loading } = useStbInventory(user?.id);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [historySerial, setHistorySerial] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const status = (params.get('status') ?? 'all') as StbStatus | 'all';
+  const deviceType = (params.get('type') ?? 'all') as DeviceType | 'all';
   const q = params.get('q') ?? '';
 
   const subById = useMemo(() => {
@@ -75,6 +73,7 @@ export default function Equipment() {
     const term = q.trim().toLowerCase();
     return stbs.filter((d) => {
       if (status !== 'all' && d.status !== status) return false;
+      if (deviceType !== 'all' && d.device_type !== deviceType) return false;
       if (!term) return true;
       const holder = d.subscriber_id ? subById.get(d.subscriber_id) : null;
       return (
@@ -84,7 +83,7 @@ export default function Equipment() {
         (holder?.subscriber_id ?? '').toLowerCase().includes(term)
       );
     });
-  }, [stbs, status, q, subById]);
+  }, [stbs, status, deviceType, q, subById]);
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
