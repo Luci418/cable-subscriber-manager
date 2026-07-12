@@ -133,6 +133,50 @@ export type Database = {
           },
         ]
       }
+      device_status_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          device_id: string
+          device_serial: string
+          from_status: Database["public"]["Enums"]["stb_status"] | null
+          id: string
+          reason: string | null
+          to_status: Database["public"]["Enums"]["stb_status"]
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          device_id: string
+          device_serial: string
+          from_status?: Database["public"]["Enums"]["stb_status"] | null
+          id?: string
+          reason?: string | null
+          to_status: Database["public"]["Enums"]["stb_status"]
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          device_id?: string
+          device_serial?: string
+          from_status?: Database["public"]["Enums"]["stb_status"] | null
+          id?: string
+          reason?: string | null
+          to_status?: Database["public"]["Enums"]["stb_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_status_log_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "stb_inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       packs: {
         Row: {
           billing_type: string
