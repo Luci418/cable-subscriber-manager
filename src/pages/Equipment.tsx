@@ -230,7 +230,7 @@ export default function Equipment() {
                       className="text-left hover:underline"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/customers/${holder.id}`);
+                        navigate(`/customers/${holder.subscriber_id}`);
                       }}
                     >
                       <div className="font-medium truncate max-w-[220px]">{holder.name}</div>

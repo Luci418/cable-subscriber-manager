@@ -114,7 +114,7 @@ export function Dashboard({ subscribers, transactions, onNavigate, onSelectSubsc
                 return (
                   <li key={s.id}>
                     <button
-                      onClick={() => onSelectSubscriber(s.id)}
+                      onClick={() => onSelectSubscriber(s.subscriber_id)}
                       className="w-full flex items-center justify-between gap-3 px-5 py-3 hover:bg-accent/40 text-left"
                     >
                       <div className="min-w-0">
@@ -150,7 +150,7 @@ export function Dashboard({ subscribers, transactions, onNavigate, onSelectSubsc
               {expiring.map((row, i) => (
                 <li key={i}>
                   <button
-                    onClick={() => onSelectSubscriber(row.subscriber.id)}
+                    onClick={() => onSelectSubscriber(row.subscriber.subscriber_id)}
                     className="w-full flex items-center justify-between gap-3 px-5 py-3 hover:bg-accent/40 text-left"
                   >
                     <div className="min-w-0">
