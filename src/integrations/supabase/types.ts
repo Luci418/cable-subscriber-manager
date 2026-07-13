@@ -1178,6 +1178,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      mark_device_faulty: {
+        Args: { p_device_id: string; p_reason?: string }
+        Returns: Json
+      }
       pair_device: {
         Args: {
           p_device_id: string
