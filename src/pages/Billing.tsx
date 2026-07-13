@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { friendlyDbError } from '@/lib/dbErrors';
 import { RecentVoidsCard } from '@/components/RecentVoidsCard';
+import { TodaysCollectionsCard } from '@/components/TodaysCollectionsCard';
 import type { Subscriber } from '@/hooks/useSubscribers';
 
 /**
