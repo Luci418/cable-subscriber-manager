@@ -10,6 +10,7 @@ import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { hasAnyActive } from '@/lib/activeSubs';
+import { useProviders } from '@/hooks/useProviders';
 
 type ServiceType = 'cable' | 'internet';
 
