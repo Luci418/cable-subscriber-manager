@@ -193,23 +193,41 @@ export const AddPackageSubscriptionDialog = ({
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   {activePacks.length > 0 ? (
-                    activePacks.map((pack: any) => (
-                      <SelectItem key={pack.id} value={pack.name}>
-                        {pack.name} — ₹{Number(pack.price).toFixed(2)}
-                        {pack.billing_type === 'prepaid'
-                          ? ` / ${pack.validity_days || 30}d`
-                          : ' / month'}
-                        {' '}({pack.billing_type === 'prepaid' ? 'Prepaid' : 'Postpaid'})
-                      </SelectItem>
-                    ))
+                    activePacks.map((pack: any) => {
+                      const providerName = pack.provider_id
+                        ? providerNameById.get(pack.provider_id) ?? 'Unknown provider'
+                        : 'No provider';
+                      return (
+                        <SelectItem key={pack.id} value={pack.name}>
+                          <span className="font-medium">{pack.name}</span>
+                          <span className="text-muted-foreground"> — {providerName}</span>
+                          {' · ₹'}
+                          {Number(pack.price).toFixed(2)}
+                          {pack.billing_type === 'prepaid'
+                            ? ` / ${pack.validity_days || 30}d`
+                            : ' / month'}
+                        </SelectItem>
+                      );
+                    })
                   ) : (
                     <div className="px-2 py-3 text-sm text-muted-foreground flex items-center gap-2">
                       <AlertCircle className="h-4 w-4" />
-                      No active {serviceLabel.toLowerCase()} packages. Create one first.
+                      {activeProviderId
+                        ? `No active packs from the current ${serviceLabel.toLowerCase()} provider. Add one, or cancel the active subscription to switch providers.`
+                        : `No active ${serviceLabel.toLowerCase()} packages. Create one first.`}
                     </div>
                   )}
                 </SelectContent>
               </Select>
+              {activeProviderId && (
+                <p className="text-[11px] text-muted-foreground">
+                  Only packs from{' '}
+                  <span className="font-medium">
+                    {providerNameById.get(activeProviderId) ?? 'the current provider'}
+                  </span>{' '}
+                  are shown. Cancel the active {serviceLabel.toLowerCase()} subscription first to switch providers.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
