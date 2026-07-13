@@ -10,6 +10,7 @@ import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { hasAnyActive } from '@/lib/activeSubs';
+import { useProviders } from '@/hooks/useProviders';
 
 type ServiceType = 'cable' | 'internet';
 
@@ -42,24 +43,36 @@ export const AddPackageSubscriptionDialog = ({
 }: AddPackageSubscriptionDialogProps) => {
   const { user, loading: authLoading } = useAuth();
   const { packs, loading: packsLoading, reloadPacks, getActivePacks } = usePacks(user?.id);
+  const { providers } = useProviders(user?.id);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
   const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
+  const [activeProviderId, setActiveProviderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [subscriberLoading, setSubscriberLoading] = useState(false);
 
   const serviceLabel = serviceType === 'internet' ? 'Internet' : 'Cable';
 
-  // Pull the live pack metadata to determine billing model + validity.
-  const activePacks = getActivePacks().filter((p: any) => (p.service_type || 'cable') === serviceType);
-  const selectedPackData: any = activePacks.find(p => p.name === selectedPack);
+  // Batch 4 fix: filter packs by provider.
+  // - If subscriber has an active subscription for this service, only that
+  //   provider's packs are selectable (mirrors the DB invariant that blocks
+  //   provider changes while an active sub exists).
+  // - If no active sub, all packs for this service are shown, grouped and
+  //   labelled by provider so the operator knows what they're picking.
+  const providerNameById = new Map(providers.map((p) => [p.id, p.name] as const));
+  const allServicePacks = getActivePacks().filter(
+    (p: any) => (p.service_type || 'cable') === serviceType,
+  );
+  const activePacks = activeProviderId
+    ? allServicePacks.filter((p: any) => p.provider_id === activeProviderId)
+    : allServicePacks;
+  const selectedPackData: any = activePacks.find((p) => p.name === selectedPack);
   const isPrepaid = selectedPackData?.billing_type === 'prepaid';
   const validityDays = Number(selectedPackData?.validity_days) || 30;
 
   const startDate = new Date();
   const endDate = new Date();
   if (isPrepaid) {
-    // Prepaid: validity in days × number of recharges
     endDate.setDate(endDate.getDate() + validityDays * duration);
   } else {
     endDate.setMonth(endDate.getMonth() + duration);
@@ -72,20 +85,33 @@ export const AddPackageSubscriptionDialog = ({
     }
   }, [open, user?.id]);
 
-  // We read from the relational `v_subscriber_active_subscription` view
-  // (Phase 4b) rather than the legacy JSONB columns. The view returns one
-  // row per active subscription, so multi-device subscribers can have
-  // multiple cable or internet rows — `hasActiveSubscription` is true when
-  // there is at least one row for this service.
+  // Load active-subscription count AND the pinned provider for this service
+  // so pack filtering matches the DB invariant.
   const loadSubscriber = async () => {
     if (!subscriberId) return;
     setSubscriberLoading(true);
-    const { data } = await (supabase as any)
-      .from('v_subscriber_active_subscription')
-      .select('subscription_id')
-      .eq('subscriber_id', subscriberId)
-      .eq('service_type', serviceType);
-    setCurrentSubscriber({ activeCount: (data as any[] | null)?.length || 0 });
+    const [viewRes, subRes] = await Promise.all([
+      (supabase as any)
+        .from('v_subscriber_active_subscription')
+        .select('subscription_id')
+        .eq('subscriber_id', subscriberId)
+        .eq('service_type', serviceType),
+      (supabase as any)
+        .from('subscribers')
+        .select('cable_provider_id, internet_provider_id')
+        .eq('id', subscriberId)
+        .maybeSingle(),
+    ]);
+    const activeCount = (viewRes?.data as any[] | null)?.length || 0;
+    setCurrentSubscriber({ activeCount });
+    // Only pin the provider when at least one active sub exists — otherwise
+    // let the operator pick any provider's pack (first sub for this service).
+    const pinned = activeCount > 0
+      ? (serviceType === 'internet'
+          ? subRes?.data?.internet_provider_id
+          : subRes?.data?.cable_provider_id) ?? null
+      : null;
+    setActiveProviderId(pinned);
     setSubscriberLoading(false);
   };
 
@@ -167,23 +193,41 @@ export const AddPackageSubscriptionDialog = ({
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   {activePacks.length > 0 ? (
-                    activePacks.map((pack: any) => (
-                      <SelectItem key={pack.id} value={pack.name}>
-                        {pack.name} — ₹{Number(pack.price).toFixed(2)}
-                        {pack.billing_type === 'prepaid'
-                          ? ` / ${pack.validity_days || 30}d`
-                          : ' / month'}
-                        {' '}({pack.billing_type === 'prepaid' ? 'Prepaid' : 'Postpaid'})
-                      </SelectItem>
-                    ))
+                    activePacks.map((pack: any) => {
+                      const providerName = pack.provider_id
+                        ? providerNameById.get(pack.provider_id) ?? 'Unknown provider'
+                        : 'No provider';
+                      return (
+                        <SelectItem key={pack.id} value={pack.name}>
+                          <span className="font-medium">{pack.name}</span>
+                          <span className="text-muted-foreground"> — {providerName}</span>
+                          {' · ₹'}
+                          {Number(pack.price).toFixed(2)}
+                          {pack.billing_type === 'prepaid'
+                            ? ` / ${pack.validity_days || 30}d`
+                            : ' / month'}
+                        </SelectItem>
+                      );
+                    })
                   ) : (
                     <div className="px-2 py-3 text-sm text-muted-foreground flex items-center gap-2">
                       <AlertCircle className="h-4 w-4" />
-                      No active {serviceLabel.toLowerCase()} packages. Create one first.
+                      {activeProviderId
+                        ? `No active packs from the current ${serviceLabel.toLowerCase()} provider. Add one, or cancel the active subscription to switch providers.`
+                        : `No active ${serviceLabel.toLowerCase()} packages. Create one first.`}
                     </div>
                   )}
                 </SelectContent>
               </Select>
+              {activeProviderId && (
+                <p className="text-[11px] text-muted-foreground">
+                  Only packs from{' '}
+                  <span className="font-medium">
+                    {providerNameById.get(activeProviderId) ?? 'the current provider'}
+                  </span>{' '}
+                  are shown. Cancel the active {serviceLabel.toLowerCase()} subscription first to switch providers.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

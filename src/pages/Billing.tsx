@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { friendlyDbError } from '@/lib/dbErrors';
 import { RecentVoidsCard } from '@/components/RecentVoidsCard';
+import { TodaysCollectionsCard } from '@/components/TodaysCollectionsCard';
 import type { Subscriber } from '@/hooks/useSubscribers';
 
 /**
@@ -329,6 +330,8 @@ export const Billing = () => {
       </div>
 
       {/* Priority worklist — overdue & expiring inside 7 days. */}
+      <TodaysCollectionsCard />
+
       <SectionCard
         title="Needs attention today"
         description="Overdue balances and subscriptions expiring in the next 7 days. Act top-down."
