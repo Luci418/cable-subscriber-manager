@@ -184,20 +184,23 @@ export const useStbInventory = (userId: string | undefined) => {
   };
 
   const markAsFaulty = async (stbId: string, notes?: string) => {
-    const stb = stbs.find(s => s.id === stbId);
-    if (stb?.status === 'assigned') {
-      // Unassign first, then mark faulty
-      await updateStb(stbId, { 
-        status: 'faulty', 
-        subscriber_id: null,
-        notes: notes || 'Marked as faulty' 
-      });
-    } else {
-      await updateStb(stbId, { 
-        status: 'faulty', 
-        notes: notes || 'Marked as faulty' 
-      });
+    // Phase 6.5 Batch 4 fix — INV-09: faulty ⇒ subscriber_id IS NULL.
+    // Route through the mark_device_faulty RPC so the flip is atomic:
+    // status=faulty, subscriber_id cleared, assignment log closed with
+    // reason='faulty', and the subscribers.stb_number cache cleared when
+    // it pointed at this device. The active subscription is intentionally
+    // left untouched — the customer is still entitled to service and the
+    // operator will use Replace Device to restore hardware.
+    const { error } = await (supabase as any).rpc('mark_device_faulty', {
+      p_device_id: stbId,
+      p_reason: notes ?? null,
+    });
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to mark device faulty'));
+      console.error(error);
+      return false;
     }
+    await loadStbs();
     return true;
   };
 
