@@ -330,6 +330,8 @@ export const Billing = () => {
       </div>
 
       {/* Priority worklist — overdue & expiring inside 7 days. */}
+      <TodaysCollectionsCard />
+
       <SectionCard
         title="Needs attention today"
         description="Overdue balances and subscriptions expiring in the next 7 days. Act top-down."
