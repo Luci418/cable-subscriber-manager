@@ -1,33 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Subscriber, Transaction } from '@/lib/storage';
-import { generateInvoicePDF, generateThermalReceipt, generateSubscriptionInvoice } from '@/lib/pdf';
+import { settingsToCompany, useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { ArrowLeft, Plus, Trash2, Edit, Download, Calendar, Clock, History, Pencil, Printer, FileText, RefreshCw, Tv, Wifi, Receipt, User, Link2, Link2Off, ArrowLeftRight, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-// Tooltip import removed in Phase 5.2/5.3 — no remaining tooltip usages.
-import { useEnabledServices } from '@/hooks/useEnabledServices';
-import { useSettings, settingsToCompany } from '@/contexts/SettingsContext';
-import { AddTransactionDialog } from './AddTransactionDialog';
-import { EditSubscriberDialog } from './EditSubscriberDialog';
-import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
-import { VoidTransactionDialog } from './VoidTransactionDialog';
-import { TransactionNotesDialog } from './TransactionNotesDialog';
-import { PairDeviceDialog } from './PairDeviceDialog';
-import { UnpairDeviceDialog } from './UnpairDeviceDialog';
-import { ReplaceDeviceDialog } from './ReplaceDeviceDialog';
-import { CollectPaymentDialog } from './CollectPaymentDialog';
-import { friendlyDbError } from '@/lib/dbErrors';
+import { Archive, Calendar, Edit, FileText, Receipt, RotateCcw, Trash2, Tv, User } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,42 +14,33 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { AddTransactionDialog } from './AddTransactionDialog';
+import { EditSubscriberDialog } from './EditSubscriberDialog';
+import { AddPackageSubscriptionDialog } from './AddPackageSubscriptionDialog';
+import { VoidTransactionDialog } from './VoidTransactionDialog';
+import { TransactionNotesDialog } from './TransactionNotesDialog';
+import { PairDeviceDialog } from './PairDeviceDialog';
+import { UnpairDeviceDialog } from './UnpairDeviceDialog';
+import { ReplaceDeviceDialog } from './ReplaceDeviceDialog';
+import { CollectPaymentDialog } from './CollectPaymentDialog';
 import { CancelSubscriptionDialog } from './CancelSubscriptionDialog';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import {
-  getSubscriptionStatus,
-  SubscriptionEntry
-} from '@/lib/subscriptionUtils';
-import { getActives, getHistory, hasAnyActive, daysUntil, type SubscriptionBlob } from '@/lib/activeSubs';
-import {
-  computeOverallPosition,
-  computeNextActionChip,
-  chipToneClasses,
-  positionToneClasses,
-} from '@/lib/financialPosition';
-import {
-  buildLedgerEntries,
-  buildGrossComponents,
-  type LedgerSubscription,
-  type LedgerAllocation,
-  type LedgerRawTransaction,
-} from '@/lib/ledgerRendering';
-import { TransactionLedger } from './TransactionLedger';
-import { generateAccountStatementPDF } from '@/lib/pdfStatement';
-import { computeReconciliation } from '@/lib/reconciliation';
 import { ArchiveCustomerDialog } from './ArchiveCustomerDialog';
 import { ReactivateCustomerDialog } from './ReactivateCustomerDialog';
-import { AssetTimelineCustomer } from './AssetTimelineCustomer';
-import { Archive, RotateCcw } from 'lucide-react';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { getActives, getHistory, hasAnyActive, type SubscriptionBlob } from '@/lib/activeSubs';
+import {
+  computeReconciliation,
+} from '@/lib/reconciliation';
+import type { LedgerAllocation, LedgerSubscription } from '@/lib/ledgerRendering';
 import { usePermissions } from '@/lib/permissions';
 
-interface PairedDevice {
-  id: string;
-  serial_number: string;
-  device_type: 'stb' | 'onu' | 'router';
-  service_type: 'cable' | 'internet';
-}
+import { OverviewTab } from './subscriber-detail/OverviewTab';
+import { SubscriptionsTab } from './subscriber-detail/SubscriptionsTab';
+import { DevicesTab, type LastClosedAssignment, type PairedDevice } from './subscriber-detail/DevicesTab';
+import { LedgerTab } from './subscriber-detail/LedgerTab';
+import { CredentialsTab } from './subscriber-detail/CredentialsTab';
 
 interface SubscriberDetailProps {
   subscriber: Subscriber;
@@ -83,11 +50,18 @@ interface SubscriberDetailProps {
   onEdit: (updates: Partial<Subscriber>) => void | boolean | Promise<void | boolean>;
   onDelete: () => void;
   onReload?: () => void;
-  /** Controlled tab from URL (Batch 3). Falls back to internal state when omitted. */
   activeTab?: string;
   onTabChange?: (tab: string) => void;
 }
 
+/**
+ * SubscriberDetail (Batch 4 refactor) — orchestrator. Owns every piece of
+ * shared state (paired devices, reconciliation snapshot, dialog toggles)
+ * and delegates each tab body to a dedicated component under
+ * ./subscriber-detail/*. No behaviour change from the pre-split version
+ * beyond the new "device needed" guided state on the Devices tab
+ * (see DevicesTab.tsx for the workflow details).
+ */
 export const SubscriberDetail = ({
   subscriber,
   transactions,
@@ -100,82 +74,75 @@ export const SubscriberDetail = ({
   onTabChange,
 }: SubscriberDetailProps) => {
   const perms = usePermissions();
-  const [showAddTransaction, setShowAddTransaction] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
-  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
-  const isArchived = (subscriber as any).customer_status === 'archived';
-  const [showAddPackage, setShowAddPackage] = useState(false);
-  const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
-  // Phase 5.1 multi-device fix: when the operator clicks Renew on a per-device
-  // card, route the new subscription to THAT device via the create_subscription
-  // RPC's p_device_id. Null = legacy fallback (RPC picks an assigned device).
-  const [addPackageDeviceId, setAddPackageDeviceId] = useState<string | null>(null);
-  const [showVoidDialog, setShowVoidDialog] = useState(false);
-  const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
-  const [showNotesDialog, setShowNotesDialog] = useState(false);
-  const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  // Phase 5.1 multi-device fix: cancel targets a specific subscription
-  // (by subscriptionId) rather than "the latest active for this service".
-  const [cancelTarget, setCancelTarget] = useState<{
-    service: 'cable' | 'internet';
-    subscriptionId: string;
-    blob: SubscriptionBlob;
-  } | null>(null);
-  const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
-  const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
-  const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
-  const [deleteChecking, setDeleteChecking] = useState(false);
-  // Item #8 — Add Service: confirmation for adding a missing service category
-  // (cable / internet) to an existing subscriber. No device is paired here;
-  // that remains the separate Pair Device workflow.
-  const [addServiceTarget, setAddServiceTarget] = useState<'cable' | 'internet' | null>(null);
-  const [addingService, setAddingService] = useState(false);
-
-  // Pair / Unpair / Replace / Collect dialog state — Phase 5.1–5.3 workflow actions.
-  const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
-  const [unpairDevice, setUnpairDevice] = useState<PairedDevice | null>(null);
-  const [replaceDevice, setReplaceDevice] = useState<PairedDevice | null>(null);
-  // Phase 5.3: bill-first Collect Payment. Carries device + subscription
-  // context from the invoking card so the payment is recorded against the
-  // exact subscription the operator was looking at.
-  const [collectTarget, setCollectTarget] = useState<{
-    service: 'cable' | 'internet';
-    subscriptionId: string | null;
-    packName: string | null;
-    outstandingForSubscription: number;
-  } | null>(null);
-  // Outstanding-per-active-subscription, keyed by subscriptionId, scoped to
-  // this subscriber. Computed from subscriptions.total_charged minus the
-  // sum of payment_allocations against that subscription.
-  const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
-  const [serviceCredit, setServiceCredit] = useState<{ cable: number; internet: number }>({ cable: 0, internet: 0 });
-  // Phase 5.5 — passbook rendering. Subscriptions (full snapshots) and
-  // allocations (per-transaction) feed the shared `buildLedgerEntries` model.
-  const [subsById, setSubsById] = useState<Record<string, LedgerSubscription>>({});
-  const [allocByTx, setAllocByTx] = useState<Record<string, LedgerAllocation[]>>({});
-
-
   const { cableEnabled, internetEnabled } = useEnabledServices();
   const { settings: businessSettings } = useSettings();
   const companyForPdf = businessSettings
     ? settingsToCompany(businessSettings)
     : { name: '', address: '', phone: '', email: '', receipt_footer: '' };
+
+  const isArchived = (subscriber as any).customer_status === 'archived';
   const subscriberServices = subscriber.services && subscriber.services.length > 0
     ? subscriber.services
     : ['cable'];
   const showCableTab = cableEnabled && subscriberServices.includes('cable');
   const showInternetTab = internetEnabled && subscriberServices.includes('internet');
+
+  // Tab (URL-controlled in CustomerDetail, self-controlled otherwise).
   const [internalTab, setInternalTab] = useState<string>('overview');
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = (t: string) => {
     if (onTabChange) onTabChange(t);
     else setInternalTab(t);
   };
-  // Drives the per-device cards in the Cable and Internet tabs. Multi-device
-  // ready: a subscriber may have 0, 1, or many devices per service.
+
+  // Dialog toggles.
+  const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
+  const [showAddPackage, setShowAddPackage] = useState(false);
+  const [addPackageService, setAddPackageService] = useState<'cable' | 'internet'>('cable');
+  const [addPackageDeviceId, setAddPackageDeviceId] = useState<string | null>(null);
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [notesTransaction, setNotesTransaction] = useState<Transaction | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{
+    service: 'cable' | 'internet';
+    subscriptionId: string;
+    blob: SubscriptionBlob;
+  } | null>(null);
+  const [pairDialogService, setPairDialogService] = useState<'cable' | 'internet' | null>(null);
+  const [unpairDevice, setUnpairDevice] = useState<PairedDevice | null>(null);
+  const [replaceDevice, setReplaceDevice] = useState<PairedDevice | null>(null);
+  const [collectTarget, setCollectTarget] = useState<{
+    service: 'cable' | 'internet';
+    subscriptionId: string | null;
+    packName: string | null;
+    outstandingForSubscription: number;
+  } | null>(null);
+  const [addServiceTarget, setAddServiceTarget] = useState<'cable' | 'internet' | null>(null);
+  const [addingService, setAddingService] = useState(false);
+  const [deleteBlockers, setDeleteBlockers] = useState<string[] | null>(null);
+  const [deleteChecking, setDeleteChecking] = useState(false);
+
+  // Shared reconciliation / device state.
+  const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
+  const [providerNames, setProviderNames] = useState<{ cable?: string; internet?: string }>({});
+  const [outstandingBySub, setOutstandingBySub] = useState<Record<string, number>>({});
+  const [subsById, setSubsById] = useState<Record<string, LedgerSubscription>>({});
+  const [allocByTx, setAllocByTx] = useState<Record<string, LedgerAllocation[]>>({});
+  // Batch 4 — most recent CLOSED assignment per service. Powers the
+  // "device needed" guided state on the Devices tab (faulty vs. plain).
+  const [lastClosedByService, setLastClosedByService] = useState<{
+    cable: LastClosedAssignment | null;
+    internet: LastClosedAssignment | null;
+  }>({ cable: null, internet: null });
+
+  // ---- loaders ---------------------------------------------------------
+
   const loadPairedDevices = async () => {
     const { data, error } = await supabase
       .from('stb_inventory')
@@ -189,11 +156,55 @@ export const SubscriberDetail = ({
     setPairedDevices((data as PairedDevice[]) || []);
   };
 
-  // Authoritative reconciliation: per-subscription outstanding, per-service
-  // net balance, and unallocated advance credit — all derived from the
-  // immutable ledger using `computeReconciliation`. This is the SINGLE
-  // source every UI surface reads, so device rows, service summaries, the
-  // overall position, and Billing can never disagree.
+  /**
+   * Batch 4 — read the newest CLOSED assignment per service so the Devices
+   * tab can render the "device needed / faulty replacement" guided state.
+   * Read-only, no schema change.
+   */
+  const loadLastClosedAssignments = async () => {
+    const { data, error } = await (supabase as any)
+      .from('device_assignment_log')
+      .select('device_serial, closed_at, close_reason, closed_by, service_type')
+      .eq('subscriber_id', subscriber.id)
+      .not('closed_at', 'is', null)
+      .order('closed_at', { ascending: false });
+    if (error) {
+      console.warn('loadLastClosedAssignments failed:', error);
+      return;
+    }
+    const rows = (data as any[]) || [];
+    const firstBy: Record<string, any> = {};
+    rows.forEach((r) => {
+      if (!firstBy[r.service_type]) firstBy[r.service_type] = r;
+    });
+
+    // Resolve closer names in one round-trip.
+    const closerIds = Array.from(
+      new Set(Object.values(firstBy).map((r: any) => r.closed_by).filter(Boolean))
+    ) as string[];
+    let nameById: Record<string, string> = {};
+    if (closerIds.length > 0) {
+      const { data: profs } = await (supabase as any)
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', closerIds);
+      ((profs as any[]) || []).forEach((p) => {
+        nameById[p.id] = p.full_name || p.email || 'operator';
+      });
+    }
+    const build = (svc: 'cable' | 'internet'): LastClosedAssignment | null => {
+      const r = firstBy[svc];
+      if (!r) return null;
+      return {
+        device_serial: r.device_serial,
+        closed_at: r.closed_at,
+        close_reason: r.close_reason,
+        closed_by_name: r.closed_by ? (nameById[r.closed_by] || null) : null,
+      };
+    };
+    setLastClosedByService({ cable: build('cable'), internet: build('internet') });
+  };
+
   const loadOutstanding = async () => {
     const { data: subs, error: subErr } = await (supabase as any)
       .from('subscriptions')
@@ -217,9 +228,6 @@ export const SubscriberDetail = ({
     });
     setSubsById(subMap);
 
-    // Pull EVERY allocation for these subscriptions (not just active ones).
-    // We need cancelled/expired subs too so reconciliation sees their
-    // historical allocations when distinguishing live vs voided cash.
     const subIds = (subs as any[]).map((s) => s.id);
     let allocs: any[] = [];
     if (subIds.length > 0) {
@@ -230,9 +238,6 @@ export const SubscriberDetail = ({
       allocs = (data as any[]) || [];
     }
 
-    // Reconcile using the authoritative computer. Excludes voided/reversal
-    // transactions from allocation totals so a void + reversal cancel out
-    // exactly the way the DB balance trigger expects.
     const recon = computeReconciliation(
       (subs as any[]).map((s) => ({
         id: s.id,
@@ -260,13 +265,7 @@ export const SubscriberDetail = ({
       svc.perSub.forEach((p) => { out[p.subscription_id] = p.remaining; });
     });
     setOutstandingBySub(out);
-    setServiceCredit({
-      cable: recon.services.find((s) => s.service === 'cable')?.unallocated_credit || 0,
-      internet: recon.services.find((s) => s.service === 'internet')?.unallocated_credit || 0,
-    });
 
-    // All allocations keyed by transaction_id — drives "Applied to..." rows
-    // in the passbook. Scope to this subscriber's transactions.
     const txIds = transactions.map((t) => t.id);
     if (txIds.length > 0) {
       const { data: txAllocs } = await (supabase as any)
@@ -291,13 +290,10 @@ export const SubscriberDetail = ({
   useEffect(() => {
     loadPairedDevices();
     loadOutstanding();
-    // Re-run when the transaction set changes so the allocations map and
-    // outstanding-by-sub stay in sync with the passbook content.
+    loadLastClosedAssignments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscriber.id, transactions.length]);
 
-  // Resolve provider names linked to this subscriber's services so the
-  // operator can see WHO is delivering each service without leaving the page.
   useEffect(() => {
     let cancelled = false;
     const ids = [
@@ -324,11 +320,50 @@ export const SubscriberDetail = ({
     return () => { cancelled = true; };
   }, [subscriber.id, (subscriber as any).cable_provider_id, (subscriber as any).internet_provider_id]);
 
+  // ---- derived ---------------------------------------------------------
 
-  // Pre-flight check before opening the destructive delete dialog. The RPC
-  // returns a list of human-readable blockers (active subs, balance owed,
-  // assigned devices, immutable transactions) so operators don't see the
-  // generic "Validation check failed" that bubbles out of the ledger trigger.
+  const sortedTransactions = [...transactions].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  const cableActives = getActives(subscriber, 'cable');
+  const internetActives = getActives(subscriber, 'internet');
+  const cableHistory = getHistory(subscriber, 'cable');
+  const internetHistory = getHistory(subscriber, 'internet');
+  const anyCableActive = hasAnyActive(subscriber, 'cable');
+  const anyInternetActive = hasAnyActive(subscriber, 'internet');
+  const anyActive = anyCableActive || anyInternetActive;
+  const accountStatus = anyActive
+    ? { label: 'Active', tone: 'bg-green-500/10 text-green-700 dark:text-green-400' }
+    : subscriberServices.length > 0
+      ? { label: 'Lapsed', tone: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' }
+      : { label: 'No services', tone: 'bg-muted text-muted-foreground' };
+
+  const cableTransactions = sortedTransactions.filter(
+    (t: any) => (t.service_type || 'cable') === 'cable'
+  );
+  const internetTransactions = sortedTransactions.filter(
+    (t: any) => t.service_type === 'internet'
+  );
+
+  const [txFilter, setTxFilter] = useState<'all' | 'cable' | 'internet'>(
+    showCableTab && !showInternetTab ? 'cable' : showInternetTab && !showCableTab ? 'internet' : 'all'
+  );
+  useEffect(() => {
+    if (activeTab === 'cable' && showCableTab) setTxFilter('cable');
+    else if (activeTab === 'internet' && showInternetTab) setTxFilter('internet');
+  }, [activeTab, showCableTab, showInternetTab]);
+
+  const visibleTransactions =
+    txFilter === 'cable' ? cableTransactions :
+    txFilter === 'internet' ? internetTransactions :
+    sortedTransactions;
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+
+  // ---- handlers --------------------------------------------------------
+
   const openDeleteDialog = async () => {
     setDeleteChecking(true);
     setShowDeleteDialog(true);
@@ -343,117 +378,15 @@ export const SubscriberDetail = ({
       setDeleteBlockers([`Unable to check deletion eligibility — ${reason}. Please try again.`]);
       return;
     }
-    const blockers = (data?.blockers as string[]) || [];
-    setDeleteBlockers(blockers);
+    setDeleteBlockers((data?.blockers as string[]) || []);
   };
-
-
-  // Server-side expiry: useSubscribers now calls the `expire_lapsed_subscriptions`
-  // RPC before every fetch, and an hourly pg_cron job runs the same function.
-  // No client-side lazy cleanup is needed here — the data we receive is already
-  // authoritative. Kept this comment so future contributors don't re-introduce it.
-
-  const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-
-  const getBalanceColor = (balance: number) => {
-    if (balance > 0) return 'text-success';
-    if (balance < 0) return 'text-destructive';
-    return 'text-muted-foreground';
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-IN', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
-  };
-
-  // Phase 4b: active subscriptions are ARRAYS (one entry per active sub).
-  // A subscriber may have multiple active subscriptions on the same service
-  // when they have multiple devices. We render each as its own card; today
-  // the arrays are length 0 or 1 in most flows.
-  const cableActives = getActives(subscriber, 'cable');
-  const internetActives = getActives(subscriber, 'internet');
-  const cableHistory = getHistory(subscriber, 'cable');
-  const internetHistory = getHistory(subscriber, 'internet');
-
-  const anyCableActive = hasAnyActive(subscriber, 'cable');
-  const anyInternetActive = hasAnyActive(subscriber, 'internet');
-
-  // Primary subscriptions used for the overview "Pack" label and provider name.
-  // For a single-device subscriber this is the only active sub; for a
-  // multi-device subscriber this is the most recent active one.
-  const primaryCable = cableActives[0] || null;
-  const primaryInternet = internetActives[0] || null;
-
-  // Overall account status: green if any service is currently active,
-  // amber if the subscriber has services but none are currently active
-  // (lapsed), grey if they've onboarded with no services configured.
-  const anyActive = anyCableActive || anyInternetActive;
-  const accountStatus = anyActive
-    ? { label: 'Active', tone: 'bg-green-500/10 text-green-700 dark:text-green-400' }
-    : subscriberServices.length > 0
-      ? { label: 'Lapsed', tone: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' }
-      : { label: 'No services', tone: 'bg-muted text-muted-foreground' };
-
-  // Per-tab transaction filtering. Legacy rows without service_type are
-  // assumed to be cable so we don't lose history when the column was added.
-  const cableTransactions = sortedTransactions.filter(
-    (t: any) => (t.service_type || 'cable') === 'cable'
-  );
-  const internetTransactions = sortedTransactions.filter(
-    (t: any) => t.service_type === 'internet'
-  );
-
-  // Transactions tab service filter. Defaults sensibly based on which services
-  // are enabled, and auto-pivots when the user navigates from Cable/Internet tab.
-  const [txFilter, setTxFilter] = useState<'all' | 'cable' | 'internet'>(
-    showCableTab && !showInternetTab ? 'cable' : showInternetTab && !showCableTab ? 'internet' : 'all'
-  );
-  useEffect(() => {
-    if (activeTab === 'cable' && showCableTab) setTxFilter('cable');
-    else if (activeTab === 'internet' && showInternetTab) setTxFilter('internet');
-  }, [activeTab, showCableTab, showInternetTab]);
-
-  const visibleTransactions =
-    txFilter === 'cable' ? cableTransactions :
-    txFilter === 'internet' ? internetTransactions :
-    sortedTransactions;
-
-  const openNotes = (transaction: Transaction) => {
-    setNotesTransaction(transaction);
-    setShowNotesDialog(true);
-  };
-
-  const openVoid = (transaction: Transaction) => {
-    setVoidingTransaction(transaction);
-    setShowVoidDialog(true);
-  };
-
-  // Per ADR-011 (hardened, 2026-06-08): transaction rows are fully immutable.
-  // Description and source are frozen along with all financial fields. To add
-  // context after the fact, operators use transaction_notes (append-only).
-  // Voids are handled by VoidTransactionDialog via the void_transaction RPC.
-  //
-  // Per ADR-012 (Phase 1, 2026-06-09): cable_balance / internet_balance are
-  // never written from the client. The transactions_recalc_balance trigger
-  // recomputes them from the immutable ledger on every change.
-
-
 
   const handleCancelSubscription = async (refundAmount: number) => {
-    // Phase 5.1 multi-device fix: pass p_subscription_id so the server
-    // cancels the EXACT subscription the operator clicked on, not the
-    // "latest active for this service" (which would corrupt sibling
-    // device subscriptions).
     if (!cancelTarget) {
       toast.error('No subscription selected to cancel');
       return;
     }
     const label = cancelTarget.service === 'internet' ? 'Internet' : 'Cable';
-
     const { error } = await (supabase as any).rpc('cancel_subscription', {
       p_subscriber_id: subscriber.id,
       p_service_type: cancelTarget.service,
@@ -461,13 +394,11 @@ export const SubscriberDetail = ({
       p_reason: null,
       p_subscription_id: cancelTarget.subscriptionId,
     });
-
     if (error) {
       toast.error(error.message || `Failed to cancel ${label.toLowerCase()} subscription`);
       console.error(error);
       return;
     }
-
     toast.success(refundAmount > 0
       ? `${label} subscription cancelled. Refund: ₹${refundAmount.toFixed(2)}`
       : `${label} subscription cancelled.`);
@@ -476,277 +407,6 @@ export const SubscriberDetail = ({
     onReload?.();
   };
 
-
-  // -----------------------------------------------------------------------
-  // Phase 5.1: per-service "Devices" card. Each paired device gets its own
-  // card with the matched active subscription summary and workflow buttons:
-  //   - Collect Payment (disabled — wired in Phase 5.3)
-  //   - Renew           (opens AddPackageSubscriptionDialog)
-  //   - Replace Device  (disabled — UI in Phase 5.2; RPC already exists)
-  //   - Unpair          (opens UnpairDeviceDialog -> unpair_device RPC)
-  // Pair Device CTA appears at the bottom of the card list. Multi-device
-  // ready: the list grows as more devices are paired to the same service.
-  // -----------------------------------------------------------------------
-  const renderDevicesCard = (service: 'cable' | 'internet') => {
-    const isCable = service === 'cable';
-    const devicesForService = pairedDevices.filter((d) => d.service_type === service);
-    const actives = isCable ? cableActives : internetActives;
-    const balance = isCable
-      ? (subscriber.cable_balance || 0)
-      : ((subscriber as any).internet_balance || 0);
-    const provider = isCable ? providerNames.cable : providerNames.internet;
-    const Icon = isCable ? Tv : Wifi;
-    const title = isCable ? 'Cable' : 'Internet';
-
-    // Unmatched actives = active subscription with no deviceId or with a
-    // deviceId that isn't in our paired list. Render them as ghost cards so
-    // they're never invisible. Multi-device safety net.
-    const matchedActiveIds = new Set(
-      devicesForService
-        .map((d) => actives.find((a) => a.deviceId === d.id)?.subscriptionId)
-        .filter(Boolean) as string[]
-    );
-    const orphanActives = actives.filter(
-      (a) => !a.subscriptionId || !matchedActiveIds.has(a.subscriptionId)
-    );
-
-    return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5" />{title}</CardTitle>
-            <div className="text-xs text-muted-foreground text-right">
-              <p>Provider: <span className="font-medium text-foreground">{provider || '—'}</span></p>
-              <p>
-                Balance:{' '}
-                <span className={`font-medium ${getBalanceColor(balance)}`}>
-                  ₹{Math.abs(balance).toFixed(2)} {balance >= 0 ? 'dues' : 'advance'}
-                </span>
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {devicesForService.length === 0 && orphanActives.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <Icon className="h-8 w-8 mx-auto opacity-40 mb-2" />
-              <p className="text-sm">No device paired</p>
-            </div>
-          ) : (
-            <>
-              {devicesForService.map((dev) => {
-                const sub = actives.find((a) => a.deviceId === dev.id) || null;
-                const daysLeft = sub ? daysUntil(sub.endDate) : null;
-                const subStatus = sub ? getSubscriptionStatus(sub as unknown as SubscriptionEntry) : null;
-
-                return (
-                  <div key={dev.id} className="rounded-lg border p-3 space-y-3">
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-medium">{dev.serial_number}</span>
-                          <Badge variant="outline" className="text-xs uppercase">{dev.device_type}</Badge>
-                        </div>
-                        {sub ? (
-                          <p className="text-sm mt-1">
-                            <span className="text-muted-foreground">Active — </span>
-                            <span className="font-medium">{sub.packName}</span>
-                            {daysLeft !== null && (
-                              <span className={`ml-2 text-xs ${
-                                daysLeft < 0
-                                  ? 'text-destructive'
-                                  : daysLeft <= 3
-                                    ? 'text-yellow-600 dark:text-yellow-400'
-                                    : 'text-muted-foreground'
-                              }`}>
-                                {daysLeft < 0
-                                  ? `Expired ${Math.abs(daysLeft)}d ago`
-                                  : daysLeft === 0
-                                    ? 'Expires today'
-                                    : `${daysLeft}d remaining`}
-                              </span>
-                            )}
-                          </p>
-                        ) : (
-                          <p className="text-sm mt-1 text-muted-foreground">No active subscription</p>
-                        )}
-                      </div>
-                      {sub ? (
-                        <Badge className={
-                          subStatus?.statusColor === 'yellow'
-                            ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/10'
-                            : 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10'
-                        }>
-                          {subStatus?.statusText || 'Active'}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Idle</Badge>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!perms.canCollectPayment}
-                        title={!perms.canCollectPayment ? 'You do not have permission to collect payments' : undefined}
-                        onClick={() => {
-                          // Phase 5.3: bill-first Collect Payment. Pass the
-                          // exact subscription on THIS device card so the
-                          // dialog can show this device's bill at the top.
-                          setCollectTarget({
-                            service,
-                            subscriptionId: sub?.subscriptionId || null,
-                            packName: sub?.packName || null,
-                            outstandingForSubscription:
-                              sub?.subscriptionId
-                                ? (outstandingBySub[sub.subscriptionId] || 0)
-                                : 0,
-                          });
-                        }}
-                      >
-                        <Wallet className="h-3.5 w-3.5 mr-1.5" />Collect
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // Phase 5.1 multi-device fix: pin the renew to THIS device.
-                          setAddPackageService(service);
-                          setAddPackageDeviceId(dev.id);
-                          setShowAddPackage(true);
-                        }}
-                      >
-                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                        {sub ? 'Renew' : 'Subscribe'}
-                      </Button>
-
-                      {perms.canReplaceDevice && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setReplaceDevice(dev)}
-                        >
-                          <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />Replace
-                        </Button>
-                      )}
-
-                      {perms.canPairDevice && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setUnpairDevice(dev)}
-                        >
-                          <Link2Off className="h-3.5 w-3.5 mr-1.5" />Unpair
-                        </Button>
-                      )}
-                    </div>
-
-                    {sub && perms.canCancelSubscription && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-destructive hover:text-destructive"
-                        onClick={() => {
-                          // Phase 5.1 multi-device fix: target the exact
-                          // subscription on this device card.
-                          setCancelTarget({
-                            service,
-                            subscriptionId: sub.subscriptionId,
-                            blob: sub,
-                          });
-                          setShowCancelDialog(true);
-                        }}
-                      >
-                        Cancel Subscription
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-
-              {orphanActives.map((sub) => (
-                <div key={sub.subscriptionId} className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm">
-                  <p className="font-medium">{sub.packName}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Active subscription with no paired device (legacy data). Use the inventory screen to reconcile.
-                  </p>
-                </div>
-              ))}
-            </>
-          )}
-
-          {perms.canPairDevice && (
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full"
-              onClick={() => setPairDialogService(service)}
-            >
-              <Link2 className="h-4 w-4 mr-1.5" />
-              {devicesForService.length === 0 ? 'Pair Device' : 'Pair Another Device'}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // History item rendering — Bug 2 fix. For cancelled subscriptions show the
-  // ACTUAL service period (start_date → cancelled_at) rather than the
-  // originally scheduled validity, and surface the original validity as a
-  // separate reference line so operators see both. Expired subs continue to
-  // use the validity window since end_date IS the actual end for those.
-  const renderHistoryItem = (sub: SubscriptionBlob) => {
-    const start = new Date(sub.startDate);
-    const isCancelled = sub.status === 'cancelled';
-    const cancelledAt = sub.cancelledAt ? new Date(sub.cancelledAt) : null;
-    const scheduledEnd = new Date(sub.endDate);
-    const actualEnd = isCancelled && cancelledAt ? cancelledAt : scheduledEnd;
-    const dayMs = 1000 * 60 * 60 * 24;
-    const actualDays = Math.max(0, Math.floor((actualEnd.getTime() - start.getTime()) / dayMs));
-    const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const fmtShort = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    const statusLabel = isCancelled
-      ? `Cancelled after ${actualDays} day${actualDays === 1 ? '' : 's'}`
-      : sub.status === 'expired' ? 'Expired' : 'Ended';
-    const statusTone = isCancelled
-      ? 'bg-red-500/10 text-red-700 dark:text-red-400'
-      : 'bg-muted text-muted-foreground';
-    return (
-      <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm space-y-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="font-medium">{sub.packName}</span>
-          <span className={`text-xs px-2 py-1 rounded-full ${statusTone}`}>
-            {isCancelled ? 'Cancelled' : 'Expired'}
-          </span>
-        </div>
-        {isCancelled && cancelledAt && (
-          <p className="text-xs text-muted-foreground">
-            Cancelled on <span className="font-medium text-foreground">{fmt(cancelledAt)}</span>
-          </p>
-        )}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <span className="block text-muted-foreground">Original validity</span>
-            <span className="font-medium text-foreground">
-              {fmtShort(start)} – {fmtShort(scheduledEnd)}
-            </span>
-          </div>
-          <div>
-            <span className="block text-muted-foreground">Status</span>
-            <span className="font-medium text-foreground">{statusLabel}</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Tab structure (Batch 3): Overview | Subscriptions | Devices | Ledger | Credentials.
-  // Service-specific per-tab views were consolidated into "Devices" so the
-  // profile scales cleanly as future capabilities (credentials, complaints,
-  // provider integration, field visits) drop in as their own tabs.
   const TABS = [
     { value: 'overview',      label: 'Overview',      icon: User },
     { value: 'subscriptions', label: 'Subscriptions', icon: Calendar },
@@ -757,9 +417,6 @@ export const SubscriberDetail = ({
 
   return (
     <div className="space-y-4">
-      {/* Header — the top-bar breadcrumb handles back navigation, so the
-          Back button was removed in Batch 3. Only workflow-critical actions
-          remain here (Edit / Archive / Delete). */}
       <div className="flex items-center justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} disabled={isArchived}>
           <Edit className="h-4 w-4 mr-2" />
@@ -799,466 +456,92 @@ export const SubscriberDetail = ({
           ))}
         </TabsList>
 
-
-        {/* OVERVIEW TAB — subscriber profile + per-service balance summary */}
         <TabsContent value="overview" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-2xl">{subscriber.name}</CardTitle>
-                  <p className="text-muted-foreground mt-1">
-                    <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded">
-                      ID: {(subscriber as any).subscriber_id || 'N/A'}
-                    </span>
-                  </p>
-                  <p className="text-muted-foreground mt-2">{subscriber.mobile}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1.5">
-                  <span className={`text-xs px-2 py-1 rounded-full ${accountStatus.tone}`}>
-                    {accountStatus.label}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 justify-end">
-                    {subscriberServices.includes('cable') && (
-                      <Badge variant="secondary" className="gap-1"><Tv className="h-3 w-3" />Cable</Badge>
-                    )}
-                    {subscriberServices.includes('internet') && (
-                      <Badge variant="secondary" className="gap-1"><Wifi className="h-3 w-3" />Internet</Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Region/Cluster</p>
-                  <p className="font-medium">{subscriber.region || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Joined</p>
-                  <p className="font-medium">
-                    {(subscriber as any).join_date
-                      ? formatDate((subscriber as any).join_date)
-                      : (subscriber.createdAt ? formatDate(subscriber.createdAt) : 'N/A')}
-                  </p>
-                </div>
-                {subscriber.latitude && subscriber.longitude && (
-                  <div className="md:col-span-2">
-                    <p className="text-sm text-muted-foreground">Location Coordinates</p>
-                    <p className="font-medium">
-                      📍 Lat: {(subscriber.latitude || 0).toFixed(6)}, Long: {(subscriber.longitude || 0).toFixed(6)}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* BUSINESS_MODEL §G1 — overall financial position + per-device breakdown.
-                  The operator must read total + composition without scrolling and
-                  without arithmetic. Labels are mandatory: never raw signed numbers.
-                  §G5 next-action chip is shown alongside the position. */}
-              {(() => {
-                const position = computeOverallPosition(subscriber);
-                const chip = computeNextActionChip(subscriber);
-                const gross = buildGrossComponents(subscriber as any, outstandingBySub, subsById);
-                // Show gross components only when both debt AND credit coexist
-                // (the case where net hides reality). Single-sided positions
-                // are already self-explanatory from the label above.
-                const hasDebt = gross.some((g) => g.kind === 'outstanding');
-                const hasCredit = gross.some((g) => g.kind === 'available_credit' || g.kind === 'service_credit');
-                const showGross = hasDebt && hasCredit;
-                return (
-                  <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Overall position</p>
-                        <p className={`text-2xl font-bold ${positionToneClasses(position.kind)}`}>
-                          {position.label}
-                        </p>
-                        {showGross && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {gross.map((g) => g.label).join(' · ')}
-                          </p>
-                        )}
-                      </div>
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
-                      >
-                        <span aria-hidden>{chip.icon}</span>
-                        {chip.label}
-                      </span>
-                    </div>
-
-                    {/* Per-device composition — one line per active sub per service.
-                        Renders even at zero so the operator sees what makes up Settled. */}
-                    <div className="space-y-2 text-sm">
-                      {position.breakdown.map((svc) => {
-                        const svcLabel = svc.service === 'cable' ? 'Cable TV' : 'Internet';
-                        const ServiceIcon = svc.service === 'cable' ? Tv : Wifi;
-                        const devices = pairedDevices.filter((d) => d.service_type === svc.service);
-                        // Build per-device rows. Match each device to its active sub
-                        // (if any), then use per-sub outstanding when available.
-                        const rows = devices.map((dev) => {
-                          const sub = svc.actives.find((a) => a.deviceId === dev.id);
-                          const outstanding = sub?.subscriptionId
-                            ? (outstandingBySub[sub.subscriptionId] || 0)
-                            : 0;
-                          const daysLeft = sub ? daysUntil(sub.endDate) : null;
-                          let statusText: string;
-                          let statusClass = 'text-muted-foreground';
-                          if (!sub) {
-                            statusText = 'No active subscription';
-                            statusClass = 'text-yellow-700 dark:text-yellow-400';
-                          } else if (daysLeft !== null && daysLeft < 0) {
-                            statusText = `Expired ${Math.abs(daysLeft)}d ago${outstanding > 0 ? ` · ₹${outstanding.toFixed(0)} due` : ''}`;
-                            statusClass = 'text-red-700 dark:text-red-400';
-                          } else if (outstanding > 0) {
-                            statusText = `₹${outstanding.toFixed(0)} due`;
-                            statusClass = 'text-red-700 dark:text-red-400';
-                          } else {
-                            statusText = 'Settled';
-                          }
-                          return {
-                            key: dev.id,
-                            primary: `${dev.serial_number}${sub?.packName ? ` (${sub.packName})` : ''}`,
-                            statusText,
-                            statusClass,
-                          };
-                        });
-                        // Orphan actives (sub with no/unknown device) so we don't hide them.
-                        svc.actives
-                          .filter((a) => !a.deviceId || !devices.some((d) => d.id === a.deviceId))
-                          .forEach((a) => {
-                            const outstanding = a.subscriptionId
-                              ? (outstandingBySub[a.subscriptionId] || 0)
-                              : 0;
-                            rows.push({
-                              key: a.subscriptionId,
-                              primary: `${a.packName} (no device)`,
-                              statusText: outstanding > 0 ? `₹${outstanding.toFixed(0)} due` : 'Settled',
-                              statusClass: outstanding > 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
-                            });
-                          });
-                        // Net per-service balance label (using §G1 vocab).
-                        const svcNet = svc.balance;
-                        const svcSummary =
-                          svcNet > 0 ? `Outstanding ₹${svcNet.toFixed(0)}` :
-                          svcNet < 0 ? `Available Credit ₹${Math.abs(svcNet).toFixed(0)}` :
-                          'Settled';
-                        return (
-                          <div key={svc.service} className="rounded-md bg-background/60 p-3 border">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                                <ServiceIcon className="h-3.5 w-3.5" /> {svcLabel}
-                              </div>
-                              <span className={`text-xs font-medium ${positionToneClasses(svcNet > 0 ? 'outstanding' : svcNet < 0 ? 'available_credit' : 'settled')}`}>
-                                {svcSummary}
-                              </span>
-                            </div>
-                            {rows.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">No device paired</p>
-                            ) : (
-                              <ul className="space-y-0.5">
-                                {rows.map((r) => (
-                                  <li key={r.key} className="flex items-center justify-between gap-2 text-xs">
-                                    <span className="font-mono truncate">{r.primary}</span>
-                                    <span className={`shrink-0 ${r.statusClass}`}>{r.statusText}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Provider:{' '}
-                      {showCableTab && <span className="mr-2"><Tv className="inline h-3 w-3 mr-0.5" />{providerNames.cable || '—'}</span>}
-                      {showInternetTab && <span><Wifi className="inline h-3 w-3 mr-0.5" />{providerNames.internet || '—'}</span>}
-                    </p>
-                  </div>
-                );
-              })()}
-
-
-            </CardContent>
-          </Card>
-
-          {/* Asset Timeline now lives on the Devices tab (Batch 3) — one
-              home for currently-paired devices and previous-device history. */}
-
-
-
-          {/* Item #8 — Add Service: regression fix for Phase 5.1 removal of the
-              services[] checkboxes from EditSubscriberDialog. Only shown when
-              the customer is missing a globally-enabled service category. */}
-          {(() => {
-            const missing: ('cable' | 'internet')[] = [];
-            if (cableEnabled && !subscriberServices.includes('cable')) missing.push('cable');
-            if (internetEnabled && !subscriberServices.includes('internet')) missing.push('internet');
-            if (missing.length === 0 || isArchived) return null;
-            return (
-              <Card>
-                <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">Add another service</p>
-                    <p className="text-xs text-muted-foreground">
-                      This customer does not have {missing.map((m) => (m === 'cable' ? 'Cable TV' : 'Internet')).join(' or ')} yet.
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {missing.map((svc) => {
-                      const SvcIcon = svc === 'cable' ? Tv : Wifi;
-                      return (
-                        <Button
-                          key={svc}
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAddServiceTarget(svc)}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          <SvcIcon className="h-4 w-4 mr-1" />
-                          Add {svc === 'cable' ? 'Cable TV' : 'Internet'}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
+          <OverviewTab
+            subscriber={subscriber}
+            subscriberServices={subscriberServices}
+            accountStatus={accountStatus}
+            showCableTab={showCableTab}
+            showInternetTab={showInternetTab}
+            cableEnabled={cableEnabled}
+            internetEnabled={internetEnabled}
+            isArchived={isArchived}
+            pairedDevices={pairedDevices}
+            outstandingBySub={outstandingBySub}
+            subsById={subsById}
+            providerNames={providerNames}
+            formatDate={formatDate}
+            onAddServiceRequest={(svc) => setAddServiceTarget(svc)}
+          />
         </TabsContent>
 
-        {/* SUBSCRIPTIONS TAB — consolidated timeline across services. Active
-            packs, cancellations, expirations. Renew/Cancel actions still
-            live on device cards in the Devices tab (they are per-device). */}
         <TabsContent value="subscriptions" className="space-y-4 mt-4">
-          {[
-            { key: 'cable' as const, show: showCableTab, actives: cableActives, history: cableHistory, label: 'Cable', Icon: Tv },
-            { key: 'internet' as const, show: showInternetTab, actives: internetActives, history: internetHistory, label: 'Internet', Icon: Wifi },
-          ].filter(g => g.show).map(g => (
-            <Card key={g.key}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <g.Icon className="h-4 w-4" /> {g.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {g.actives.length === 0 && g.history.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No subscriptions on record.</p>
-                ) : (
-                  <>
-                    {g.actives.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Active</p>
-                        {g.actives.map((sub) => {
-                          const daysLeft = daysUntil(sub.endDate);
-                          return (
-                            <div key={sub.subscriptionId} className="rounded-lg border p-3 text-sm">
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="font-medium">{sub.packName}</span>
-                                <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/10">
-                                  {daysLeft !== null && daysLeft < 0
-                                    ? `Expired ${Math.abs(daysLeft)}d ago`
-                                    : daysLeft === 0 ? 'Expires today'
-                                    : `${daysLeft}d remaining`}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {new Date(sub.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                {' → '}
-                                {new Date(sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                {sub.stbNumber && <> · <span className="font-mono">{sub.stbNumber}</span></>}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {g.history.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">History</p>
-                        {g.history
-                          .slice()
-                          .sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
-                          .map((sub) => renderHistoryItem(sub))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+          <SubscriptionsTab
+            showCableTab={showCableTab}
+            showInternetTab={showInternetTab}
+            cableActives={cableActives}
+            internetActives={internetActives}
+            cableHistory={cableHistory}
+            internetHistory={internetHistory}
+          />
         </TabsContent>
 
-        {/* DEVICES TAB — per-device cards for every enabled service, plus
-            Customer History (previous devices). Replace / Unpair / Renew /
-            Collect actions live on each device card. */}
         <TabsContent value="devices" className="space-y-4 mt-4">
-          {showCableTab && renderDevicesCard('cable')}
-          {showInternetTab && renderDevicesCard('internet')}
-          <AssetTimelineCustomer subscriberId={subscriber.id} />
+          <DevicesTab
+            subscriber={subscriber}
+            showCableTab={showCableTab}
+            showInternetTab={showInternetTab}
+            pairedDevices={pairedDevices}
+            cableActives={cableActives}
+            internetActives={internetActives}
+            outstandingBySub={outstandingBySub}
+            providerNames={providerNames}
+            lastClosedByService={lastClosedByService}
+            perms={{
+              canCollectPayment: perms.canCollectPayment,
+              canReplaceDevice: perms.canReplaceDevice,
+              canPairDevice: perms.canPairDevice,
+              canCancelSubscription: perms.canCancelSubscription,
+            }}
+            onCollect={(t) => setCollectTarget(t)}
+            onRenew={(service, deviceId) => {
+              setAddPackageService(service);
+              setAddPackageDeviceId(deviceId);
+              setShowAddPackage(true);
+            }}
+            onReplace={(dev) => setReplaceDevice(dev)}
+            onUnpair={(dev) => setUnpairDevice(dev)}
+            onCancel={(t) => { setCancelTarget(t); setShowCancelDialog(true); }}
+            onPair={(service) => setPairDialogService(service)}
+          />
         </TabsContent>
 
-        {/* LEDGER TAB — passbook. Business-event language, running balance. */}
         <TabsContent value="ledger" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap justify-between items-center gap-3">
-                <CardTitle>Ledger</CardTitle>
-                <div className="flex items-center gap-2">
-                  {(showCableTab || showInternetTab) && (
-                    <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
-                      <Button
-                        type="button"
-                        variant={txFilter === 'all' ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="h-7 px-3"
-                        onClick={() => setTxFilter('all')}
-                      >
-                        All
-                      </Button>
-                      {showCableTab && (
-                        <Button
-                          type="button"
-                          variant={txFilter === 'cable' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className="h-7 px-3"
-                          onClick={() => setTxFilter('cable')}
-                        >
-                          <Tv className="h-3.5 w-3.5 mr-1" />Cable
-                        </Button>
-                      )}
-                      {showInternetTab && (
-                        <Button
-                          type="button"
-                          variant={txFilter === 'internet' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className="h-7 px-3"
-                          onClick={() => setTxFilter('internet')}
-                        >
-                          <Wifi className="h-3.5 w-3.5 mr-1" />Internet
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const rawTxs: LedgerRawTransaction[] = transactions.map((t: any) => ({
-                        id: t.id,
-                        date: t.date,
-                        type: t.type,
-                        amount: Number(t.amount) || 0,
-                        description: t.description ?? null,
-                        service_type: (t.service_type as any) ?? null,
-                        source: t.source ?? 'manual_charge',
-                        status: t.status ?? 'posted',
-                        payment_method: t.payment_method ?? null,
-                        subscription_id: t.subscription_id ?? null,
-                        reverses_transaction_id: t.reverses_transaction_id ?? null,
-                        void_reason: t.void_reason ?? null,
-                        void_reason_code: t.void_reason_code ?? null,
-                      }));
-                      const entries = buildLedgerEntries(rawTxs, subsById, allocByTx);
-                      const position = computeOverallPosition(subscriber);
-                      const gross = buildGrossComponents(
-                        subscriber as any,
-                        outstandingBySub,
-                        subsById,
-                      );
-                      generateAccountStatementPDF({
-                        subscriber,
-                        entries,
-                        positionLabel: position.label,
-                        grossComponents: gross,
-                        company: companyForPdf,
-                      });
-                    }}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Statement
-                  </Button>
-                  <Button onClick={() => setShowAddTransaction(true)} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Transaction
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const rawTxs: LedgerRawTransaction[] = visibleTransactions.map((t: any) => ({
-                  id: t.id,
-                  date: t.date,
-                  type: t.type,
-                  amount: Number(t.amount) || 0,
-                  description: t.description ?? null,
-                  service_type: (t.service_type as any) ?? null,
-                  source: t.source ?? 'manual_charge',
-                  status: t.status ?? 'posted',
-                  payment_method: t.payment_method ?? null,
-                  subscription_id: t.subscription_id ?? null,
-                  reverses_transaction_id: t.reverses_transaction_id ?? null,
-                  void_reason: t.void_reason ?? null,
-                  void_reason_code: t.void_reason_code ?? null,
-                }));
-                const entries = buildLedgerEntries(rawTxs, subsById, allocByTx);
-                return (
-                  <TransactionLedger
-                    entries={entries}
-                    onOpenNotes={(txId) => {
-                      const tx = transactions.find((t) => t.id === txId);
-                      if (tx) openNotes(tx);
-                    }}
-                    onVoid={(txId) => {
-                      const tx = transactions.find((t) => t.id === txId);
-                      if (tx) openVoid(tx);
-                    }}
-                    canVoid={(e) =>
-                      perms.canVoidTransaction &&
-                      !e.voided &&
-                      e.kind !== 'subscription_activated' &&
-                      e.kind !== 'subscription_renewed' &&
-                      e.kind !== 'subscription_refund'
-                    }
-                  />
-                );
-              })()}
-            </CardContent>
-          </Card>
+          <LedgerTab
+            subscriber={subscriber}
+            transactions={transactions}
+            visibleTransactions={visibleTransactions}
+            subsById={subsById}
+            allocByTx={allocByTx}
+            outstandingBySub={outstandingBySub}
+            companyForPdf={companyForPdf}
+            perms={{ canVoidTransaction: perms.canVoidTransaction }}
+            showCableTab={showCableTab}
+            showInternetTab={showInternetTab}
+            txFilter={txFilter}
+            setTxFilter={setTxFilter}
+            onAddTransaction={() => setShowAddTransaction(true)}
+            onOpenNotes={(tx) => { setNotesTransaction(tx); setShowNotesDialog(true); }}
+            onVoid={(tx) => { setVoidingTransaction(tx); setShowVoidDialog(true); }}
+          />
         </TabsContent>
 
-        {/* CREDENTIALS TAB — placeholder in Batch 3. The technician
-            credentials workstream (encrypted BSNL PPPoE, ONU admin, etc.)
-            ships as an independent phase; the tab exists now so it drops
-            in without another profile redesign. */}
         <TabsContent value="credentials" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-4 w-4" /> Technician Credentials
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <FileText className="h-8 w-8 mx-auto text-muted-foreground/60 mb-3" />
-                <p className="text-sm font-medium">
-                  Technician credentials will appear here once configured.
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                  PPPoE username, ONU admin, telephone number and other subscriber-scoped
-                  credentials for field engineers ship in a later phase.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <CredentialsTab />
         </TabsContent>
       </Tabs>
+
+      {/* ---- dialogs ---------------------------------------------------- */}
 
       <AddTransactionDialog
         open={showAddTransaction}
@@ -1308,7 +591,7 @@ export const SubscriberDetail = ({
           subscriberId={subscriber.id}
           subscriberName={subscriber.name}
           service={pairDialogService}
-          onPaired={() => { loadPairedDevices(); onReload?.(); }}
+          onPaired={() => { loadPairedDevices(); loadLastClosedAssignments(); onReload?.(); }}
         />
       )}
 
@@ -1317,7 +600,7 @@ export const SubscriberDetail = ({
         onOpenChange={(o) => { if (!o) setUnpairDevice(null); }}
         subscriberId={subscriber.id}
         device={unpairDevice}
-        onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); onReload?.(); }}
+        onUnpaired={() => { setUnpairDevice(null); loadPairedDevices(); loadLastClosedAssignments(); onReload?.(); }}
       />
 
       <ReplaceDeviceDialog
@@ -1330,6 +613,7 @@ export const SubscriberDetail = ({
           setReplaceDevice(null);
           loadPairedDevices();
           loadOutstanding();
+          loadLastClosedAssignments();
           onReload?.();
         }}
       />
@@ -1339,7 +623,7 @@ export const SubscriberDetail = ({
         onOpenChange={setShowArchiveDialog}
         subscriber={subscriber as any}
         outstandingTotal={(subscriber.cable_balance || 0) + ((subscriber as any).internet_balance || 0)}
-        activeSubscriptionCount={pairedDevices.length /* approximate; archive RPC re-counts authoritatively */}
+        activeSubscriptionCount={pairedDevices.length}
         onArchived={() => { onReload?.(); onBack?.(); }}
       />
       <ReactivateCustomerDialog
@@ -1372,7 +656,6 @@ export const SubscriberDetail = ({
         />
       )}
 
-
       {cancelTarget && (
         <CancelSubscriptionDialog
           open={showCancelDialog}
@@ -1382,7 +665,6 @@ export const SubscriberDetail = ({
         />
       )}
 
-      {/* Item #8 — confirm adding a new service category to this subscriber. */}
       <AlertDialog
         open={!!addServiceTarget}
         onOpenChange={(o) => { if (!o && !addingService) setAddServiceTarget(null); }}
@@ -1409,13 +691,7 @@ export const SubscriberDetail = ({
                 try {
                   const next = Array.from(new Set([...(subscriberServices || []), addServiceTarget]));
                   const result = await onEdit({ services: next } as any);
-                  // onEdit returns false when the DB write is rejected (e.g. by an
-                  // invariants trigger). Treat only an explicit `false` as failure —
-                  // legacy callers return void, which we optimistically accept.
-                  if (result === false) {
-                    // The hook already surfaced a specific error toast.
-                    return;
-                  }
+                  if (result === false) return;
                   toast.success(`${addServiceTarget === 'cable' ? 'Cable TV' : 'Internet'} added`);
                   setAddServiceTarget(null);
                   setActiveTab(addServiceTarget);
