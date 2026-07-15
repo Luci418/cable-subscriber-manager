@@ -195,6 +195,25 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     return activeSubs > 0 ? revenuePrev / activeSubs : 0;
   })();
 
+  // Subscriptions expiring in the next 7 days (across scoped services).
+  // Operators check this daily — it drives renewal nudges.
+  const expiring7d = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now + 7 * 86400000;
+    let count = 0;
+    subsScoped.forEach((s) => {
+      const actives: any[] = [];
+      if (service !== 'internet') actives.push(...((s as any)._activeCable || []));
+      if (service !== 'cable') actives.push(...((s as any)._activeInternet || []));
+      actives.forEach((a) => {
+        if (!a?.endDate) return;
+        const t = +new Date(a.endDate);
+        if (t >= now && t <= cutoff) count++;
+      });
+    });
+    return count;
+  }, [subsScoped, service]);
+
   // ---------- time series ----------
   const timeseries = useMemo(() => {
     const days = eachDayOfInterval({ start: range.from, end: range.to });
