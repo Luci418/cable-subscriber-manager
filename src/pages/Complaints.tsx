@@ -9,9 +9,9 @@ import { Badge }         from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus } from 'lucide-react';
 import { useAuth }       from '@/hooks/useAuth';
-import { useSubscribers } from '@/hooks/useSubscribers';
 import { useComplaints }  from '@/hooks/useComplaints';
 import { toast }          from 'sonner';
+import { SubscriberCombobox, type SubscriberComboboxValue } from '@/components/ui-ext';
 
 interface ComplaintsProps {
   onBack: () => void;
