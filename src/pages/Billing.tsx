@@ -344,6 +344,27 @@ export const Billing = () => {
         description="Overdue balances and subscriptions expiring in the next 7 days. Act top-down."
         className="mb-6"
         padded={false}
+        actions={
+          bothEnabled ? (
+            <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+              {(['all', 'cable', 'internet'] as ServiceFilter[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setNeedsServiceFilter(v)}
+                  className={
+                    'px-3 py-1.5 transition-colors ' +
+                    (needsServiceFilter === v
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-transparent hover:bg-accent/40 text-muted-foreground')
+                  }
+                >
+                  {v === 'all' ? 'Both' : v === 'cable' ? 'Cable' : 'Internet'}
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
       >
         {needsAttention.length === 0 ? (
           <EmptyState
@@ -398,12 +419,12 @@ export const Billing = () => {
       <SectionCard title="All service lines" padded={false}>
         <Toolbar
           searchValue={q}
-          onSearchChange={(v) => setParam('q', v)}
+          onSearchChange={(v) => { setParam('q', v); setWorklistPage(1); }}
           searchPlaceholder="Search name, mobile, ID, pack…"
           filters={
             <>
               {bothEnabled && (
-                <Select value={service} onValueChange={(v) => setParam('service', v)}>
+                <Select value={service} onValueChange={(v) => { setParam('service', v); setWorklistPage(1); }}>
                   <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="Service" />
                   </SelectTrigger>
@@ -414,7 +435,7 @@ export const Billing = () => {
                   </SelectContent>
                 </Select>
               )}
-              <Select value={status} onValueChange={(v) => setParam('status', v)}>
+              <Select value={status} onValueChange={(v) => { setParam('status', v); setWorklistPage(1); }}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -437,18 +458,30 @@ export const Billing = () => {
             description="Adjust the filters or search to see other lines."
           />
         ) : (
-          <DataTable
-            rows={worklist}
-            rowKey={(l) => l.key}
-            columns={columns}
-            rowActions={(l) =>
-              l.balance > 0 ? (
-                <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
-                  <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
-                </Button>
-              ) : null
-            }
-          />
+          <>
+            <DataTable
+              rows={worklist.slice(
+                (worklistPage - 1) * WORKLIST_PAGE_SIZE,
+                worklistPage * WORKLIST_PAGE_SIZE,
+              )}
+              rowKey={(l) => l.key}
+              columns={columns}
+              rowActions={(l) =>
+                l.balance > 0 ? (
+                  <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
+                    <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
+                  </Button>
+                ) : null
+              }
+            />
+            <Pagination
+              page={worklistPage}
+              pageSize={WORKLIST_PAGE_SIZE}
+              total={worklist.length}
+              label="service lines"
+              onPageChange={setWorklistPage}
+            />
+          </>
         )}
       </SectionCard>
 
