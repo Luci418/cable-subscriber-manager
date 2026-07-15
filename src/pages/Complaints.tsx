@@ -58,11 +58,8 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    const subscriberDisplayId = formData.get('subscriberId') as string;
-    const subscriber = subscribers.find((s) => s.subscriber_id === subscriberDisplayId);
-
-    if (!subscriber) {
-      toast.error('Subscriber not found');
+    if (!pickedSubscriber) {
+      toast.error('Please select a subscriber');
       return;
     }
 
@@ -76,7 +73,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
     }
 
     const created = await addComplaint({
-      subscriber_id: subscriber.id,
+      subscriber_id: pickedSubscriber.id,
       description,
       category,
       priority,
@@ -85,6 +82,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
     if (created) {
       toast.success('Complaint registered successfully');
       setShowAddDialog(false);
+      setPickedSubscriber(null);
       e.currentTarget.reset();
     }
   };
