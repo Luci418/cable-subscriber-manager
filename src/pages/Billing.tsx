@@ -174,13 +174,14 @@ export const Billing = () => {
     () =>
       bySvc
         .filter((l) => l.isOverdue || l.isExpiring)
+        .filter((l) => needsServiceFilter === 'all' || l.service === needsServiceFilter)
         .sort((a, b) => {
           // Overdue first, then soonest-expiring, then largest balance
           if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
           if (a.isExpiring && b.isExpiring) return (a.daysUntil ?? 999) - (b.daysUntil ?? 999);
           return b.balance - a.balance;
         }),
-    [bySvc],
+    [bySvc, needsServiceFilter],
   );
 
   const worklist = useMemo(() => {
