@@ -19,7 +19,6 @@ interface ComplaintsProps {
 
 export const Complaints = ({ onBack }: ComplaintsProps) => {
   const { user } = useAuth();
-  const { subscribers } = useSubscribers(user?.id);
   const { complaints, loading, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
 
   const [filteredComplaints, setFilteredComplaints] = useState(complaints);
@@ -28,6 +27,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   const [selectedComplaint, setSelectedComplaint] = useState<(typeof complaints)[0] | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [pickedSubscriber, setPickedSubscriber] = useState<SubscriberComboboxValue | null>(null);
 
   useEffect(() => {
     filterComplaints();
