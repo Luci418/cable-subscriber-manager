@@ -929,8 +929,10 @@ interface KpiCardProps {
   tone?: 'success' | 'danger';
   negativeAware?: boolean;
   value_?: number;
+  /** When provided, the card becomes a clickable link to a filtered view. */
+  to?: string;
 }
-const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, negativeAware, value_ }: KpiCardProps) => {
+const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, negativeAware, value_, to }: KpiCardProps) => {
   const up = delta > 0.5;
   const down = delta < -0.5;
   const flat = !up && !down;
@@ -938,11 +940,14 @@ const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, neg
     : tone === 'success' ? 'text-success'
     : negativeAware && (value_ ?? 0) < 0 ? 'text-destructive'
     : 'text-foreground';
-  return (
-    <Card>
+  const inner = (
+    <Card className={cn(to && 'transition-shadow hover:shadow-md cursor-pointer h-full')}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <div className="text-muted-foreground">{icon}</div>
+        <div className="text-muted-foreground flex items-center gap-1">
+          {icon}
+          {to && <ArrowRight className="h-3 w-3 opacity-40" />}
+        </div>
       </CardHeader>
       <CardContent>
         <div className={cn('text-xl sm:text-2xl font-bold', valColor)}>{value}</div>
@@ -966,6 +971,7 @@ const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, neg
       </CardContent>
     </Card>
   );
+  return to ? <Link to={to} className="block">{inner}</Link> : inner;
 };
 
 interface DistroPieProps {
