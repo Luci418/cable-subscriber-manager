@@ -182,19 +182,12 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
             </DialogHeader>
             <form onSubmit={handleAddComplaint} className="space-y-4">
               <div>
-                <Label htmlFor="subscriberId">Subscriber</Label>
-                <Select name="subscriberId" required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select subscriber" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subscribers.map((s) => (
-                      <SelectItem key={s.id} value={s.subscriber_id}>
-                        {s.name} — {s.subscriber_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Subscriber</Label>
+                <SubscriberCombobox
+                  value={pickedSubscriber}
+                  onChange={setPickedSubscriber}
+                  placeholder="Search a subscriber…"
+                />
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>
