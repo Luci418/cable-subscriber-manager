@@ -557,27 +557,28 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         </Card>
       </div>
 
-      {/* KPI scorecards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Revenue" value={inr(revenue)} delta={pct(revenue, revenuePrev)}
-          icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(revenuePrev)} />
-        <KpiCard label="Net (Rev − Charges)" value={inr(net)} delta={pct(net, netPrev)}
-          icon={<TrendingUp className="h-4 w-4" />} compare={compare} prevLabel={inr(netPrev)} negativeAware value_={net} />
-        <KpiCard label="Outstanding" value={inr(outstanding)} delta={0}
+      {/* Operational KPI scorecards — 6 metrics operators act on daily. Clickable → filtered destinations. */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3">
+        <KpiCard label="Active Subscribers" value={activeSubs.toLocaleString('en-IN')} delta={0}
+          icon={<Users className="h-4 w-4" />} compare={false} sub={`${subsScoped.length} total`}
+          to="/customers?status=active" />
+        <KpiCard label="Collected vs Charged" value={`${inr(revenue)} / ${inr(charges)}`} delta={pct(revenue, revenuePrev)}
+          icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(revenuePrev)}
+          to="/billing" />
+        <KpiCard label="Collection Rate" value={`${collectionEff.toFixed(0)}%`}
+          delta={pct(collectionEff, collectionEffPrev)} icon={<Percent className="h-4 w-4" />}
+          compare={compare} prevLabel={`${collectionEffPrev.toFixed(0)}%`}
+          to="/billing" />
+        <KpiCard label="Expiring in 7 days" value={expiring7d.toLocaleString('en-IN')} delta={0}
+          icon={<Clock className="h-4 w-4" />} compare={false}
+          sub="Renewals to nudge"
+          tone={expiring7d > 0 ? 'danger' : undefined}
+          to="/billing?status=expiring" />
+        <KpiCard label="Outstanding Balance" value={inr(outstanding)} delta={0}
           icon={<Wallet className="h-4 w-4" />} compare={false}
           sub={outstanding > 0 ? 'Due from subscribers' : 'Credit with subscribers'}
-          tone={outstanding > 0 ? 'danger' : 'success'} />
-        <KpiCard label="Collection Efficiency" value={`${collectionEff.toFixed(0)}%`}
-          delta={pct(collectionEff, collectionEffPrev)} icon={<Percent className="h-4 w-4" />}
-          compare={compare} prevLabel={`${collectionEffPrev.toFixed(0)}%`} />
-        <KpiCard label="Active Subscribers" value={activeSubs.toLocaleString('en-IN')} delta={0}
-          icon={<Users className="h-4 w-4" />} compare={false} sub={`${subsScoped.length} total`} />
-        <KpiCard label="New Subscribers" value={newSubs.toLocaleString('en-IN')}
-          delta={pct(newSubs, newSubsPrev)} icon={<UserPlus className="h-4 w-4" />}
-          compare={compare} prevLabel={`${newSubsPrev} prev`} />
-        <KpiCard label="Churned (Expired)" value={churned.toLocaleString('en-IN')} delta={0}
-          icon={<UserMinus className="h-4 w-4" />} compare={false}
-          sub="Subscriptions expired in range" tone={churned > 0 ? 'danger' : undefined} />
+          tone={outstanding > 0 ? 'danger' : 'success'}
+          to="/customers?balance=dues" />
         <KpiCard label="ARPU" value={inr(arpu)} delta={pct(arpu, arpuPrev)}
           icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(arpuPrev)}
           sub="Avg revenue per active sub" />
