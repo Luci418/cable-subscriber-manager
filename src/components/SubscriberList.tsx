@@ -1,19 +1,9 @@
-import { useState } from 'react';
-import { Subscriber } from '@/lib/storage';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv, Building, MoreHorizontal, Wallet, RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Settings2, Upload, Download, HardDrive, Package, MapPin, Wifi, Tv, Building } from 'lucide-react';
-import { useEnabledServices } from '@/hooks/useEnabledServices';
-import { computeNextActionChip, chipToneClasses } from '@/lib/financialPosition';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +12,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { PageHeader, Toolbar, DataTable, EmptyState, Pagination, Money, SectionCard, type DataTableColumn } from '@/components/ui-ext';
+import { useAuth } from '@/hooks/useAuth';
+import { useEnabledServices } from '@/hooks/useEnabledServices';
+import { useRegions } from '@/hooks/useRegions';
+import { useSubscribersPaged, type ServiceFilter, type StatusFilter, type BalanceFilter } from '@/hooks/useSubscribersPaged';
+import { computeNextActionChip, chipToneClasses } from '@/lib/financialPosition';
+import { CollectPaymentDialog } from '@/components/CollectPaymentDialog';
+import type { Subscriber } from '@/hooks/useSubscribers';
 
 interface SubscriberListProps {
-  subscribers: Subscriber[];
   onSelectSubscriber: (id: string) => void;
   onAddNew: () => void;
   onExport: () => void;
@@ -33,13 +30,20 @@ interface SubscriberListProps {
   onManageRegions: () => void;
   onManageProviders: () => void;
   onManageStbs: () => void;
-  initialPackFilter?: string;
-  initialRegionFilter?: string;
-  initialBalanceFilter?: string;
+  /** Bumped by the parent (e.g. after import) to force refetch. */
+  refreshKey?: number;
 }
 
+const PAGE_SIZE = 50;
+
+/**
+ * SubscriberList (Batch B rewrite).
+ *
+ * Server-paginated, URL-bound filters, DataTable-based rows with inline
+ * primary actions (Collect / Renew) and an overflow menu for less-frequent
+ * ones. Replaces the card grid + client-side filter loop.
+ */
 export const SubscriberList = ({
-  subscribers,
   onSelectSubscriber,
   onAddNew,
   onExport,
@@ -48,360 +52,342 @@ export const SubscriberList = ({
   onManageRegions,
   onManageProviders,
   onManageStbs,
-  initialPackFilter,
-  initialRegionFilter,
-  initialBalanceFilter,
+  refreshKey = 0,
 }: SubscriberListProps) => {
+  const { user } = useAuth();
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
-  const [search, setSearch] = useState('');
-  const [packFilter, setPackFilter] = useState<string>(initialPackFilter || 'all');
-  const [regionFilter, setRegionFilter] = useState<string>(initialRegionFilter || 'all');
-  const [balanceFilter, setBalanceFilter] = useState<string>(initialBalanceFilter || 'all');
-  // Item 5 — next-action chip filter. Lets an operator narrow the list to
-  // just the rows that need today's attention without scrolling.
-  const [actionFilter, setActionFilter] = useState<'all' | 'collect' | 'renew' | 'expiring' | 'settled'>('all');
+  const { regions } = useRegions(user?.id);
+  const [params, setParams] = useSearchParams();
 
-  // Batch B: derive available pack filter values from active subscriptions
-  // (both services) instead of the retired current_pack cached label.
-  const packs = Array.from(new Set(
-    subscribers.flatMap(s => {
-      const sAny = s as any;
-      const cable = (sAny._activeCable || []).map((a: any) => a?.packName).filter(Boolean);
-      const inet  = (sAny._activeInternet || []).map((a: any) => a?.packName).filter(Boolean);
-      return [...cable, ...inet];
-    })
-  ));
-  const regions = Array.from(new Set(subscribers.map(s => s.region).filter(Boolean)));
+  const search = params.get('q') ?? '';
+  const service = (params.get('service') ?? 'all') as ServiceFilter;
+  const region = params.get('region') ?? 'all';
+  const status = (params.get('status') ?? 'active') as StatusFilter;
+  const balance = (params.get('balance') ?? 'all') as BalanceFilter;
+  const page = Math.max(1, Number(params.get('page') ?? '1'));
 
-  // Phase 5.6 — hide archived customers from the day-to-day worklist.
-  // They remain in analytics, mobile search by mobile number, and the
-  // reactivation workflow (open via search; we expose a toggle below).
-  const [showArchived, setShowArchived] = useState(false);
+  const setParam = (key: string, value: string | null, resetPage = true) => {
+    const next = new URLSearchParams(params);
+    if (value == null || value === '' || (key !== 'q' && value === 'all')) next.delete(key);
+    else next.set(key, value);
+    if (resetPage) next.delete('page');
+    setParams(next, { replace: true });
+  };
+  const setPage = (p: number) => {
+    const next = new URLSearchParams(params);
+    if (p <= 1) next.delete('page');
+    else next.set('page', String(p));
+    setParams(next, { replace: true });
+  };
 
-  const filteredSubscribers = subscribers.filter(s => {
-    if (!showArchived && (s as any).customer_status === 'archived') {
-      // Allow archived rows through only when the search explicitly matches —
-      // mobile lookup must still find them.
-      const term = search.toLowerCase().trim();
-      const matchesArchivedBySearch = term &&
-        (s.name.toLowerCase().includes(term) ||
-         s.mobile.toLowerCase().includes(term));
-      if (!matchesArchivedBySearch) return false;
-    }
-    const searchLower = search.toLowerCase().trim();
-    const stbNum = (s as any).stb_number || '';
-    const sAnyFilter = s as any;
-    const activePacks: string[] = [
-      ...((sAnyFilter._activeCable || []).map((a: any) => a?.packName).filter(Boolean)),
-      ...((sAnyFilter._activeInternet || []).map((a: any) => a?.packName).filter(Boolean)),
-    ];
-
-    const matchesSearch = !searchLower ||
-      s.name.toLowerCase().includes(searchLower) ||
-      s.mobile.toLowerCase().includes(searchLower) ||
-      stbNum.toLowerCase().includes(searchLower) ||
-      s.id.toLowerCase().includes(searchLower);
-
-    const matchesPack = packFilter === 'all' || activePacks.includes(packFilter);
-    const matchesRegion = regionFilter === 'all' || s.region === regionFilter;
-
-    const totalBalance = (s.cable_balance || 0) + ((s as any).internet_balance || 0);
-    let matchesBalance = true;
-    if (balanceFilter === 'positive') matchesBalance = totalBalance > 0;
-    else if (balanceFilter === 'negative') matchesBalance = totalBalance < 0;
-    else if (balanceFilter === 'zero') matchesBalance = totalBalance === 0;
-
-    // Action-chip filter (Item 5). We re-compute the chip here so list
-    // filtering stays consistent with the chip rendered on each card.
-    let matchesAction = true;
-    if (actionFilter !== 'all') {
-      const chipLabel = computeNextActionChip(s).label.toLowerCase();
-      if (actionFilter === 'collect')  matchesAction = chipLabel.startsWith('collect');
-      else if (actionFilter === 'renew')    matchesAction = chipLabel.startsWith('renew');
-      else if (actionFilter === 'expiring') matchesAction = chipLabel.includes('renewal due');
-      else if (actionFilter === 'settled')  matchesAction = chipLabel === 'no action required';
-    }
-
-    return matchesSearch && matchesPack && matchesRegion && matchesBalance && matchesAction;
+  const { rows, total, loading } = useSubscribersPaged({
+    userId: user?.id,
+    search,
+    service,
+    region,
+    status,
+    balance,
+    page,
+    pageSize: PAGE_SIZE,
+    refreshKey,
   });
 
-  const getBalanceColor = (balance: number) => {
-    if (balance > 0) return 'text-success';
-    if (balance < 0) return 'text-destructive';
-    return 'text-muted-foreground';
+  const [collect, setCollect] = useState<{
+    sub: Subscriber;
+    service: 'cable' | 'internet';
+    balance: number;
+  } | null>(null);
+
+  const columns: DataTableColumn<Subscriber>[] = useMemo(() => {
+    const cols: DataTableColumn<Subscriber>[] = [
+      {
+        id: 'who',
+        header: 'Subscriber',
+        cell: (s) => (
+          <div className="min-w-0">
+            <div className="font-medium truncate">{s.name}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              <span className="font-mono">{(s as any).subscriber_id}</span>
+              {s.mobile ? ` · ${s.mobile}` : ''}
+              {s.region ? ` · ${s.region}` : ''}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'services',
+        header: 'Services',
+        hideBelow: 'sm',
+        cell: (s) => {
+          const services: string[] = (s as any).services || ['cable'];
+          const hasCable = cableEnabled && services.includes('cable');
+          const hasInternet = internetEnabled && services.includes('internet');
+          return (
+            <div className="flex gap-1">
+              {hasCable && (
+                <Badge variant="secondary" className="gap-1 h-5 text-[10px]">
+                  <Tv className="h-3 w-3" /> Cable
+                </Badge>
+              )}
+              {hasInternet && (
+                <Badge variant="secondary" className="gap-1 h-5 text-[10px]">
+                  <Wifi className="h-3 w-3" /> Net
+                </Badge>
+              )}
+              {!hasCable && !hasInternet && (
+                <span className="text-xs text-muted-foreground">—</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'action',
+        header: 'Next action',
+        hideBelow: 'md',
+        cell: (s) => {
+          const chip = computeNextActionChip(s);
+          return (
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${chipToneClasses(chip.tone)}`}
+            >
+              <span aria-hidden>{chip.icon}</span>
+              {chip.label}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'balance',
+        header: 'Balance',
+        align: 'right',
+        cell: (s) => {
+          const cable = Number((s as any).cable_balance || 0);
+          const net = Number((s as any).internet_balance || 0);
+          const total = cable + net;
+          if (total === 0) return <span className="text-muted-foreground text-sm">—</span>;
+          return (
+            <Money
+              value={total}
+              className={total > 0 ? 'text-destructive font-semibold' : 'text-success font-medium'}
+            />
+          );
+        },
+      },
+    ];
+    return cols;
+  }, [cableEnabled, internetEnabled]);
+
+  const rowActions = (s: Subscriber) => {
+    const cable = Number((s as any).cable_balance || 0);
+    const net = Number((s as any).internet_balance || 0);
+    const owedService: 'cable' | 'internet' | null = cable > 0 ? 'cable' : net > 0 ? 'internet' : null;
+
+    // Renew hint: any active sub expiring within 7d
+    const actives = [
+      ...((s as any)._activeCable ?? []),
+      ...((s as any)._activeInternet ?? []),
+    ];
+    const expiringSoon = actives.some((a: any) => {
+      if (!a?.endDate) return false;
+      const days = Math.ceil((new Date(a.endDate).getTime() - Date.now()) / 86400000);
+      return days >= 0 && days <= 7;
+    });
+
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        {owedService && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            onClick={() =>
+              setCollect({
+                sub: s,
+                service: owedService,
+                balance: owedService === 'cable' ? cable : net,
+              })
+            }
+          >
+            <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
+          </Button>
+        )}
+        {!owedService && expiringSoon && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            onClick={() => onSelectSubscriber((s as any).subscriber_id)}
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Renew
+          </Button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-7 w-7">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={() => onSelectSubscriber((s as any).subscriber_id)}>
+              <ExternalLink className="h-4 w-4 mr-2" /> Open profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSelectSubscriber((s as any).subscriber_id)}>
+              View ledger
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onSelectSubscriber((s as any).subscriber_id)}>
+              Edit identity
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSelectSubscriber((s as any).subscriber_id)}>
+              Archive
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex-1 w-full sm:w-auto">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search by name, mobile, or STB..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+    <>
+      <PageHeader
+        title="Customers"
+        description="Search, filter, and collect. Server-paginated for large operator books."
+        actions={
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Manage</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Catalog</DropdownMenuLabel>
+                <DropdownMenuItem onClick={onManagePacks}>
+                  <Package className="h-4 w-4 mr-2" /> Packs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onManageRegions}>
+                  <MapPin className="h-4 w-4 mr-2" /> Regions
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onManageProviders}>
+                  <Building className="h-4 w-4 mr-2" /> Providers
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Inventory</DropdownMenuLabel>
+                <DropdownMenuItem onClick={onManageStbs}>
+                  {internetEnabled && !cableEnabled ? (
+                    <><Wifi className="h-4 w-4 mr-2" /> ONU / Router Inventory</>
+                  ) : bothEnabled ? (
+                    <><HardDrive className="h-4 w-4 mr-2" /> Device Inventory</>
+                  ) : (
+                    <><Tv className="h-4 w-4 mr-2" /> STB Inventory</>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Data</DropdownMenuLabel>
+                <DropdownMenuItem onClick={onImport}>
+                  <Upload className="h-4 w-4 mr-2" /> Import
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExport}>
+                  <Download className="h-4 w-4 mr-2" /> Export
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={onAddNew} size="sm">
+              <Plus className="h-4 w-4 mr-1" /> Add Subscriber
+            </Button>
           </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Select value={packFilter} onValueChange={setPackFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Filter by pack" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Packs</SelectItem>
-              {packs.filter(Boolean).map((pack, idx) => (
-                <SelectItem key={`pack-${pack}-${idx}`} value={pack}>{pack}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        }
+      />
 
-          <Select value={regionFilter} onValueChange={setRegionFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Filter by region" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Regions</SelectItem>
-              {regions.filter(Boolean).map((region, idx) => (
-                <SelectItem key={`region-${region}-${idx}`} value={region}>{region}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <Toolbar
+        searchValue={search}
+        onSearchChange={(v) => setParam('q', v)}
+        searchPlaceholder="Search by name, mobile, subscriber ID, or STB…"
+        filters={
+          <>
+            {bothEnabled && (
+              <Select value={service} onValueChange={(v) => setParam('service', v)}>
+                <SelectTrigger className="w-[130px] h-9"><SelectValue placeholder="Service" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All services</SelectItem>
+                  <SelectItem value="cable">Cable</SelectItem>
+                  <SelectItem value="internet">Internet</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={region} onValueChange={(v) => setParam('region', v)}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Region" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All regions</SelectItem>
+                {regions.map((r) => (
+                  <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={(v) => setParam('status', v)}>
+              <SelectTrigger className="w-[130px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="prospect">Prospect</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={balance} onValueChange={(v) => setParam('balance', v)}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Balance" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any balance</SelectItem>
+                <SelectItem value="dues">Has dues</SelectItem>
+                <SelectItem value="credit">Has credit</SelectItem>
+                <SelectItem value="settled">Settled</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+        className="mb-4"
+      />
 
-          <Select value={balanceFilter} onValueChange={setBalanceFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Filter by balance" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Balances</SelectItem>
-              <SelectItem value="positive">Credit</SelectItem>
-              <SelectItem value="negative">Debit</SelectItem>
-              <SelectItem value="zero">Zero</SelectItem>
-            </SelectContent>
-          </Select>
+      <SectionCard padded={false}>
+        <DataTable
+          rows={rows}
+          rowKey={(s) => s.id}
+          columns={columns}
+          loading={loading}
+          onRowClick={(s) => onSelectSubscriber((s as any).subscriber_id)}
+          rowActions={rowActions}
+          empty={
+            <EmptyState
+              title="No subscribers match"
+              description={
+                search || service !== 'all' || region !== 'all' || balance !== 'all' || status !== 'active'
+                  ? 'Try clearing filters or searching a different term.'
+                  : 'Add your first subscriber to get started.'
+              }
+            />
+          }
+        />
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          label="subscribers"
+          onPageChange={setPage}
+        />
+      </SectionCard>
 
-          <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as any)}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Next action" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Actions</SelectItem>
-              <SelectItem value="collect">Collect</SelectItem>
-              <SelectItem value="renew">Renew</SelectItem>
-              <SelectItem value="expiring">Expiring soon</SelectItem>
-              <SelectItem value="settled">Settled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Manage</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Catalog</DropdownMenuLabel>
-              <DropdownMenuItem onClick={onManagePacks}>
-                <Package className="h-4 w-4 mr-2" />
-                Packs {bothEnabled && <span className="ml-auto text-xs text-muted-foreground">Cable + Internet</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onManageRegions}>
-                <MapPin className="h-4 w-4 mr-2" />
-                Regions
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onManageProviders}>
-                <Building className="h-4 w-4 mr-2" />
-                Providers
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Inventory</DropdownMenuLabel>
-              {/* Inventory label adapts: cable-only → "STBs", internet-only → "ONU / Routers", both → unified label */}
-              <DropdownMenuItem onClick={onManageStbs}>
-                {internetEnabled && !cableEnabled ? (
-                  <><Wifi className="h-4 w-4 mr-2" /> ONU / Router Inventory</>
-                ) : bothEnabled ? (
-                  <><HardDrive className="h-4 w-4 mr-2" /> Device Inventory</>
-                ) : (
-                  <><Tv className="h-4 w-4 mr-2" /> STB Inventory</>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Data</DropdownMenuLabel>
-              <DropdownMenuItem onClick={onImport}>
-                <Upload className="h-4 w-4 mr-2" />
-                Import
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onExport}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <Button onClick={onAddNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Subscriber
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4">
-        {filteredSubscribers.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                {search || packFilter !== 'all' || regionFilter !== 'all' || balanceFilter !== 'all'
-                  ? 'No subscribers found matching your criteria'
-                  : 'No subscribers yet. Add your first subscriber to get started!'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredSubscribers.map(subscriber => {
-            const sAny = subscriber as any;
-            const stbNum = sAny.stb_number || '';
-            // Batch B: pack labels come from the primary active subscription per service.
-            const cablePack = sAny._activeCable?.[0]?.packName || '';
-            const internetPack = sAny._activeInternet?.[0]?.packName || '';
-            // Active subscriptions are arrays (Phase 4b). Multi-device
-            // subscribers can have more than one entry per service. We
-            // display the most-recent one as the primary expiry indicator
-            // and append a "+N more" badge when there are additional ones.
-            const cableActives = (sAny._activeCable as any[]) || [];
-            const internetActives = (sAny._activeInternet as any[]) || [];
-            const cableSub = cableActives[0] || null;
-            const internetSub = internetActives[0] || null;
-            const cableExtra = Math.max(0, cableActives.length - 1);
-            const internetExtra = Math.max(0, internetActives.length - 1);
-            const services: string[] = sAny.services || ['cable'];
-            const hasCable = cableEnabled && services.includes('cable');
-            const hasInternet = internetEnabled && services.includes('internet');
-
-            const formatExpiry = (sub: any) => {
-              if (!sub?.endDate) return null;
-              const d = new Date(sub.endDate);
-              const days = Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-              if (days < 0) return { text: `Expired ${dateStr}`, tone: 'text-destructive' };
-              if (days <= 5) return { text: `${dateStr} • ${days}d left`, tone: 'text-warning' };
-              return { text: `${dateStr} • ${days}d left`, tone: 'text-muted-foreground' };
-            };
-
-            const ServiceStrip = ({
-              icon: Icon,
-              label,
-              pack,
-              expiry,
-              balance,
-              extraCount = 0,
-            }: {
-              icon: typeof Tv;
-              label: string;
-              pack: string;
-              expiry: ReturnType<typeof formatExpiry>;
-              balance: number;
-              extraCount?: number;
-            }) => (
-              <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/40">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">{label}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate flex items-center gap-1.5">
-                      <span className="truncate">{pack || 'No pack'}</span>
-                      {extraCount > 0 && (
-                        <Badge variant="outline" className="text-[10px] py-0 px-1 h-4">
-                          +{extraCount} more
-                        </Badge>
-                      )}
-                    </div>
-                    {expiry && <div className={`text-xs ${expiry.tone}`}>{expiry.text}</div>}
-                  </div>
-                </div>
-                <div className={`text-sm font-semibold whitespace-nowrap ${getBalanceColor(balance)}`}>
-                  ₹{balance.toFixed(0)}
-                </div>
-              </div>
-            );
-
-            const chip = computeNextActionChip(subscriber);
-
-            return (
-              <Card
-                key={subscriber.id}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => onSelectSubscriber((subscriber as any).subscriber_id)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="min-w-0">
-                      <CardTitle className="text-lg truncate">{subscriber.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1 truncate">
-                        {subscriber.mobile}
-                        {subscriber.region && <> • {subscriber.region}</>}
-                        {stbNum && <> • {stbNum}</>}
-                      </p>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      {hasCable && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Tv className="h-3 w-3" /> Cable
-                        </Badge>
-                      )}
-                      {hasInternet && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Wifi className="h-3 w-3" /> Net
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  {/* Next-action chip — single computed label per BUSINESS_MODEL §G5.
-                      Replaces the need to open each profile to know what to do. */}
-                  <div className="mt-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
-                    >
-                      <span aria-hidden>{chip.icon}</span>
-                      {chip.label}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {hasCable && (
-                    <ServiceStrip
-                      icon={Tv}
-                      label="Cable"
-                      pack={cableSub?.packName || cablePack}
-                      expiry={formatExpiry(cableSub)}
-                      balance={subscriber.cable_balance || 0}
-                      extraCount={cableExtra}
-                    />
-                  )}
-                  {hasInternet && (
-                    <ServiceStrip
-                      icon={Wifi}
-                      label="Internet"
-                      pack={internetSub?.packName || internetPack}
-                      expiry={formatExpiry(internetSub)}
-                      balance={(subscriber as any).internet_balance || 0}
-                      extraCount={internetExtra}
-                    />
-                  )}
-                  {!hasCable && !hasInternet && (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      No active services
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
-    </div>
+      {collect && (
+        <CollectPaymentDialog
+          open={!!collect}
+          onOpenChange={(o) => { if (!o) setCollect(null); }}
+          subscriberId={collect.sub.id}
+          subscriberName={collect.sub.name}
+          service={collect.service}
+          serviceBalance={collect.balance}
+          onCollected={() => setCollect(null)}
+        />
+      )}
+    </>
   );
 };
