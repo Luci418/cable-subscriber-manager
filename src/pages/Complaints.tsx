@@ -9,9 +9,9 @@ import { Badge }         from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus } from 'lucide-react';
 import { useAuth }       from '@/hooks/useAuth';
-import { useSubscribers } from '@/hooks/useSubscribers';
 import { useComplaints }  from '@/hooks/useComplaints';
 import { toast }          from 'sonner';
+import { SubscriberCombobox, type SubscriberComboboxValue } from '@/components/ui-ext';
 
 interface ComplaintsProps {
   onBack: () => void;
@@ -19,7 +19,6 @@ interface ComplaintsProps {
 
 export const Complaints = ({ onBack }: ComplaintsProps) => {
   const { user } = useAuth();
-  const { subscribers } = useSubscribers(user?.id);
   const { complaints, loading, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
 
   const [filteredComplaints, setFilteredComplaints] = useState(complaints);
@@ -28,6 +27,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   const [selectedComplaint, setSelectedComplaint] = useState<(typeof complaints)[0] | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [pickedSubscriber, setPickedSubscriber] = useState<SubscriberComboboxValue | null>(null);
 
   useEffect(() => {
     filterComplaints();
@@ -58,11 +58,8 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    const subscriberDisplayId = formData.get('subscriberId') as string;
-    const subscriber = subscribers.find((s) => s.subscriber_id === subscriberDisplayId);
-
-    if (!subscriber) {
-      toast.error('Subscriber not found');
+    if (!pickedSubscriber) {
+      toast.error('Please select a subscriber');
       return;
     }
 
@@ -76,7 +73,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
     }
 
     const created = await addComplaint({
-      subscriber_id: subscriber.id,
+      subscriber_id: pickedSubscriber.id,
       description,
       category,
       priority,
@@ -85,6 +82,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
     if (created) {
       toast.success('Complaint registered successfully');
       setShowAddDialog(false);
+      setPickedSubscriber(null);
       e.currentTarget.reset();
     }
   };
@@ -184,19 +182,12 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
             </DialogHeader>
             <form onSubmit={handleAddComplaint} className="space-y-4">
               <div>
-                <Label htmlFor="subscriberId">Subscriber</Label>
-                <Select name="subscriberId" required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select subscriber" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subscribers.map((s) => (
-                      <SelectItem key={s.id} value={s.subscriber_id}>
-                        {s.name} — {s.subscriber_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Subscriber</Label>
+                <SubscriberCombobox
+                  value={pickedSubscriber}
+                  onChange={setPickedSubscriber}
+                  placeholder="Search a subscriber…"
+                />
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>

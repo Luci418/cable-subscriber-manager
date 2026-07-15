@@ -9,6 +9,7 @@ import {
   EmptyState,
   Toolbar,
   Money,
+  Pagination,
   type DataTableColumn,
 } from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
@@ -77,6 +78,11 @@ export const Billing = () => {
   const [payLine, setPayLine] = useState<ServiceLine | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
   const [paySaving, setPaySaving] = useState(false);
+  /** Local service filter for the "Needs attention today" section only. */
+  const [needsServiceFilter, setNeedsServiceFilter] = useState<ServiceFilter>('all');
+  /** Client-side pagination for the full worklist. */
+  const [worklistPage, setWorklistPage] = useState(1);
+  const WORKLIST_PAGE_SIZE = 25;
 
   const openRecordPayment = (line: ServiceLine) => {
     setPayLine(line);
@@ -168,13 +174,14 @@ export const Billing = () => {
     () =>
       bySvc
         .filter((l) => l.isOverdue || l.isExpiring)
+        .filter((l) => needsServiceFilter === 'all' || l.service === needsServiceFilter)
         .sort((a, b) => {
           // Overdue first, then soonest-expiring, then largest balance
           if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
           if (a.isExpiring && b.isExpiring) return (a.daysUntil ?? 999) - (b.daysUntil ?? 999);
           return b.balance - a.balance;
         }),
-    [bySvc],
+    [bySvc, needsServiceFilter],
   );
 
   const worklist = useMemo(() => {
@@ -337,6 +344,27 @@ export const Billing = () => {
         description="Overdue balances and subscriptions expiring in the next 7 days. Act top-down."
         className="mb-6"
         padded={false}
+        actions={
+          bothEnabled ? (
+            <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+              {(['all', 'cable', 'internet'] as ServiceFilter[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setNeedsServiceFilter(v)}
+                  className={
+                    'px-3 py-1.5 transition-colors ' +
+                    (needsServiceFilter === v
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-transparent hover:bg-accent/40 text-muted-foreground')
+                  }
+                >
+                  {v === 'all' ? 'Both' : v === 'cable' ? 'Cable' : 'Internet'}
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
       >
         {needsAttention.length === 0 ? (
           <EmptyState
@@ -391,12 +419,12 @@ export const Billing = () => {
       <SectionCard title="All service lines" padded={false}>
         <Toolbar
           searchValue={q}
-          onSearchChange={(v) => setParam('q', v)}
+          onSearchChange={(v) => { setParam('q', v); setWorklistPage(1); }}
           searchPlaceholder="Search name, mobile, ID, pack…"
           filters={
             <>
               {bothEnabled && (
-                <Select value={service} onValueChange={(v) => setParam('service', v)}>
+                <Select value={service} onValueChange={(v) => { setParam('service', v); setWorklistPage(1); }}>
                   <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="Service" />
                   </SelectTrigger>
@@ -407,7 +435,7 @@ export const Billing = () => {
                   </SelectContent>
                 </Select>
               )}
-              <Select value={status} onValueChange={(v) => setParam('status', v)}>
+              <Select value={status} onValueChange={(v) => { setParam('status', v); setWorklistPage(1); }}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -430,18 +458,30 @@ export const Billing = () => {
             description="Adjust the filters or search to see other lines."
           />
         ) : (
-          <DataTable
-            rows={worklist}
-            rowKey={(l) => l.key}
-            columns={columns}
-            rowActions={(l) =>
-              l.balance > 0 ? (
-                <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
-                  <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
-                </Button>
-              ) : null
-            }
-          />
+          <>
+            <DataTable
+              rows={worklist.slice(
+                (worklistPage - 1) * WORKLIST_PAGE_SIZE,
+                worklistPage * WORKLIST_PAGE_SIZE,
+              )}
+              rowKey={(l) => l.key}
+              columns={columns}
+              rowActions={(l) =>
+                l.balance > 0 ? (
+                  <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
+                    <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
+                  </Button>
+                ) : null
+              }
+            />
+            <Pagination
+              page={worklistPage}
+              pageSize={WORKLIST_PAGE_SIZE}
+              total={worklist.length}
+              label="service lines"
+              onPageChange={setWorklistPage}
+            />
+          </>
         )}
       </SectionCard>
 

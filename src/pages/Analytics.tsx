@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Users, IndianRupee, Wallet, UserPlus,
-  UserMinus, Percent, Download, CalendarIcon, Tv, Wifi, Minus,
+  UserMinus, Percent, Download, CalendarIcon, Tv, Wifi, Minus, Clock, ArrowRight,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -193,6 +194,25 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     // active count is point-in-time; use same denominator for stable comparison
     return activeSubs > 0 ? revenuePrev / activeSubs : 0;
   })();
+
+  // Subscriptions expiring in the next 7 days (across scoped services).
+  // Operators check this daily — it drives renewal nudges.
+  const expiring7d = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now + 7 * 86400000;
+    let count = 0;
+    subsScoped.forEach((s) => {
+      const actives: any[] = [];
+      if (service !== 'internet') actives.push(...((s as any)._activeCable || []));
+      if (service !== 'cable') actives.push(...((s as any)._activeInternet || []));
+      actives.forEach((a) => {
+        if (!a?.endDate) return;
+        const t = +new Date(a.endDate);
+        if (t >= now && t <= cutoff) count++;
+      });
+    });
+    return count;
+  }, [subsScoped, service]);
 
   // ---------- time series ----------
   const timeseries = useMemo(() => {
@@ -556,27 +576,28 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         </Card>
       </div>
 
-      {/* KPI scorecards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Revenue" value={inr(revenue)} delta={pct(revenue, revenuePrev)}
-          icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(revenuePrev)} />
-        <KpiCard label="Net (Rev − Charges)" value={inr(net)} delta={pct(net, netPrev)}
-          icon={<TrendingUp className="h-4 w-4" />} compare={compare} prevLabel={inr(netPrev)} negativeAware value_={net} />
-        <KpiCard label="Outstanding" value={inr(outstanding)} delta={0}
+      {/* Operational KPI scorecards — 6 metrics operators act on daily. Clickable → filtered destinations. */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3">
+        <KpiCard label="Active Subscribers" value={activeSubs.toLocaleString('en-IN')} delta={0}
+          icon={<Users className="h-4 w-4" />} compare={false} sub={`${subsScoped.length} total`}
+          to="/customers?status=active" />
+        <KpiCard label="Collected vs Charged" value={`${inr(revenue)} / ${inr(charges)}`} delta={pct(revenue, revenuePrev)}
+          icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(revenuePrev)}
+          to="/billing" />
+        <KpiCard label="Collection Rate" value={`${collectionEff.toFixed(0)}%`}
+          delta={pct(collectionEff, collectionEffPrev)} icon={<Percent className="h-4 w-4" />}
+          compare={compare} prevLabel={`${collectionEffPrev.toFixed(0)}%`}
+          to="/billing" />
+        <KpiCard label="Expiring in 7 days" value={expiring7d.toLocaleString('en-IN')} delta={0}
+          icon={<Clock className="h-4 w-4" />} compare={false}
+          sub="Renewals to nudge"
+          tone={expiring7d > 0 ? 'danger' : undefined}
+          to="/billing?status=expiring" />
+        <KpiCard label="Outstanding Balance" value={inr(outstanding)} delta={0}
           icon={<Wallet className="h-4 w-4" />} compare={false}
           sub={outstanding > 0 ? 'Due from subscribers' : 'Credit with subscribers'}
-          tone={outstanding > 0 ? 'danger' : 'success'} />
-        <KpiCard label="Collection Efficiency" value={`${collectionEff.toFixed(0)}%`}
-          delta={pct(collectionEff, collectionEffPrev)} icon={<Percent className="h-4 w-4" />}
-          compare={compare} prevLabel={`${collectionEffPrev.toFixed(0)}%`} />
-        <KpiCard label="Active Subscribers" value={activeSubs.toLocaleString('en-IN')} delta={0}
-          icon={<Users className="h-4 w-4" />} compare={false} sub={`${subsScoped.length} total`} />
-        <KpiCard label="New Subscribers" value={newSubs.toLocaleString('en-IN')}
-          delta={pct(newSubs, newSubsPrev)} icon={<UserPlus className="h-4 w-4" />}
-          compare={compare} prevLabel={`${newSubsPrev} prev`} />
-        <KpiCard label="Churned (Expired)" value={churned.toLocaleString('en-IN')} delta={0}
-          icon={<UserMinus className="h-4 w-4" />} compare={false}
-          sub="Subscriptions expired in range" tone={churned > 0 ? 'danger' : undefined} />
+          tone={outstanding > 0 ? 'danger' : 'success'}
+          to="/customers?balance=dues" />
         <KpiCard label="ARPU" value={inr(arpu)} delta={pct(arpu, arpuPrev)}
           icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(arpuPrev)}
           sub="Avg revenue per active sub" />
@@ -927,8 +948,10 @@ interface KpiCardProps {
   tone?: 'success' | 'danger';
   negativeAware?: boolean;
   value_?: number;
+  /** When provided, the card becomes a clickable link to a filtered view. */
+  to?: string;
 }
-const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, negativeAware, value_ }: KpiCardProps) => {
+const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, negativeAware, value_, to }: KpiCardProps) => {
   const up = delta > 0.5;
   const down = delta < -0.5;
   const flat = !up && !down;
@@ -936,11 +959,14 @@ const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, neg
     : tone === 'success' ? 'text-success'
     : negativeAware && (value_ ?? 0) < 0 ? 'text-destructive'
     : 'text-foreground';
-  return (
-    <Card>
+  const inner = (
+    <Card className={cn(to && 'transition-shadow hover:shadow-md cursor-pointer h-full')}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <div className="text-muted-foreground">{icon}</div>
+        <div className="text-muted-foreground flex items-center gap-1">
+          {icon}
+          {to && <ArrowRight className="h-3 w-3 opacity-40" />}
+        </div>
       </CardHeader>
       <CardContent>
         <div className={cn('text-xl sm:text-2xl font-bold', valColor)}>{value}</div>
@@ -964,6 +990,7 @@ const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, neg
       </CardContent>
     </Card>
   );
+  return to ? <Link to={to} className="block">{inner}</Link> : inner;
 };
 
 interface DistroPieProps {
