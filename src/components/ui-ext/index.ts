@@ -5,3 +5,5 @@ export { DataTable, type DataTableColumn } from './DataTable';
 export { Toolbar } from './Toolbar';
 export { EmptyState } from './EmptyState';
 export { Money, KeyValue } from './Money';
+export { Pagination } from './Pagination';
+export { SubscriberCombobox, type SubscriberComboboxValue } from './SubscriberCombobox';
