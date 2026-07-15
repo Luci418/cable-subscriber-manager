@@ -78,6 +78,11 @@ export const Billing = () => {
   const [payLine, setPayLine] = useState<ServiceLine | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
   const [paySaving, setPaySaving] = useState(false);
+  /** Local service filter for the "Needs attention today" section only. */
+  const [needsServiceFilter, setNeedsServiceFilter] = useState<ServiceFilter>('all');
+  /** Client-side pagination for the full worklist. */
+  const [worklistPage, setWorklistPage] = useState(1);
+  const WORKLIST_PAGE_SIZE = 25;
 
   const openRecordPayment = (line: ServiceLine) => {
     setPayLine(line);
