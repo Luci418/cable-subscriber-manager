@@ -9,6 +9,7 @@ import {
   EmptyState,
   Toolbar,
   Money,
+  Pagination,
   type DataTableColumn,
 } from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
