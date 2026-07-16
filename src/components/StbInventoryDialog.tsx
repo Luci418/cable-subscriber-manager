@@ -84,7 +84,13 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this device from inventory?')) {
+    const { confirm } = await import('@/lib/confirm');
+    if (await confirm({
+      title: 'Delete device from inventory?',
+      description: 'This permanently removes the device record. Only devices with no assignment or transaction history can be deleted.',
+      confirmText: 'Delete',
+      destructive: true,
+    })) {
       const ok = await deleteStb(id);
       if (ok) toast.success('Device deleted');
     }
@@ -116,7 +122,13 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   };
 
   const handleDecommission = async (id: string) => {
-    if (!confirm('Decommission this device?')) return;
+    const { confirm } = await import('@/lib/confirm');
+    if (!(await confirm({
+      title: 'Decommission this device?',
+      description: 'Decommissioned devices cannot be reassigned. Use this for devices that are permanently retired from service.',
+      confirmText: 'Decommission',
+      destructive: true,
+    }))) return;
     const reason = prompt('Reason (optional):');
     if (reason === null) return;
     const ok = await decommission(id, reason || undefined);

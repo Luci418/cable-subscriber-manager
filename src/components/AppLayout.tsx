@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppShell } from './AppShell';
 import { AppDataProvider } from '@/contexts/AppDataContext';
+import { ConfirmHost } from '@/lib/confirm';
 
 /**
  * AppLayout — protected shell layout. Redirects unauthenticated users
@@ -32,6 +33,7 @@ export default function AppLayout() {
       <AppShell>
         <Outlet />
       </AppShell>
+      <ConfirmHost />
     </AppDataProvider>
   );
 }

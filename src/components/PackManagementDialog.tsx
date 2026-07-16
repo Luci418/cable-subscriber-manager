@@ -106,14 +106,25 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this pack? Only works if no customers are assigned.')) {
+    const { confirm } = await import('@/lib/confirm');
+    if (await confirm({
+      title: 'Delete pack?',
+      description: 'This only works if no customers are assigned to this pack. Consider retiring instead to hide it from new subscriptions while preserving history.',
+      confirmText: 'Delete',
+      destructive: true,
+    })) {
       const ok = await deletePack(id);
       if (ok) toast.success('Pack deleted');
     }
   };
 
   const handleRetire = async (id: string) => {
-    if (confirm('Retire this pack? It will be hidden from new subscriptions.')) {
+    const { confirm } = await import('@/lib/confirm');
+    if (await confirm({
+      title: 'Retire this pack?',
+      description: 'The pack will be hidden from new subscriptions. Existing subscriptions on this pack continue unchanged.',
+      confirmText: 'Retire',
+    })) {
       const ok = await retirePack(id);
       if (ok) toast.success('Pack retired');
     }

@@ -41,7 +41,13 @@ export const RegionManagementDialog = ({ open, onOpenChange }: RegionManagementD
       return;
     }
 
-    if (confirm('Are you sure you want to delete this region?')) {
+    const { confirm } = await import('@/lib/confirm');
+    if (await confirm({
+      title: 'Delete region?',
+      description: 'This removes the region from the list. Existing subscribers keep their region field for historical records.',
+      confirmText: 'Delete',
+      destructive: true,
+    })) {
       const success = await deleteRegion(id);
       if (success) {
         toast.success('Region deleted successfully');
