@@ -51,7 +51,13 @@ export const ProviderManagementDialog = ({ open, onOpenChange }: ProviderManagem
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this provider? Only works if nothing references it. Otherwise, retire it.')) return;
+    const { confirm } = await import('@/lib/confirm');
+    if (!(await confirm({
+      title: 'Delete provider?',
+      description: 'This only works if nothing references it (packs, subscriptions, transactions, subscribers). Otherwise, retire it instead.',
+      confirmText: 'Delete',
+      destructive: true,
+    }))) return;
     const ok = await deleteProvider(id);
     if (ok) toast.success('Provider deleted');
   };

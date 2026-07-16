@@ -106,7 +106,13 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this complaint?')) {
+    const { confirm } = await import('@/lib/confirm');
+    if (await confirm({
+      title: 'Delete complaint?',
+      description: 'This will remove the complaint permanently. This cannot be undone.',
+      confirmText: 'Delete',
+      destructive: true,
+    })) {
       const ok = await deleteComplaint(id);
       if (ok) {
         toast.success('Complaint deleted');
