@@ -58,8 +58,10 @@ const COLORS = [
 
 export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalance }: AnalyticsProps) => {
   const { user } = useAuth();
-  const { subscribers, loading: subsLoading } = useSubscribers(user?.id);
-  const { transactions, loading: txnLoading } = useTransactions(user?.id);
+  // Reuse the shared AppData context so we don't duplicate the subscribers
+  // + transactions fetch that Home/Customers/Billing already perform.
+  const { subscribers, loading: subsLoading, transactions } = useAppData();
+  const txnLoading = false;
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const { providers } = useProviders(user?.id);
 

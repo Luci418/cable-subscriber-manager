@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ArrowLeftRight, Link2, Link2Off, RefreshCw, Tv, Wallet, Wifi, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -228,7 +229,12 @@ export function DevicesTab(props: DevicesTabProps) {
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-medium">{dev.serial_number}</span>
+                          <Link
+                            to={`/equipment/${encodeURIComponent(dev.serial_number)}`}
+                            className="font-mono font-medium hover:underline"
+                          >
+                            {dev.serial_number}
+                          </Link>
                           <Badge variant="outline" className="text-xs uppercase">{dev.device_type}</Badge>
                         </div>
                         {sub ? (
