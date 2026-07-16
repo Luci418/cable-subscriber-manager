@@ -18,8 +18,7 @@ import {
 import { format, subDays, startOfDay, endOfDay, differenceInDays, eachDayOfInterval } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useAuth } from '@/hooks/useAuth';
-import { useSubscribers } from '@/hooks/useSubscribers';
-import { useTransactions } from '@/hooks/useTransactions';
+import { useAppData } from '@/contexts/AppDataContext';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
 import { cn } from '@/lib/utils';
