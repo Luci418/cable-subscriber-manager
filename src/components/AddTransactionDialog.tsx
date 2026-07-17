@@ -73,6 +73,7 @@ export const AddTransactionDialog = ({
     amount: '',
     description: '',
     service_type: defaultService,
+    payment_method: 'cash' as 'cash' | 'upi' | 'other',
   });
 
   useEffect(() => {
