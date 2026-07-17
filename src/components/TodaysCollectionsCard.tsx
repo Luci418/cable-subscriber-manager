@@ -81,7 +81,7 @@ export const TodaysCollectionsCard = () => {
       // operator cares about the raw receipt for reconciliation.
       const { data: txs, error } = await (supabase as any)
         .from('transactions')
-        .select('id, amount, date, service_type, description, source, subscriber_id, created_by, type, status')
+        .select('id, amount, date, service_type, description, source, subscriber_id, created_by, type, status, payment_method')
         .eq('user_id', user.id)
         .eq('type', 'payment')
         .eq('status', 'posted')
