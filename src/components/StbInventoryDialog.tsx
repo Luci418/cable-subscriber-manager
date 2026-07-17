@@ -192,7 +192,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
                 <Button variant="outline" size="sm" onClick={() => handleRepair(stb.id)} title="Mark Repaired">
                   <RotateCcw className="h-4 w-4" />
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDecommission(stb.id)} title="Decommission">
+                <Button variant="destructive" size="sm" onClick={() => openDecommission(stb)} title="Decommission">
                   <XCircle className="h-4 w-4" />
                 </Button>
               </>
