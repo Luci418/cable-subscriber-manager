@@ -469,6 +469,49 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
           )}
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={!!resolveTarget}
+        onOpenChange={(o) => { if (!o && !resolveSubmitting) setResolveTarget(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark complaint resolved</DialogTitle>
+            <DialogDescription>
+              Add optional notes describing how this complaint was resolved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Resolution notes (optional)</Label>
+            <Textarea
+              value={resolveNotes}
+              onChange={(e) => setResolveNotes(e.target.value)}
+              placeholder="e.g. signal restored after amplifier reset"
+              rows={4}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResolveTarget(null)} disabled={resolveSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!resolveTarget) return;
+                setResolveSubmitting(true);
+                try {
+                  await handleUpdateStatus(resolveTarget.id, 'resolved', resolveNotes);
+                  setResolveTarget(null);
+                } finally {
+                  setResolveSubmitting(false);
+                }
+              }}
+              disabled={resolveSubmitting}
+            >
+              {resolveSubmitting ? 'Saving…' : 'Mark resolved'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
