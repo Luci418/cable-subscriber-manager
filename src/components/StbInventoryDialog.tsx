@@ -360,6 +360,33 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={!!decomTarget} onOpenChange={(o) => { if (!o && !decomSubmitting) setDecomTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Decommission device</DialogTitle>
+            <DialogDescription>
+              {decomTarget?.serial_number} will be permanently retired and cannot be reassigned.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Reason (optional)</Label>
+            <Input
+              value={decomReason}
+              onChange={(e) => setDecomReason(e.target.value)}
+              placeholder="e.g. beyond repair, obsolete model"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDecomTarget(null)} disabled={decomSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDecommission} disabled={decomSubmitting}>
+              {decomSubmitting ? 'Decommissioning…' : 'Decommission'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };
