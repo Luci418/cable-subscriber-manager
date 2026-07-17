@@ -290,24 +290,39 @@ export const Settings = () => {
           {section === 'roles' && <RolesManagement />}
 
           {section === 'backup' && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <SectionCard title="Backup data" description="Export local caches to a backup file.">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Business configuration is stored in your account database and does not require backup.
-                  This export covers any legacy local caches.
-                </p>
-                <Button onClick={handleBackup} variant="outline" className="w-full">
-                  <Download className="mr-2 h-4 w-4" /> Download backup
-                </Button>
-              </SectionCard>
-              <SectionCard title="Restore data" description="Import data from a backup file.">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Restore data from a previous backup. An automatic backup will be created before restoring.
-                </p>
-                <Button onClick={handleRestore} variant="outline" className="w-full">
-                  <Upload className="mr-2 h-4 w-4" /> Upload backup
-                </Button>
-              </SectionCard>
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <SectionCard title="Backup data" description="Export local caches to a backup file.">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Business configuration is stored in your account database and does not require backup.
+                    This export covers any legacy local caches.
+                  </p>
+                  <Button onClick={handleBackup} variant="outline" className="w-full">
+                    <Download className="mr-2 h-4 w-4" /> Download backup
+                  </Button>
+                </SectionCard>
+                <SectionCard title="Restore data" description="Import data from a backup file.">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Restore data from a previous backup. An automatic backup will be created before restoring.
+                  </p>
+                  <Button onClick={handleRestore} variant="outline" className="w-full">
+                    <Upload className="mr-2 h-4 w-4" /> Upload backup
+                  </Button>
+                </SectionCard>
+              </div>
+
+              {perms.isOwner && (
+                <SectionCard
+                  title="Reconcile all balances"
+                  description="Recompute every subscriber's cable and internet balances from the transaction ledger. Any drift is corrected and logged to the audit trail."
+                >
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Run this if you suspect a balance mismatch, or as a monthly integrity check. Owner-only.
+                    Runs in one pass over your entire subscriber base — expect it to take a few seconds on large accounts.
+                  </p>
+                  <ReconcileAllButton />
+                </SectionCard>
+              )}
             </div>
           )}
         </div>
