@@ -3,7 +3,7 @@ import { Subscriber, Transaction } from '@/lib/storage';
 import { settingsToCompany, useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Archive, Calendar, Edit, FileText, Receipt, RotateCcw, Trash2, Tv, User } from 'lucide-react';
+import { Archive, Calendar, Edit, FileText, Receipt, RotateCcw, Scale, Trash2, Tv, User } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
