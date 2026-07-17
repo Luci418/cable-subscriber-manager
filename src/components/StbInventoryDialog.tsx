@@ -124,18 +124,23 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
     if (ok) toast.success('Marked as repaired');
   };
 
-  const handleDecommission = async (id: string) => {
-    const { confirm } = await import('@/lib/confirm');
-    if (!(await confirm({
-      title: 'Decommission this device?',
-      description: 'Decommissioned devices cannot be reassigned. Use this for devices that are permanently retired from service.',
-      confirmText: 'Decommission',
-      destructive: true,
-    }))) return;
-    const reason = prompt('Reason (optional):');
-    if (reason === null) return;
-    const ok = await decommission(id, reason || undefined);
-    if (ok) toast.success('Decommissioned');
+  const openDecommission = (stb: StbInventoryItem) => {
+    setDecomReason('');
+    setDecomTarget(stb);
+  };
+
+  const confirmDecommission = async () => {
+    if (!decomTarget) return;
+    setDecomSubmitting(true);
+    try {
+      const ok = await decommission(decomTarget.id, decomReason.trim() || undefined);
+      if (ok) {
+        toast.success('Decommissioned');
+        setDecomTarget(null);
+      }
+    } finally {
+      setDecomSubmitting(false);
+    }
   };
 
 
