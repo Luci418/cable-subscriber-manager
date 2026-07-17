@@ -97,6 +97,7 @@ export const AddTransactionDialog = ({
       description: formData.description,
       service_type: formData.service_type,
       provider_id: providerIdFor(formData.service_type),
+      payment_method: formData.type === 'payment' ? formData.payment_method : null,
     });
 
     setFormData({
@@ -104,6 +105,7 @@ export const AddTransactionDialog = ({
       amount: '',
       description: '',
       service_type: defaultService,
+      payment_method: 'cash',
     });
     onOpenChange(false);
   };
