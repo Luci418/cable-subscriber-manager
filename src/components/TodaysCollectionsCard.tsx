@@ -126,6 +126,7 @@ export const TodaysCollectionsCard = () => {
           subscriber_public_id: sub?.subscriber_id ?? null,
           created_by: t.created_by ?? null,
           collected_by_name: prof?.full_name || prof?.email || null,
+          payment_method: (t.payment_method as any) ?? null,
         };
       });
       if (!cancelled) {
