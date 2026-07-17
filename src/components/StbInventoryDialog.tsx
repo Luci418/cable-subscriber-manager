@@ -56,6 +56,9 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
   const [faultyTarget, setFaultyTarget] = useState<StbInventoryItem | null>(null);
   const [faultyReason, setFaultyReason] = useState('');
   const [faultySubmitting, setFaultySubmitting] = useState(false);
+  const [decomTarget, setDecomTarget] = useState<StbInventoryItem | null>(null);
+  const [decomReason, setDecomReason] = useState('');
+  const [decomSubmitting, setDecomSubmitting] = useState(false);
 
   // Default device type when switching service tabs
   const handleServiceChange = (svc: DeviceServiceType) => {
@@ -121,18 +124,23 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
     if (ok) toast.success('Marked as repaired');
   };
 
-  const handleDecommission = async (id: string) => {
-    const { confirm } = await import('@/lib/confirm');
-    if (!(await confirm({
-      title: 'Decommission this device?',
-      description: 'Decommissioned devices cannot be reassigned. Use this for devices that are permanently retired from service.',
-      confirmText: 'Decommission',
-      destructive: true,
-    }))) return;
-    const reason = prompt('Reason (optional):');
-    if (reason === null) return;
-    const ok = await decommission(id, reason || undefined);
-    if (ok) toast.success('Decommissioned');
+  const openDecommission = (stb: StbInventoryItem) => {
+    setDecomReason('');
+    setDecomTarget(stb);
+  };
+
+  const confirmDecommission = async () => {
+    if (!decomTarget) return;
+    setDecomSubmitting(true);
+    try {
+      const ok = await decommission(decomTarget.id, decomReason.trim() || undefined);
+      if (ok) {
+        toast.success('Decommissioned');
+        setDecomTarget(null);
+      }
+    } finally {
+      setDecomSubmitting(false);
+    }
   };
 
 
@@ -184,7 +192,7 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
                 <Button variant="outline" size="sm" onClick={() => handleRepair(stb.id)} title="Mark Repaired">
                   <RotateCcw className="h-4 w-4" />
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDecommission(stb.id)} title="Decommission">
+                <Button variant="destructive" size="sm" onClick={() => openDecommission(stb)} title="Decommission">
                   <XCircle className="h-4 w-4" />
                 </Button>
               </>
@@ -348,6 +356,33 @@ export const StbInventoryDialog = ({ open, onOpenChange }: StbInventoryDialogPro
             </Button>
             <Button onClick={confirmMarkFaulty} disabled={faultySubmitting}>
               {faultySubmitting ? 'Marking…' : 'Mark faulty'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!decomTarget} onOpenChange={(o) => { if (!o && !decomSubmitting) setDecomTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Decommission device</DialogTitle>
+            <DialogDescription>
+              {decomTarget?.serial_number} will be permanently retired and cannot be reassigned.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Reason (optional)</Label>
+            <Input
+              value={decomReason}
+              onChange={(e) => setDecomReason(e.target.value)}
+              placeholder="e.g. beyond repair, obsolete model"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDecomTarget(null)} disabled={decomSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDecommission} disabled={decomSubmitting}>
+              {decomSubmitting ? 'Decommissioning…' : 'Decommission'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,7 +6,7 @@ import { Label }         from '@/components/ui/label';
 import { Textarea }      from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge }         from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus } from 'lucide-react';
 import { useAuth }       from '@/hooks/useAuth';
 import { useComplaints }  from '@/hooks/useComplaints';
@@ -28,6 +28,9 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [pickedSubscriber, setPickedSubscriber] = useState<SubscriberComboboxValue | null>(null);
+  const [resolveTarget, setResolveTarget] = useState<(typeof complaints)[0] | null>(null);
+  const [resolveNotes, setResolveNotes] = useState('');
+  const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
   useEffect(() => {
     filterComplaints();
@@ -447,10 +450,8 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                     <Button
                       variant="default"
                       onClick={() => {
-                        const notes = prompt('Enter resolution notes:');
-                        if (notes !== null) {
-                          handleUpdateStatus(selectedComplaint.id, 'resolved', notes);
-                        }
+                        setResolveNotes('');
+                        setResolveTarget(selectedComplaint);
                       }}
                     >
                       Mark Resolved
@@ -466,6 +467,49 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!resolveTarget}
+        onOpenChange={(o) => { if (!o && !resolveSubmitting) setResolveTarget(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark complaint resolved</DialogTitle>
+            <DialogDescription>
+              Add optional notes describing how this complaint was resolved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Resolution notes (optional)</Label>
+            <Textarea
+              value={resolveNotes}
+              onChange={(e) => setResolveNotes(e.target.value)}
+              placeholder="e.g. signal restored after amplifier reset"
+              rows={4}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResolveTarget(null)} disabled={resolveSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!resolveTarget) return;
+                setResolveSubmitting(true);
+                try {
+                  await handleUpdateStatus(resolveTarget.id, 'resolved', resolveNotes);
+                  setResolveTarget(null);
+                } finally {
+                  setResolveSubmitting(false);
+                }
+              }}
+              disabled={resolveSubmitting}
+            >
+              {resolveSubmitting ? 'Saving…' : 'Mark resolved'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
