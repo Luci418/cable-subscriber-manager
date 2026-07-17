@@ -151,7 +151,7 @@ export const TodaysCollectionsCard = () => {
           r.subscriber_public_id ?? '',
           r.subscriber_name ?? '',
           r.service_type ?? '',
-          inferMethod(r),
+          displayMethod(r),
           r.amount.toFixed(2),
           r.collected_by_name ?? '',
           r.description ?? '',
@@ -239,7 +239,7 @@ export const TodaysCollectionsCard = () => {
                     )}
                   </td>
                   <td className="px-4 py-2 hidden md:table-cell">
-                    <Badge variant="outline">{inferMethod(r)}</Badge>
+                    <Badge variant="outline">{displayMethod(r)}</Badge>
                   </td>
                   <td className="px-4 py-2 hidden lg:table-cell text-muted-foreground truncate max-w-[200px]">
                     {r.collected_by_name ?? '—'}
