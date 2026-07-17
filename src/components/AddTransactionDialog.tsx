@@ -27,7 +27,7 @@ type ManualTxnType = 'payment' | 'charge' | 'adjustment';
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { type: ManualTxnType; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null }) => void;
+  onSubmit: (data: { type: ManualTxnType; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null; payment_method?: 'cash' | 'upi' | 'other' | null }) => void;
   subscriber: Subscriber;
 }
 
