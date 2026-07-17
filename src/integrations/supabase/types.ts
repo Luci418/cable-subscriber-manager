@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      balance_audit: {
+        Row: {
+          computed_balance: number
+          drift_amount: number
+          id: string
+          reconciled_at: string
+          reconciled_by: string
+          scope: string
+          service_type: string
+          stored_balance: number
+          subscriber_id: string
+          user_id: string
+        }
+        Insert: {
+          computed_balance: number
+          drift_amount: number
+          id?: string
+          reconciled_at?: string
+          reconciled_by: string
+          scope?: string
+          service_type: string
+          stored_balance: number
+          subscriber_id: string
+          user_id: string
+        }
+        Update: {
+          computed_balance?: number
+          drift_amount?: number
+          id?: string
+          reconciled_at?: string
+          reconciled_by?: string
+          scope?: string
+          service_type?: string
+          stored_balance?: number
+          subscriber_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_audit_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_audit_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       complaints: {
         Row: {
           category: string
@@ -1198,7 +1252,12 @@ export type Database = {
         Args: { p_service_type: string; p_subscriber_id: string }
         Returns: undefined
       }
+      reconcile_all_balances: { Args: never; Returns: Json }
       reconcile_stb_inventory: { Args: never; Returns: Json }
+      reconcile_subscriber_balance: {
+        Args: { p_subscriber_id: string }
+        Returns: Json
+      }
       replace_device: {
         Args: {
           p_new_serial: string

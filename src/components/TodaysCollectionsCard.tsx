@@ -28,6 +28,7 @@ interface Row {
   subscriber_public_id: string | null;
   created_by: string | null;
   collected_by_name: string | null;
+  payment_method: 'cash' | 'upi' | 'other' | null;
 }
 
 const todayISO = () => {
@@ -42,7 +43,15 @@ const tomorrowISO = () => {
   return d.toISOString();
 };
 
-const inferMethod = (r: Row): 'Cash' | 'UPI' | 'Other' => {
+/**
+ * Prefer the persisted `payment_method` column (populated by the Collect
+ * Payment dialog and the Add Transaction dialog). Fall back to string
+ * scraping only for historical rows that predate the column.
+ */
+const displayMethod = (r: Row): 'Cash' | 'UPI' | 'Other' => {
+  if (r.payment_method === 'cash') return 'Cash';
+  if (r.payment_method === 'upi') return 'UPI';
+  if (r.payment_method === 'other') return 'Other';
   const s = `${r.description ?? ''} ${r.source ?? ''}`.toLowerCase();
   if (s.includes('upi')) return 'UPI';
   if (s.includes('cash')) return 'Cash';
@@ -72,7 +81,7 @@ export const TodaysCollectionsCard = () => {
       // operator cares about the raw receipt for reconciliation.
       const { data: txs, error } = await (supabase as any)
         .from('transactions')
-        .select('id, amount, date, service_type, description, source, subscriber_id, created_by, type, status')
+        .select('id, amount, date, service_type, description, source, subscriber_id, created_by, type, status, payment_method')
         .eq('user_id', user.id)
         .eq('type', 'payment')
         .eq('status', 'posted')
@@ -117,6 +126,7 @@ export const TodaysCollectionsCard = () => {
           subscriber_public_id: sub?.subscriber_id ?? null,
           created_by: t.created_by ?? null,
           collected_by_name: prof?.full_name || prof?.email || null,
+          payment_method: (t.payment_method as any) ?? null,
         };
       });
       if (!cancelled) {
@@ -141,7 +151,7 @@ export const TodaysCollectionsCard = () => {
           r.subscriber_public_id ?? '',
           r.subscriber_name ?? '',
           r.service_type ?? '',
-          inferMethod(r),
+          displayMethod(r),
           r.amount.toFixed(2),
           r.collected_by_name ?? '',
           r.description ?? '',
@@ -229,7 +239,7 @@ export const TodaysCollectionsCard = () => {
                     )}
                   </td>
                   <td className="px-4 py-2 hidden md:table-cell">
-                    <Badge variant="outline">{inferMethod(r)}</Badge>
+                    <Badge variant="outline">{displayMethod(r)}</Badge>
                   </td>
                   <td className="px-4 py-2 hidden lg:table-cell text-muted-foreground truncate max-w-[200px]">
                     {r.collected_by_name ?? '—'}

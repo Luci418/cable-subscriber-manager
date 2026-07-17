@@ -90,8 +90,8 @@ None. Project is unblocked for Phase 6.5.
 |---|---|---|---|
 | Legacy JSONB blob columns on `subscribers` | Duplicated state — cache vs. normalised `subscriptions` | Medium | See `LEGACY_DEPENDENCY_AUDIT.md` and `PRODUCTION_READINESS.md#technical-debt`. Retirement order documented. |
 | `src/lib/storage.ts` (585 lines, still imported by 7 files) | Legacy localStorage-era helpers not fully migrated to Supabase hooks | Low | Callers work correctly; refactor when touching each caller for another reason. |
-| Balance reconciliation | Stored balances can drift under concurrent writes | Medium | ADR-003. `reconcile_balances()` planned. Weekly manual SQL check documented in runbook. |
-| `grant_owner_on_signup()` trigger | Bootstrap-only auto-grant; must be dropped before opening public signup | Medium | Tagged `TODO(pre-production)` in migration; checklist in `PRODUCTION_READINESS.md`. |
+| Balance reconciliation | Shipped 2026-07-17 — `reconcile_subscriber_balance` + `reconcile_all_balances` RPCs + `balance_audit` table + UI. ADR-003 closed. | ✅ Done | — |
+| `grant_owner_on_signup()` trigger | Dropped 2026-07-17. First-Owner provisioning is now a documented manual SQL step in PRODUCTION_READINESS.md. | ✅ Done | — |
 | Renewal lineage in analytics | Renewals look like new sales; churn is approximate | Low | Enrich subscription blob when Batch C ships. |
 | No client-side error capture (Sentry) | Silent frontend errors invisible to operator | Low | Nice-to-have. |
 | No automated tests | Every release relies on manual QA | Medium | See `TESTING_ARCHITECTURE.md` for the phased plan. |

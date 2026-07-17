@@ -27,7 +27,7 @@ type ManualTxnType = 'payment' | 'charge' | 'adjustment';
 interface AddTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { type: ManualTxnType; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null }) => void;
+  onSubmit: (data: { type: ManualTxnType; amount: number; description: string; service_type: 'cable' | 'internet'; provider_id?: string | null; payment_method?: 'cash' | 'upi' | 'other' | null }) => void;
   subscriber: Subscriber;
 }
 
@@ -73,6 +73,7 @@ export const AddTransactionDialog = ({
     amount: '',
     description: '',
     service_type: defaultService,
+    payment_method: 'cash' as 'cash' | 'upi' | 'other',
   });
 
   useEffect(() => {
@@ -96,6 +97,7 @@ export const AddTransactionDialog = ({
       description: formData.description,
       service_type: formData.service_type,
       provider_id: providerIdFor(formData.service_type),
+      payment_method: formData.type === 'payment' ? formData.payment_method : null,
     });
 
     setFormData({
@@ -103,6 +105,7 @@ export const AddTransactionDialog = ({
       amount: '',
       description: '',
       service_type: defaultService,
+      payment_method: 'cash',
     });
     onOpenChange(false);
   };
@@ -160,6 +163,26 @@ export const AddTransactionDialog = ({
               </p>
             )}
           </div>
+
+          {formData.type === 'payment' && (
+            <div className="space-y-2">
+              <Label htmlFor="method">Payment method</Label>
+              <Select
+                value={formData.payment_method}
+                onValueChange={(value: 'cash' | 'upi' | 'other') => setFormData({ ...formData, payment_method: value })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Used by Today's Collections and reports to group cash vs. UPI receipts.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (₹)</Label>

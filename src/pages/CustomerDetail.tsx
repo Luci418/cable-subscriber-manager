@@ -89,6 +89,7 @@ export default function CustomerDetail() {
           service_type: svc,
           provider_id: providerId,
           source,
+          payment_method: data.type === 'payment' ? (data.payment_method || 'cash') : null,
           date: new Date().toISOString(),
         } as any);
         if (ok) {

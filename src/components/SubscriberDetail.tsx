@@ -3,7 +3,7 @@ import { Subscriber, Transaction } from '@/lib/storage';
 import { settingsToCompany, useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Archive, Calendar, Edit, FileText, Receipt, RotateCcw, Trash2, Tv, User } from 'lucide-react';
+import { Archive, Calendar, Edit, FileText, Receipt, RotateCcw, Scale, Trash2, Tv, User } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -422,6 +422,33 @@ export const SubscriberDetail = ({
           <Edit className="h-4 w-4 mr-2" />
           Edit
         </Button>
+        {perms.isOwner && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const { data, error } = await (supabase as any).rpc('reconcile_subscriber_balance', {
+                p_subscriber_id: subscriber.id,
+              });
+              if (error) {
+                toast.error(error.message || 'Reconcile failed');
+                return;
+              }
+              const services = (data?.services || []) as any[];
+              const drift = services.reduce((s, r) => s + Math.abs(Number(r.drift) || 0), 0);
+              if (drift === 0) {
+                toast.success('Balances are correct — no drift detected.');
+              } else {
+                toast.success(`Balances reconciled. Corrected drift: ₹${drift.toFixed(2)}`);
+              }
+              onReload?.();
+            }}
+            title="Recompute cable & internet balances from the ledger (Owner only)"
+          >
+            <Scale className="h-4 w-4 mr-2" />
+            Reconcile
+          </Button>
+        )}
         {isArchived ? (
           perms.canArchiveCustomer && (
             <Button variant="default" size="sm" onClick={() => setShowReactivateDialog(true)}>

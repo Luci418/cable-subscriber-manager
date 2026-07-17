@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useParams, Navigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -290,28 +292,70 @@ export const Settings = () => {
           {section === 'roles' && <RolesManagement />}
 
           {section === 'backup' && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <SectionCard title="Backup data" description="Export local caches to a backup file.">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Business configuration is stored in your account database and does not require backup.
-                  This export covers any legacy local caches.
-                </p>
-                <Button onClick={handleBackup} variant="outline" className="w-full">
-                  <Download className="mr-2 h-4 w-4" /> Download backup
-                </Button>
-              </SectionCard>
-              <SectionCard title="Restore data" description="Import data from a backup file.">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Restore data from a previous backup. An automatic backup will be created before restoring.
-                </p>
-                <Button onClick={handleRestore} variant="outline" className="w-full">
-                  <Upload className="mr-2 h-4 w-4" /> Upload backup
-                </Button>
-              </SectionCard>
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <SectionCard title="Backup data" description="Export local caches to a backup file.">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Business configuration is stored in your account database and does not require backup.
+                    This export covers any legacy local caches.
+                  </p>
+                  <Button onClick={handleBackup} variant="outline" className="w-full">
+                    <Download className="mr-2 h-4 w-4" /> Download backup
+                  </Button>
+                </SectionCard>
+                <SectionCard title="Restore data" description="Import data from a backup file.">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Restore data from a previous backup. An automatic backup will be created before restoring.
+                  </p>
+                  <Button onClick={handleRestore} variant="outline" className="w-full">
+                    <Upload className="mr-2 h-4 w-4" /> Upload backup
+                  </Button>
+                </SectionCard>
+              </div>
+
+              {perms.isOwner && (
+                <SectionCard
+                  title="Reconcile all balances"
+                  description="Recompute every subscriber's cable and internet balances from the transaction ledger. Any drift is corrected and logged to the audit trail."
+                >
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Run this if you suspect a balance mismatch, or as a monthly integrity check. Owner-only.
+                    Runs in one pass over your entire subscriber base — expect it to take a few seconds on large accounts.
+                  </p>
+                  <ReconcileAllButton />
+                </SectionCard>
+              )}
             </div>
           )}
         </div>
       </div>
     </>
+  );
+};
+
+const ReconcileAllButton = () => {
+  const [running, setRunning] = useState(false);
+  const run = async () => {
+    setRunning(true);
+    const { data, error } = await (supabase as any).rpc('reconcile_all_balances');
+    setRunning(false);
+    if (error) {
+      toast.error(error.message || 'Reconcile failed');
+      return;
+    }
+    const checked = data?.checked ?? 0;
+    const drifted = data?.drifted ?? 0;
+    const total = Number(data?.total_drift_absolute ?? 0);
+    if (drifted === 0) {
+      toast.success(`Checked ${checked} balances — no drift detected.`);
+    } else {
+      toast.success(`Checked ${checked} balances. Corrected ${drifted} entries (total drift ₹${total.toFixed(2)}).`);
+    }
+  };
+  return (
+    <Button onClick={run} disabled={running} variant="outline">
+      {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Scale className="mr-2 h-4 w-4" />}
+      {running ? 'Reconciling…' : 'Reconcile all balances'}
+    </Button>
   );
 };
