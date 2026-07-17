@@ -115,18 +115,31 @@ and any accepted risks.
 See [PERMISSION_MATRIX.md](./PERMISSION_MATRIX.md) and
 [ROLE_DESIGN.md](./ROLE_DESIGN.md) for the full model.
 
+### First deployment — provisioning the initial Owner
+
+The bootstrap trigger `grant_owner_on_signup()` has been **dropped** (2026-07-17).
+Nobody is auto-elevated on signup. To seed the first Owner on a fresh
+deployment:
+
+1. Have the intended Owner sign up through `/auth` — they will land with
+   *no* role and will see the "no permissions" state.
+2. Look up their `user_id`:
+   ```sql
+   SELECT id, email FROM auth.users WHERE email = 'owner@example.com';
+   ```
+3. Grant Owner:
+   ```sql
+   INSERT INTO public.user_roles (user_id, role, granted_by)
+   VALUES ('<owner-uuid>', 'owner', '<owner-uuid>');
+   ```
+4. That Owner can now provision the rest of the team through
+   Settings → Team & Roles.
+
 ### Pre-production checklist
 
-- [ ] **Replace the bootstrap trigger.** `grant_owner_on_signup()` currently
-      auto-grants `owner` to the FIRST signup only. Before opening signup to
-      the public (if ever), drop the trigger entirely and provision the first
-      owner manually via a one-off SQL insert into `public.user_roles`.
-      This trigger is tagged `TODO(pre-production)` in migration
-      `20260704…` — do not ship as-is if the `/auth` page is publicly
-      reachable.
-- [ ] **First owner creation.** On a fresh deployment the first person to
-      sign up becomes Owner automatically. Verify this happened for the
-      intended person by checking `SELECT * FROM public.user_roles`.
+- [x] **Bootstrap trigger dropped** — `grant_owner_on_signup()` is gone
+      as of the 2026-07-17 migration. First-Owner provisioning is now the
+      manual SQL step above.
 - [ ] **Employee onboarding.** New staff sign up via `/auth` with their own
       email. The Owner then opens Settings → Roles & Access and grants the
       appropriate role. No email invitation flow exists — this is manual by
