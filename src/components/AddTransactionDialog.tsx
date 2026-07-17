@@ -164,6 +164,26 @@ export const AddTransactionDialog = ({
             )}
           </div>
 
+          {formData.type === 'payment' && (
+            <div className="space-y-2">
+              <Label htmlFor="method">Payment method</Label>
+              <Select
+                value={formData.payment_method}
+                onValueChange={(value: 'cash' | 'upi' | 'other') => setFormData({ ...formData, payment_method: value })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Used by Today's Collections and reports to group cash vs. UPI receipts.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (₹)</Label>
             <Input
