@@ -28,6 +28,7 @@ interface Row {
   subscriber_public_id: string | null;
   created_by: string | null;
   collected_by_name: string | null;
+  payment_method: 'cash' | 'upi' | 'other' | null;
 }
 
 const todayISO = () => {
@@ -42,7 +43,15 @@ const tomorrowISO = () => {
   return d.toISOString();
 };
 
-const inferMethod = (r: Row): 'Cash' | 'UPI' | 'Other' => {
+/**
+ * Prefer the persisted `payment_method` column (populated by the Collect
+ * Payment dialog and the Add Transaction dialog). Fall back to string
+ * scraping only for historical rows that predate the column.
+ */
+const displayMethod = (r: Row): 'Cash' | 'UPI' | 'Other' => {
+  if (r.payment_method === 'cash') return 'Cash';
+  if (r.payment_method === 'upi') return 'UPI';
+  if (r.payment_method === 'other') return 'Other';
   const s = `${r.description ?? ''} ${r.source ?? ''}`.toLowerCase();
   if (s.includes('upi')) return 'UPI';
   if (s.includes('cash')) return 'Cash';
