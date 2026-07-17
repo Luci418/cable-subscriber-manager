@@ -29,7 +29,7 @@ go-live; 🟢 items are already in good shape; 🔵 items are nice-to-have.
 
 | Item | Status | Notes |
 |---|---|---|
-| **Balance reconciliation** | 🟠 | Stored balances can drift (ADR-003). Phase 3 of the roadmap adds `reconcile_balances()` + `balance_audit`. Until then, run a weekly manual SQL check (see Runbook §3). |
+| **Balance reconciliation** | ✅ | `reconcile_subscriber_balance` + `reconcile_all_balances` RPCs shipped 2026-07-17 with a `balance_audit` history table. Owner-only. UI: per-subscriber "Reconcile" button, bulk "Reconcile all balances" in Settings → Backup. |
 | Subscription renewal lineage | 🟠 | Today, renewals look like new sales (BUSINESS_RULES §4.5). Phase 6 enriches the subscription blob. Renewal/churn analytics is approximate until then. |
 | Per-staff roles | 🔵 | Single-account today (ADR-009). Acceptable for 1–3 staff. Add `user_roles` before going to 4+ staff. |
 | Monitoring / uptime alert | 🟠 | Recommend a free uptime ping (UptimeRobot, BetterStack free tier) on the deployed URL and on `/auth`. |
