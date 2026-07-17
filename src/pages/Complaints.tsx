@@ -28,6 +28,9 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [pickedSubscriber, setPickedSubscriber] = useState<SubscriberComboboxValue | null>(null);
+  const [resolveTarget, setResolveTarget] = useState<(typeof complaints)[0] | null>(null);
+  const [resolveNotes, setResolveNotes] = useState('');
+  const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
   useEffect(() => {
     filterComplaints();
