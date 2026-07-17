@@ -332,3 +332,30 @@ export const Settings = () => {
     </>
   );
 };
+
+const ReconcileAllButton = () => {
+  const [running, setRunning] = useState(false);
+  const run = async () => {
+    setRunning(true);
+    const { data, error } = await (supabase as any).rpc('reconcile_all_balances');
+    setRunning(false);
+    if (error) {
+      toast.error(error.message || 'Reconcile failed');
+      return;
+    }
+    const checked = data?.checked ?? 0;
+    const drifted = data?.drifted ?? 0;
+    const total = Number(data?.total_drift_absolute ?? 0);
+    if (drifted === 0) {
+      toast.success(`Checked ${checked} balances — no drift detected.`);
+    } else {
+      toast.success(`Checked ${checked} balances. Corrected ${drifted} entries (total drift ₹${total.toFixed(2)}).`);
+    }
+  };
+  return (
+    <Button onClick={run} disabled={running} variant="outline">
+      {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Scale className="mr-2 h-4 w-4" />}
+      {running ? 'Reconciling…' : 'Reconcile all balances'}
+    </Button>
+  );
+};
