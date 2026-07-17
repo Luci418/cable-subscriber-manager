@@ -450,10 +450,8 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                     <Button
                       variant="default"
                       onClick={() => {
-                        const notes = prompt('Enter resolution notes:');
-                        if (notes !== null) {
-                          handleUpdateStatus(selectedComplaint.id, 'resolved', notes);
-                        }
+                        setResolveNotes('');
+                        setResolveTarget(selectedComplaint);
                       }}
                     >
                       Mark Resolved
