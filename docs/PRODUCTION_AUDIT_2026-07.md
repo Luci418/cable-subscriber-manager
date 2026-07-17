@@ -75,6 +75,8 @@ confirmation matching severity.
 
 Introduced `src/lib/confirm.tsx` — imperative `confirm({title, description, destructive})` backed by a single mounted `<ConfirmHost/>` in `AppLayout`. Consistent tone, dark-mode aware, matches AlertDialog styling used everywhere else.
 
+**Verification pass (2026-07, post-audit):** Re-swept for browser-native modals. Two residual `prompt()` sites — decommission-reason in `StbInventoryDialog` and resolution-notes in `Complaints` — were replaced with proper shadcn `Dialog` + input/textarea flows. No `window.confirm` or `prompt()` calls remain in application code (only the safety fallback inside `confirm.tsx` itself).
+
 ---
 
 ## 3. Audit trail
