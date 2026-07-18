@@ -563,9 +563,17 @@ export const SubscriberDetail = ({
           />
         </TabsContent>
 
-        <TabsContent value="credentials" className="space-y-4 mt-4">
-          <CredentialsTab />
-        </TabsContent>
+        {perms.canViewCredentials && (
+          <TabsContent value="credentials" className="space-y-4 mt-4">
+            <CredentialsTab
+              subscriberId={subscriber.id}
+              cableActive={cableActives[0] ?? null}
+              internetActive={internetActives[0] ?? null}
+              cableProviderName={providerNames.cable}
+              internetProviderName={providerNames.internet}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ---- dialogs ---------------------------------------------------- */}
