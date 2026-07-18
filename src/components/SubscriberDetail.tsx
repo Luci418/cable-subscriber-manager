@@ -412,7 +412,7 @@ export const SubscriberDetail = ({
     { value: 'subscriptions', label: 'Subscriptions', icon: Calendar },
     { value: 'devices',       label: 'Devices',       icon: Tv },
     { value: 'ledger',        label: 'Ledger',        icon: Receipt },
-    { value: 'credentials',   label: 'Credentials',   icon: FileText },
+    ...(perms.canViewCredentials ? [{ value: 'credentials', label: 'Credentials', icon: FileText }] : []),
   ];
 
   return (
