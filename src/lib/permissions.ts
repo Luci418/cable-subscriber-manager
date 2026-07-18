@@ -38,6 +38,7 @@ interface Permissions {
   canReplaceDevice: boolean;
   canCollectPayment: boolean;
   canModifySettings: boolean;
+  canViewCredentials: boolean;
 }
 
 const EMPTY: Permissions = {
@@ -54,7 +55,25 @@ const EMPTY: Permissions = {
   canReplaceDevice: false,
   canCollectPayment: false,
   canModifySettings: false,
+  canViewCredentials: false,
 };
+
+/**
+ * Named permission helper for the Credentials tab.
+ *
+ * Kept as a standalone function so future phases (Technician Job Management)
+ * can extend the rule with an additional condition (e.g. "must have an
+ * active job assignment for the subscriber") without changing the
+ * CredentialsTab component or the database schema. The function signature
+ * and its consumption from CredentialsTab must not change.
+ *
+ * Today's rule: Owners, Office Admins, and Technicians may view and edit
+ * credentials. Collection agents may not — the tab is hidden entirely.
+ * Mirrors the server-side `public.can_view_credentials()` helper, which
+ * remains the authority.
+ */
+export const canViewCredentials = (roles: AppRole[]): boolean =>
+  roles.includes('owner') || roles.includes('admin_office') || roles.includes('technician');
 
 const derive = (roles: AppRole[]): Permissions => {
   const has = (r: AppRole) => roles.includes(r);
@@ -76,6 +95,7 @@ const derive = (roles: AppRole[]): Permissions => {
     canReplaceDevice:      isAdmin || isTechnician,
     canCollectPayment:     isAdmin || isCollectionAgent,
     canModifySettings:     isOwner,
+    canViewCredentials:    canViewCredentials(roles),
   };
 };
 

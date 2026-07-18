@@ -135,6 +135,8 @@ export type Database = {
           device_type: string
           id: string
           notes: string | null
+          onu_password_encrypted: string | null
+          onu_username: string | null
           open_reason: string | null
           opened_at: string
           opened_by: string | null
@@ -142,6 +144,9 @@ export type Database = {
           subscriber_id: string
           updated_at: string
           user_id: string
+          vlan_id: string | null
+          wifi_password_encrypted: string | null
+          wifi_ssid: string | null
         }
         Insert: {
           close_reason?: string | null
@@ -152,6 +157,8 @@ export type Database = {
           device_type: string
           id?: string
           notes?: string | null
+          onu_password_encrypted?: string | null
+          onu_username?: string | null
           open_reason?: string | null
           opened_at?: string
           opened_by?: string | null
@@ -159,6 +166,9 @@ export type Database = {
           subscriber_id: string
           updated_at?: string
           user_id: string
+          vlan_id?: string | null
+          wifi_password_encrypted?: string | null
+          wifi_ssid?: string | null
         }
         Update: {
           close_reason?: string | null
@@ -169,6 +179,8 @@ export type Database = {
           device_type?: string
           id?: string
           notes?: string | null
+          onu_password_encrypted?: string | null
+          onu_username?: string | null
           open_reason?: string | null
           opened_at?: string
           opened_by?: string | null
@@ -176,6 +188,9 @@ export type Database = {
           subscriber_id?: string
           updated_at?: string
           user_id?: string
+          vlan_id?: string | null
+          wifi_password_encrypted?: string | null
+          wifi_ssid?: string | null
         }
         Relationships: [
           {
@@ -495,6 +510,7 @@ export type Database = {
           created_at: string
           device_type: string
           id: string
+          mac_address: string | null
           notes: string | null
           serial_number: string
           service_type: string
@@ -507,6 +523,7 @@ export type Database = {
           created_at?: string
           device_type?: string
           id?: string
+          mac_address?: string | null
           notes?: string | null
           serial_number: string
           service_type?: string
@@ -519,6 +536,7 @@ export type Database = {
           created_at?: string
           device_type?: string
           id?: string
+          mac_address?: string | null
           notes?: string | null
           serial_number?: string
           service_type?: string
@@ -597,6 +615,7 @@ export type Database = {
           archive_reason_code: string | null
           archived_at: string | null
           archived_by: string | null
+          assigned_telephone: string | null
           cable_balance: number
           cable_provider_id: string | null
           created_at: string
@@ -609,6 +628,8 @@ export type Database = {
           longitude: number | null
           mobile: string
           name: string
+          pppoe_password_encrypted: string | null
+          pppoe_username: string | null
           region: string | null
           region_id: string | null
           services: string[]
@@ -622,6 +643,7 @@ export type Database = {
           archive_reason_code?: string | null
           archived_at?: string | null
           archived_by?: string | null
+          assigned_telephone?: string | null
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
@@ -634,6 +656,8 @@ export type Database = {
           longitude?: number | null
           mobile: string
           name: string
+          pppoe_password_encrypted?: string | null
+          pppoe_username?: string | null
           region?: string | null
           region_id?: string | null
           services?: string[]
@@ -647,6 +671,7 @@ export type Database = {
           archive_reason_code?: string | null
           archived_at?: string | null
           archived_by?: string | null
+          assigned_telephone?: string | null
           cable_balance?: number
           cable_provider_id?: string | null
           created_at?: string
@@ -659,6 +684,8 @@ export type Database = {
           longitude?: number | null
           mobile?: string
           name?: string
+          pppoe_password_encrypted?: string | null
+          pppoe_username?: string | null
           region?: string | null
           region_id?: string | null
           services?: string[]
@@ -1142,6 +1169,7 @@ export type Database = {
       }
     }
     Functions: {
+      _credentials_key: { Args: never; Returns: string }
       archive_subscriber: {
         Args: {
           p_reason_code: string
@@ -1156,6 +1184,7 @@ export type Database = {
       can_modify_settings: { Args: { _uid?: string }; Returns: boolean }
       can_pair_device: { Args: { _uid?: string }; Returns: boolean }
       can_replace_device: { Args: { _uid?: string }; Returns: boolean }
+      can_view_credentials: { Args: { _uid?: string }; Returns: boolean }
       can_void_transaction: { Args: { _uid?: string }; Returns: boolean }
       cancel_subscription: {
         Args: {
@@ -1213,6 +1242,10 @@ export type Database = {
         Args: { p_region_name: string }
         Returns: string
       }
+      get_subscriber_credentials: {
+        Args: { p_subscriber_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1266,6 +1299,36 @@ export type Database = {
           p_subscriber_id: string
         }
         Returns: Json
+      }
+      save_isp_identity_credentials: {
+        Args: {
+          p_assigned_telephone: string
+          p_clear_password?: boolean
+          p_pppoe_password: string
+          p_pppoe_username: string
+          p_subscriber_id: string
+        }
+        Returns: undefined
+      }
+      save_onu_credentials: {
+        Args: {
+          p_clear_password?: boolean
+          p_mac_address: string
+          p_onu_password: string
+          p_onu_username: string
+          p_subscriber_id: string
+          p_vlan_id: string
+        }
+        Returns: undefined
+      }
+      save_wifi_credentials: {
+        Args: {
+          p_clear_password?: boolean
+          p_subscriber_id: string
+          p_wifi_password: string
+          p_wifi_ssid: string
+        }
+        Returns: undefined
       }
       unpair_device: {
         Args: {

@@ -412,7 +412,7 @@ export const SubscriberDetail = ({
     { value: 'subscriptions', label: 'Subscriptions', icon: Calendar },
     { value: 'devices',       label: 'Devices',       icon: Tv },
     { value: 'ledger',        label: 'Ledger',        icon: Receipt },
-    { value: 'credentials',   label: 'Credentials',   icon: FileText },
+    ...(perms.canViewCredentials ? [{ value: 'credentials', label: 'Credentials', icon: FileText }] : []),
   ];
 
   return (
@@ -563,9 +563,17 @@ export const SubscriberDetail = ({
           />
         </TabsContent>
 
-        <TabsContent value="credentials" className="space-y-4 mt-4">
-          <CredentialsTab />
-        </TabsContent>
+        {perms.canViewCredentials && (
+          <TabsContent value="credentials" className="space-y-4 mt-4">
+            <CredentialsTab
+              subscriberId={subscriber.id}
+              cableActive={cableActives[0] ?? null}
+              internetActive={internetActives[0] ?? null}
+              cableProviderName={providerNames.cable}
+              internetProviderName={providerNames.internet}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ---- dialogs ---------------------------------------------------- */}
