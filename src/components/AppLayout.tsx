@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AppShell } from './AppShell';
 import { AppDataProvider } from '@/contexts/AppDataContext';
 import { ConfirmHost } from '@/lib/confirm';
+import { PermissionsProvider } from '@/lib/permissions';
 
 /**
  * AppLayout — protected shell layout. Redirects unauthenticated users
@@ -30,10 +31,12 @@ export default function AppLayout() {
 
   return (
     <AppDataProvider>
-      <AppShell>
-        <Outlet />
-      </AppShell>
-      <ConfirmHost />
+      <PermissionsProvider>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+        <ConfirmHost />
+      </PermissionsProvider>
     </AppDataProvider>
   );
 }

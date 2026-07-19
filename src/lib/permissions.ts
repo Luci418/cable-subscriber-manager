@@ -18,7 +18,7 @@
  *   collect payment           |   ✓   |      ✓       |        ✓         |
  *   modify settings           |   ✓   |              |                  |
  */
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode, createElement } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -60,17 +60,8 @@ const EMPTY: Permissions = {
 
 /**
  * Named permission helper for the Credentials tab.
- *
- * Kept as a standalone function so future phases (Technician Job Management)
- * can extend the rule with an additional condition (e.g. "must have an
- * active job assignment for the subscriber") without changing the
- * CredentialsTab component or the database schema. The function signature
- * and its consumption from CredentialsTab must not change.
- *
- * Today's rule: Owners, Office Admins, and Technicians may view and edit
- * credentials. Collection agents may not — the tab is hidden entirely.
- * Mirrors the server-side `public.can_view_credentials()` helper, which
- * remains the authority.
+ * See file header comment. Future phases may extend this with
+ * job-assignment conditions without changing consumers.
  */
 export const canViewCredentials = (roles: AppRole[]): boolean =>
   roles.includes('owner') || roles.includes('admin_office') || roles.includes('technician');
@@ -100,10 +91,13 @@ const derive = (roles: AppRole[]): Permissions => {
 };
 
 /**
- * Hook: current signed-in user's roles + derived permission booleans.
- * Re-fetches when auth user changes.
+ * PermissionsProvider — fetches the signed-in user's roles ONCE per session
+ * (on login) and caches them in context. Role changes require re-login.
+ * Mount this inside AppLayout so every consumer reads synchronously.
  */
-export const usePermissions = (): Permissions => {
+const PermissionsCtx = createContext<Permissions>(EMPTY);
+
+export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<Permissions>(EMPTY);
 
@@ -129,5 +123,10 @@ export const usePermissions = (): Permissions => {
     return () => { cancelled = true; };
   }, [user?.id, authLoading]);
 
-  return state;
+  return createElement(PermissionsCtx.Provider, { value: state }, children);
 };
+
+/**
+ * Hook: read cached permissions from context. Synchronous — no RPC per mount.
+ */
+export const usePermissions = (): Permissions => useContext(PermissionsCtx);
