@@ -2129,4 +2129,41 @@ Phase 4b (separate deployment after Phase 4a is confirmed stable):
 *Any change to a business rule, invariant, or workflow decision must be*
 *reflected here before implementation begins.*
 
+---
+
+## Appendix: Credential Ownership
+
+Every credential surfaced on the Credentials tab is owned by exactly one
+table. This mapping is authoritative — both the RPCs and the UI enforce it,
+and the ownership comment in `src/components/subscriber-detail/CredentialsTab.tsx`
+mirrors this table verbatim.
+
+| Field                | Owner table              | Reason                                                      |
+| -------------------- | ------------------------ | ----------------------------------------------------------- |
+| Assigned Telephone   | `subscribers`            | ISP identity, persists regardless of device                 |
+| PPPoE Username       | `subscribers`            | Account credential, not device-specific                     |
+| PPPoE Password       | `subscribers`            | Account credential, not device-specific                     |
+| WiFi SSID            | `device_assignment_log`  | Installation-specific, reconfigured on device replacement   |
+| WiFi Password        | `device_assignment_log`  | Installation-specific, reconfigured on device replacement   |
+| ONU Username         | `device_assignment_log`  | Deployment-specific                                         |
+| ONU Password         | `device_assignment_log`  | Deployment-specific                                         |
+| VLAN ID              | `device_assignment_log`  | Network config per installation                             |
+| MAC Address          | `stb_inventory`          | Hardware identity, fixed to the physical device             |
+
+**Consequences of this ownership model:**
+
+- WiFi and ONU credentials both live on the **internet** device's open
+  assignment log row. There is no cable-side WiFi credential — a cable STB
+  does not provide WiFi in this model.
+- Replacing an internet device (via `replace_device`) opens a fresh
+  assignment log row with null credentials. Installation-specific values
+  (SSID, WiFi password, ONU login, VLAN) must be re-entered by the
+  technician. This is intentional — those values are typically
+  reconfigured during a physical install.
+- Account-level values (assigned telephone, PPPoE) survive device swaps
+  because they live on `subscribers`.
+- MAC address is written once per device on `stb_inventory` and is locked
+  in the UI thereafter. To change it, the device itself must be replaced.
+
+
 

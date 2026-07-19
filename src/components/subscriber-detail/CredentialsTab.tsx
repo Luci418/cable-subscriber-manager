@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Eye, EyeOff, FileText, Loader2, Router, Signal, Wifi } from 'lucide-react';
+import { Copy, Eye, EyeOff, FileText, Loader2, Router, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,16 +7,33 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import type { SubscriptionBlob } from '@/lib/activeSubs';
 
 /**
  * CREDENTIALS TAB
  *
- * Four cards, each saves independently:
+ * Three cards, each saves independently:
  *   1. ISP Identity           → subscribers table
- *   2. WiFi Credentials       → open device_assignment_log row (cable device)
+ *   2. WiFi Credentials       → open device_assignment_log row (internet device)
  *   3. Router / ONU Details   → stb_inventory (MAC) + open assignment log (internet)
- *   4. Connection Reference   → read-only, sourced from active subscriptions
+ *
+ * All credentials on this tab relate to the internet installation. WiFi is
+ * provided by the router/ONU, not by cable equipment — the tab reflects that.
+ *
+ * ---------------------------------------------------------------------------
+ * CREDENTIAL OWNERSHIP TABLE (authoritative — mirrored in BUSINESS_MODEL.md)
+ * ---------------------------------------------------------------------------
+ *  Field                    | Owner table              | Reason
+ *  ------------------------ | ------------------------ | --------------------------------
+ *  Assigned Telephone       | subscribers              | ISP identity, persists regardless of device
+ *  PPPoE Username           | subscribers              | Account credential, not device-specific
+ *  PPPoE Password           | subscribers              | Account credential, not device-specific
+ *  WiFi SSID                | device_assignment_log    | Installation-specific, reconfigured on device replacement
+ *  WiFi Password            | device_assignment_log    | Installation-specific, reconfigured on device replacement
+ *  ONU Username             | device_assignment_log    | Deployment-specific
+ *  ONU Password             | device_assignment_log    | Deployment-specific
+ *  VLAN ID                  | device_assignment_log    | Network config per installation
+ *  MAC Address              | stb_inventory            | Hardware identity, fixed to the physical device
+ * ---------------------------------------------------------------------------
  *
  * All sensitive password values are encrypted server-side via pgp_sym_encrypt.
  * The RPC returns already-decrypted values so the client never sees ciphertext.
@@ -26,10 +43,6 @@ import type { SubscriptionBlob } from '@/lib/activeSubs';
 
 interface Props {
   subscriberId: string;
-  cableActive: SubscriptionBlob | null;
-  internetActive: SubscriptionBlob | null;
-  cableProviderName?: string;
-  internetProviderName?: string;
 }
 
 interface CredentialPayload {
@@ -38,19 +51,13 @@ interface CredentialPayload {
     pppoe_username: string | null;
     pppoe_password: string | null;
   };
-  cable: {
+  internet: {
     device_id: string;
     serial_number: string;
     mac_address: string | null;
     assignment_id: string | null;
     wifi_ssid: string | null;
     wifi_password: string | null;
-  } | null;
-  internet: {
-    device_id: string;
-    serial_number: string;
-    mac_address: string | null;
-    assignment_id: string | null;
     onu_username: string | null;
     onu_password: string | null;
     vlan_id: string | null;
@@ -70,7 +77,6 @@ const copy = async (value: string | null | undefined, label: string) => {
   }
 };
 
-/** Small icon-button used next to every value/field. */
 const CopyBtn = ({ value, label }: { value: string | null | undefined; label: string }) => (
   <Button
     type="button"
@@ -84,47 +90,24 @@ const CopyBtn = ({ value, label }: { value: string | null | undefined; label: st
   </Button>
 );
 
-/** Text row with copy button. */
 const TextField = ({
-  label,
-  value,
-  onChange,
-  disabled,
-  placeholder,
+  label, value, onChange, disabled, placeholder,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
+  label: string; value: string; onChange: (v: string) => void; disabled?: boolean; placeholder?: string;
 }) => (
   <div className="space-y-1.5">
     <Label className="text-xs font-medium">{label}</Label>
     <div className="flex items-center gap-1.5">
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-      />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} placeholder={placeholder} />
       <CopyBtn value={value} label={label} />
     </div>
   </div>
 );
 
-/** Password row: masked by default, eye toggle, copy button. */
 const PasswordField = ({
-  label,
-  value,
-  onChange,
-  disabled,
-  placeholder,
+  label, value, onChange, disabled, placeholder,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
+  label: string; value: string; onChange: (v: string) => void; disabled?: boolean; placeholder?: string;
 }) => {
   const [shown, setShown] = useState(false);
   return (
@@ -156,17 +139,10 @@ const PasswordField = ({
   );
 };
 
-/** Read-only MAC-style field once a value is set, editable input otherwise. */
 const MacField = ({
-  value,
-  onChange,
-  locked,
-  disabled,
+  value, onChange, locked, disabled,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  locked: boolean;
-  disabled: boolean;
+  value: string; onChange: (v: string) => void; locked: boolean; disabled: boolean;
 }) => (
   <div className="space-y-1.5">
     <Label className="text-xs font-medium">MAC Address</Label>
@@ -188,22 +164,16 @@ const MacField = ({
   </div>
 );
 
-const NoDeviceNote = ({ service }: { service: 'cable' | 'internet' }) => (
+const NoDeviceNote = () => (
   <div className="rounded-md border border-dashed p-4 text-center">
-    <p className="text-sm font-medium">No {service} device paired</p>
+    <p className="text-sm font-medium">No internet device paired</p>
     <p className="text-xs text-muted-foreground mt-1">
-      Pair a device to configure these credentials.
+      Pair a router/ONU to configure these credentials.
     </p>
   </div>
 );
 
-export function CredentialsTab({
-  subscriberId,
-  cableActive,
-  internetActive,
-  cableProviderName,
-  internetProviderName,
-}: Props) {
+export function CredentialsTab({ subscriberId }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<CredentialPayload | null>(null);
 
@@ -241,17 +211,15 @@ export function CredentialsTab({
     setTel(p.identity.assigned_telephone ?? '');
     setPppoeUser(p.identity.pppoe_username ?? '');
     setPppoePass(p.identity.pppoe_password ?? '');
-    setSsid(p.cable?.wifi_ssid ?? '');
-    setWifiPass(p.cable?.wifi_password ?? '');
+    setSsid(p.internet?.wifi_ssid ?? '');
+    setWifiPass(p.internet?.wifi_password ?? '');
     setMac(p.internet?.mac_address ?? '');
     setOnuUser(p.internet?.onu_username ?? '');
     setOnuPass(p.internet?.onu_password ?? '');
     setVlan(p.internet?.vlan_id ?? '');
   }, [subscriberId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const saveIdentity = async () => {
     setSavingId(true);
@@ -263,10 +231,7 @@ export function CredentialsTab({
       p_clear_password: !!data?.identity.pppoe_password && pppoePass === '',
     });
     setSavingId(false);
-    if (error) {
-      toast.error(error.message || 'Failed to save');
-      return;
-    }
+    if (error) { toast.error(error.message || 'Failed to save'); return; }
     toast.success('ISP identity saved');
     load();
   };
@@ -277,13 +242,10 @@ export function CredentialsTab({
       p_subscriber_id: subscriberId,
       p_wifi_ssid: ssid,
       p_wifi_password: wifiPass,
-      p_clear_password: !!data?.cable?.wifi_password && wifiPass === '',
+      p_clear_password: !!data?.internet?.wifi_password && wifiPass === '',
     });
     setSavingWifi(false);
-    if (error) {
-      toast.error(error.message || 'Failed to save');
-      return;
-    }
+    if (error) { toast.error(error.message || 'Failed to save'); return; }
     toast.success('WiFi credentials saved');
     load();
   };
@@ -299,10 +261,7 @@ export function CredentialsTab({
       p_clear_password: !!data?.internet?.onu_password && onuPass === '',
     });
     setSavingOnu(false);
-    if (error) {
-      toast.error(error.message || 'Failed to save');
-      return;
-    }
+    if (error) { toast.error(error.message || 'Failed to save'); return; }
     toast.success('ONU credentials saved');
     load();
   };
@@ -315,14 +274,8 @@ export function CredentialsTab({
     );
   }
 
-  const cablePaired = !!data?.cable;
   const internetPaired = !!data?.internet;
   const macLocked = internetPaired && !!(data?.internet?.mac_address ?? '').trim();
-
-  const fmtDate = (d?: string | null) =>
-    d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-
-  const showReference = !!cableActive || !!internetActive;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -334,24 +287,9 @@ export function CredentialsTab({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <TextField
-            label="Assigned Telephone"
-            value={tel}
-            onChange={setTel}
-            placeholder="e.g. 080-XXXX-XXXX"
-          />
-          <TextField
-            label="PPPoE Username"
-            value={pppoeUser}
-            onChange={setPppoeUser}
-            placeholder="user@isp"
-          />
-          <PasswordField
-            label="PPPoE Password"
-            value={pppoePass}
-            onChange={setPppoePass}
-            placeholder="••••••••"
-          />
+          <TextField label="Assigned Telephone" value={tel} onChange={setTel} placeholder="e.g. 080-XXXX-XXXX" />
+          <TextField label="PPPoE Username" value={pppoeUser} onChange={setPppoeUser} placeholder="user@isp" />
+          <PasswordField label="PPPoE Password" value={pppoePass} onChange={setPppoePass} placeholder="••••••••" />
           <div className="flex justify-end">
             <Button size="sm" onClick={saveIdentity} disabled={savingId}>
               {savingId ? 'Saving…' : 'Save ISP Identity'}
@@ -360,37 +298,25 @@ export function CredentialsTab({
         </CardContent>
       </Card>
 
-      {/* Card 2 — WiFi Credentials */}
+      {/* Card 2 — WiFi Credentials (internet device) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Wifi className="h-4 w-4" /> WiFi Credentials
-            {cablePaired && (
+            {internetPaired && (
               <Badge variant="outline" className="ml-auto font-mono text-[10px]">
-                {data!.cable!.serial_number}
+                {data!.internet!.serial_number}
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!cablePaired ? (
-            <NoDeviceNote service="cable" />
+          {!internetPaired ? (
+            <NoDeviceNote />
           ) : (
             <>
-              <TextField
-                label="Network Name (SSID)"
-                value={ssid}
-                onChange={setSsid}
-                disabled={!cablePaired}
-                placeholder="e.g. MyHome-5G"
-              />
-              <PasswordField
-                label="WiFi Password"
-                value={wifiPass}
-                onChange={setWifiPass}
-                disabled={!cablePaired}
-                placeholder="••••••••"
-              />
+              <TextField label="Network Name (SSID)" value={ssid} onChange={setSsid} placeholder="e.g. MyHome-5G" />
+              <PasswordField label="WiFi Password" value={wifiPass} onChange={setWifiPass} placeholder="••••••••" />
               <div className="flex justify-end">
                 <Button size="sm" onClick={saveWifi} disabled={savingWifi}>
                   {savingWifi ? 'Saving…' : 'Save WiFi'}
@@ -401,7 +327,7 @@ export function CredentialsTab({
         </CardContent>
       </Card>
 
-      {/* Card 3 — Router / ONU */}
+      {/* Card 3 — Router / ONU (internet device) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -415,30 +341,13 @@ export function CredentialsTab({
         </CardHeader>
         <CardContent className="space-y-4">
           {!internetPaired ? (
-            <NoDeviceNote service="internet" />
+            <NoDeviceNote />
           ) : (
             <>
-              <MacField value={mac} onChange={setMac} locked={macLocked} disabled={!internetPaired} />
-              <TextField
-                label="ONU Username"
-                value={onuUser}
-                onChange={setOnuUser}
-                disabled={!internetPaired}
-              />
-              <PasswordField
-                label="ONU Password"
-                value={onuPass}
-                onChange={setOnuPass}
-                disabled={!internetPaired}
-                placeholder="••••••••"
-              />
-              <TextField
-                label="VLAN ID"
-                value={vlan}
-                onChange={setVlan}
-                disabled={!internetPaired}
-                placeholder="e.g. 100"
-              />
+              <MacField value={mac} onChange={setMac} locked={macLocked} disabled={false} />
+              <TextField label="ONU Username" value={onuUser} onChange={setOnuUser} />
+              <PasswordField label="ONU Password" value={onuPass} onChange={setOnuPass} placeholder="••••••••" />
+              <TextField label="VLAN ID" value={vlan} onChange={setVlan} placeholder="e.g. 100" />
               <div className="flex justify-end">
                 <Button size="sm" onClick={saveOnu} disabled={savingOnu}>
                   {savingOnu ? 'Saving…' : 'Save Router / ONU'}
@@ -448,51 +357,6 @@ export function CredentialsTab({
           )}
         </CardContent>
       </Card>
-
-      {/* Card 4 — Connection Reference (read-only) */}
-      {showReference && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Signal className="h-4 w-4" /> Connection Reference
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {cableActive && (
-              <div className="rounded-md border p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <Badge variant="secondary" className="text-[10px]">Cable</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {fmtDate(cableActive.startDate)} → {fmtDate(cableActive.endDate)}
-                  </span>
-                </div>
-                <p className="text-sm font-medium">{cableActive.packName}</p>
-                {(cableProviderName || cableActive.providerName) && (
-                  <p className="text-xs text-muted-foreground">
-                    Provider: {cableProviderName || cableActive.providerName}
-                  </p>
-                )}
-              </div>
-            )}
-            {internetActive && (
-              <div className="rounded-md border p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <Badge variant="secondary" className="text-[10px]">Internet</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {fmtDate(internetActive.startDate)} → {fmtDate(internetActive.endDate)}
-                  </span>
-                </div>
-                <p className="text-sm font-medium">{internetActive.packName}</p>
-                {(internetProviderName || internetActive.providerName) && (
-                  <p className="text-xs text-muted-foreground">
-                    Provider: {internetProviderName || internetActive.providerName}
-                  </p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
