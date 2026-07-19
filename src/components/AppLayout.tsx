@@ -31,10 +31,12 @@ export default function AppLayout() {
 
   return (
     <AppDataProvider>
-      <AppShell>
-        <Outlet />
-      </AppShell>
-      <ConfirmHost />
+      <PermissionsProvider>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+        <ConfirmHost />
+      </PermissionsProvider>
     </AppDataProvider>
   );
 }
