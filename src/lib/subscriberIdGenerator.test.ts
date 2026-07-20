@@ -18,8 +18,9 @@ describe("createRegionPrefix", () => {
     expect(createRegionPrefix("Maharaj Ganj")).toBe("MAHARAJ");
   });
 
-  it("strips non-alphanumerics", () => {
-    expect(createRegionPrefix("St. Peter's")).toBe("STPETERS");
+  it("strips non-alphanumerics from the first word", () => {
+    expect(createRegionPrefix("St. Peter's")).toBe("ST"); // splits on spaces only → first word "St."
+    expect(createRegionPrefix("Ward#7")).toBe("WARD7");
   });
 
   it("falls back to DEFAULT for empty / whitespace", () => {
