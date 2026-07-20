@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db": "pg_prove -v test/db/*.sql"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
