@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * useSubscriberLookup — debounced typeahead for subscriber comboboxes.
  *
- * Returns up to 20 matches by name / mobile / subscriber_id / stb_number.
+ * Returns up to 20 matches by name / mobile / subscriber_id.
  * Use this in place of a full <Select> of every subscriber (which becomes
  * unusable past a few hundred rows).
  */
@@ -43,7 +43,7 @@ export function useSubscriberLookup(userId: string | undefined, term: string, li
       if (debounced) {
         const s = debounced.replace(/[%,]/g, '');
         q = (q as any).or(
-          `name.ilike.%${s}%,mobile.ilike.%${s}%,subscriber_id.ilike.%${s}%,stb_number.ilike.%${s}%`,
+          `name.ilike.%${s}%,mobile.ilike.%${s}%,subscriber_id.ilike.%${s}%`,
         );
       }
 

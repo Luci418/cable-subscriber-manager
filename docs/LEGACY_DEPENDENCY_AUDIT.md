@@ -21,11 +21,11 @@ keep working while callers migrate.
 | `subscribers.current_internet_pack` (text) | Same, internet side | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch B (2026-07-07)** |
 | `subscribers.current_pack_id` (uuid FK) | FK form of `current_pack` | ❌ No frontend readers | `types.ts` only | ✅ Yes | **DROPPED — Batch A (2026-06-20)** |
 | `subscribers.current_internet_pack_id` (uuid FK) | Same, internet | ❌ No frontend readers | `types.ts` only | ✅ Yes | **DROPPED — Batch A (2026-06-20)** |
-| `subscribers.stb_number` (text) | Cache of the single cable STB serial | ✅ Yes — invariant trigger + UI list + CSV | `subscribers_enforce_invariants`, `sync_stb_inventory_on_subscriber_change`, `reconcile_stb_inventory`, `SubscriberList.tsx`, `Index.tsx:75`, CSV export | ❌ No — highest blast radius | Batch D (Phase 8) |
+| `subscribers.stb_number` (text) | Cache of the single cable STB serial | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch D (2026-07-21)** |
 | `subscribers.services[]` (text[]) | Declared intent for which services the subscriber wants | ✅ Yes — many | Trigger + several UI sites | ❌ **Keep** — reframed as declared intent, not derived | No planned removal |
-| `subscribers.stbNumber` (camelCase legacy) | Fallback name for `stb_number` | 🟡 Fallback read only | `SubscriberList.tsx:84,254` | 🟡 After Batch D | With Batch D |
 | `src/lib/storage.ts` (585 LoC) | Pre-Supabase localStorage helpers | ✅ Yes — 7 files still import from it | Various | ❌ Not yet | Opportunistic |
-| `sync_stb_inventory_on_subscriber_change` trigger | Bidirectional sync between `subscribers.stb_number` and `stb_inventory` | ✅ Yes | Trigger on `subscribers` | ❌ No — dies with `stb_number` | Batch D (Phase 8) |
+| `sync_stb_inventory_on_subscriber_change` trigger | Bidirectional sync between `subscribers.stb_number` and `stb_inventory` | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch D (2026-07-21)** |
+| `reconcile_stb_inventory()` RPC | Legacy reconciler that treated `stb_number` as source of truth | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch D (2026-07-21)** |
 | `useEnabledServices` hook | Backwards-compatible shim over `SettingsContext` | ✅ Yes (called across UI) | `src/hooks/useEnabledServices.tsx` | ❌ Not urgent — shim is 20 LoC | Opportunistic |
 
 ## Batch execution status
@@ -50,11 +50,7 @@ keep working while callers migrate.
   and needed no change. Frontend was already fully on the view-backed
   `_activeCable` / `_activeInternet` / `_timelineCable` /
   `_timelineInternet` arrays (Phase 4b), so no UI change was required.
-- **Batch D — Phase 8.** Rewrite cable-STB invariant against
-  `stb_inventory`; migrate list/CSV/detail to compute "primary device +
-  N-1 others" from inventory; retire
-  `sync_stb_inventory_on_subscriber_change`; drop `stb_number`. Highest
-  blast radius — do last.
+- **Batch D — DONE (2026-07-21).** `stb_number` retired. `subscribers_enforce_invariants` simplified (device identity no longer read from the subscriber row); `pair_device` / `unpair_device` / `mark_device_faulty` / `replace_device` rewritten to stop writing the cache; `sync_stb_inventory_on_subscriber_change` and its two triggers dropped; obsolete `reconcile_stb_inventory()` dropped; column `subscribers.stb_number` dropped. Device identity for a subscriber is now derived exclusively from `stb_inventory WHERE subscriber_id = :id AND status = 'assigned'` (current pairing) and `subscriptions.device_serial_snapshot` / `device_id` (per-subscription history). Frontend camelCase `stbNumber` fields that remain are local form/PDF/CSV DTOs unrelated to the removed column. All 46 Vitest tests pass; typecheck clean.
 
 ## Items intentionally NOT scheduled for removal
 
