@@ -50,11 +50,7 @@ keep working while callers migrate.
   and needed no change. Frontend was already fully on the view-backed
   `_activeCable` / `_activeInternet` / `_timelineCable` /
   `_timelineInternet` arrays (Phase 4b), so no UI change was required.
-- **Batch D — Phase 8.** Rewrite cable-STB invariant against
-  `stb_inventory`; migrate list/CSV/detail to compute "primary device +
-  N-1 others" from inventory; retire
-  `sync_stb_inventory_on_subscriber_change`; drop `stb_number`. Highest
-  blast radius — do last.
+- **Batch D — DONE (2026-07-21).** `stb_number` retired. `subscribers_enforce_invariants` simplified (device identity no longer read from the subscriber row); `pair_device` / `unpair_device` / `mark_device_faulty` / `replace_device` rewritten to stop writing the cache; `sync_stb_inventory_on_subscriber_change` and its two triggers dropped; obsolete `reconcile_stb_inventory()` dropped; column `subscribers.stb_number` dropped. Device identity for a subscriber is now derived exclusively from `stb_inventory WHERE subscriber_id = :id AND status = 'assigned'` (current pairing) and `subscriptions.device_serial_snapshot` / `device_id` (per-subscription history). Frontend camelCase `stbNumber` fields that remain are local form/PDF/CSV DTOs unrelated to the removed column. All 46 Vitest tests pass; typecheck clean.
 
 ## Items intentionally NOT scheduled for removal
 
