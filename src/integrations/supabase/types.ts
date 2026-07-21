@@ -633,7 +633,6 @@ export type Database = {
           region: string | null
           region_id: string | null
           services: string[]
-          stb_number: string | null
           subscriber_id: string
           updated_at: string
           user_id: string
@@ -661,7 +660,6 @@ export type Database = {
           region?: string | null
           region_id?: string | null
           services?: string[]
-          stb_number?: string | null
           subscriber_id: string
           updated_at?: string
           user_id: string
@@ -689,7 +687,6 @@ export type Database = {
           region?: string | null
           region_id?: string | null
           services?: string[]
-          stb_number?: string | null
           subscriber_id?: string
           updated_at?: string
           user_id?: string
@@ -1286,7 +1283,6 @@ export type Database = {
         Returns: undefined
       }
       reconcile_all_balances: { Args: never; Returns: Json }
-      reconcile_stb_inventory: { Args: never; Returns: Json }
       reconcile_subscriber_balance: {
         Args: { p_subscriber_id: string }
         Returns: Json
