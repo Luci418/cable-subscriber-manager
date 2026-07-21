@@ -43,7 +43,7 @@ export function useSubscriberLookup(userId: string | undefined, term: string, li
       if (debounced) {
         const s = debounced.replace(/[%,]/g, '');
         q = (q as any).or(
-          `name.ilike.%${s}%,mobile.ilike.%${s}%,subscriber_id.ilike.%${s}%,stb_number.ilike.%${s}%`,
+          `name.ilike.%${s}%,mobile.ilike.%${s}%,subscriber_id.ilike.%${s}%`,
         );
       }
 
