@@ -21,11 +21,11 @@ keep working while callers migrate.
 | `subscribers.current_internet_pack` (text) | Same, internet side | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch B (2026-07-07)** |
 | `subscribers.current_pack_id` (uuid FK) | FK form of `current_pack` | ❌ No frontend readers | `types.ts` only | ✅ Yes | **DROPPED — Batch A (2026-06-20)** |
 | `subscribers.current_internet_pack_id` (uuid FK) | Same, internet | ❌ No frontend readers | `types.ts` only | ✅ Yes | **DROPPED — Batch A (2026-06-20)** |
-| `subscribers.stb_number` (text) | Cache of the single cable STB serial | ✅ Yes — invariant trigger + UI list + CSV | `subscribers_enforce_invariants`, `sync_stb_inventory_on_subscriber_change`, `reconcile_stb_inventory`, `SubscriberList.tsx`, `Index.tsx:75`, CSV export | ❌ No — highest blast radius | Batch D (Phase 8) |
+| `subscribers.stb_number` (text) | Cache of the single cable STB serial | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch D (2026-07-21)** |
 | `subscribers.services[]` (text[]) | Declared intent for which services the subscriber wants | ✅ Yes — many | Trigger + several UI sites | ❌ **Keep** — reframed as declared intent, not derived | No planned removal |
-| `subscribers.stbNumber` (camelCase legacy) | Fallback name for `stb_number` | 🟡 Fallback read only | `SubscriberList.tsx:84,254` | 🟡 After Batch D | With Batch D |
 | `src/lib/storage.ts` (585 LoC) | Pre-Supabase localStorage helpers | ✅ Yes — 7 files still import from it | Various | ❌ Not yet | Opportunistic |
-| `sync_stb_inventory_on_subscriber_change` trigger | Bidirectional sync between `subscribers.stb_number` and `stb_inventory` | ✅ Yes | Trigger on `subscribers` | ❌ No — dies with `stb_number` | Batch D (Phase 8) |
+| `sync_stb_inventory_on_subscriber_change` trigger | Bidirectional sync between `subscribers.stb_number` and `stb_inventory` | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch D (2026-07-21)** |
+| `reconcile_stb_inventory()` RPC | Legacy reconciler that treated `stb_number` as source of truth | ❌ No — dropped | (removed) | ✅ Yes | **DROPPED — Batch D (2026-07-21)** |
 | `useEnabledServices` hook | Backwards-compatible shim over `SettingsContext` | ✅ Yes (called across UI) | `src/hooks/useEnabledServices.tsx` | ❌ Not urgent — shim is 20 LoC | Opportunistic |
 
 ## Batch execution status
