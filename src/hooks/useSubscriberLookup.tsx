@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * useSubscriberLookup — debounced typeahead for subscriber comboboxes.
  *
- * Returns up to 20 matches by name / mobile / subscriber_id / stb_number.
+ * Returns up to 20 matches by name / mobile / subscriber_id.
  * Use this in place of a full <Select> of every subscriber (which becomes
  * unusable past a few hundred rows).
  */
