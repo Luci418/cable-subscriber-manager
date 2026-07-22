@@ -12,6 +12,8 @@ import {
   positionToneClasses,
 } from '@/lib/financialPosition';
 import { buildGrossComponents, type LedgerSubscription } from '@/lib/ledgerRendering';
+import { SubscriberComplaintsCard } from './SubscriberComplaintsCard';
+
 
 interface PairedDevice {
   id: string;
@@ -260,6 +262,11 @@ export function OverviewTab({
           </CardContent>
         </Card>
       )}
+      <SubscriberComplaintsCard
+        subscriberId={subscriber.id}
+        subscriberIdText={(subscriber as any).subscriber_id}
+      />
     </>
   );
 }
+
