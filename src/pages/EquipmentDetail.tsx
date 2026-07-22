@@ -403,7 +403,7 @@ export default function EquipmentDetail() {
         )}
       </SectionCard>
 
-      <AlertDialog open={!!pending} onOpenChange={(o) => { if (!o && !busy) setPending(null); }}>
+      <AlertDialog open={!!pending} onOpenChange={(o) => { if (!o && !busy) { setPending(null); setRepairNotes(''); } }}>
         <AlertDialogContent>
           {pending && (
             <>
@@ -411,6 +411,22 @@ export default function EquipmentDetail() {
                 <AlertDialogTitle>{confirmCopy[pending.kind].title}</AlertDialogTitle>
                 <AlertDialogDescription>{confirmCopy[pending.kind].body}</AlertDialogDescription>
               </AlertDialogHeader>
+              {pending.kind === 'repaired' && (
+                <div className="space-y-2 py-2">
+                  <Label htmlFor="repair-notes">Repair notes (optional)</Label>
+                  <Textarea
+                    id="repair-notes"
+                    placeholder="e.g. Replaced power adapter, firmware reflashed."
+                    value={repairNotes}
+                    onChange={(e) => setRepairNotes(e.target.value)}
+                    rows={3}
+                    disabled={busy}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Recorded in the device history log for audit.
+                  </p>
+                </div>
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
@@ -423,6 +439,7 @@ export default function EquipmentDetail() {
               </AlertDialogFooter>
             </>
           )}
+
         </AlertDialogContent>
       </AlertDialog>
     </>
