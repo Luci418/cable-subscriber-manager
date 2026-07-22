@@ -325,7 +325,18 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
 
       {/* Complaints List */}
       <div className="space-y-4">
-        {filteredComplaints.length === 0 ? (
+        {error ? (
+          <Card>
+            <CardContent className="p-0">
+              <EmptyState
+                variant="error"
+                title="Couldn't load complaints"
+                description={error}
+                onRetry={reloadComplaints}
+              />
+            </CardContent>
+          </Card>
+        ) : filteredComplaints.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -345,8 +356,19 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{complaint.subscriber_name || 'Unknown'}</h3>
+                      {complaint.subscriber_id_text && (
+                        <Link
+                          to={`/customers/${complaint.subscriber_id_text}/overview`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          title="Open customer profile"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {complaint.subscriber_id_text}
+                        </Link>
+                      )}
                       <Badge variant={getPriorityColor(complaint.priority) as any}>
                         {complaint.priority}
                       </Badge>
@@ -356,7 +378,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      ID: {complaint.id} • Subscriber: {complaint.subscriber_id_text || complaint.subscriber_id}
+                      ID: {complaint.id}
                     </p>
                     <p className="text-sm">
                       <strong>Category:</strong> {complaint.category}
@@ -372,6 +394,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
           ))
         )}
       </div>
+
 
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
