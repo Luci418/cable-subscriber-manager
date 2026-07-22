@@ -81,29 +81,16 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
     return true;
   };
 
-  const deleteTransaction = async (id: string) => {
-    const { error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error(friendlyDbError(error, "Failed to delete transaction"));
-      console.error(error);
-      return false;
-    }
-
-    // Optimistic update
-    setTransactions(prev => prev.filter(txn => txn.id !== id));
-    return true;
-  };
+  // `deleteTransaction` was intentionally removed. The DB trigger
+  // `transactions_enforce_immutability` blocks physical deletes; the
+  // supported way to reverse a payment or charge is `void_transaction`.
+  // Do not re-add a delete helper here — it can only mislead future work.
 
   return {
     transactions,
     loading,
     addTransaction,
     updateTransaction,
-    deleteTransaction,
     reloadTransactions: loadTransactions,
   };
 };

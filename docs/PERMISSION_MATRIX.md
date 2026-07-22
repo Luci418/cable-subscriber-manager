@@ -48,8 +48,9 @@ No gaps.
 
 | Action | Backend gate | UI gate | Helper used |
 |---|:---:|:---:|---|
-| Archive customer            | ✓ | ✓ | `canArchiveCustomer` |
-| Reactivate customer         | ✓ | ✓ | `canArchiveCustomer` |
+| Archive customer            | ✓ | ✓ | `canManageCustomerLifecycle` |
+| Reactivate customer         | ✓ | ✓ | `canManageCustomerLifecycle` |
+
 | Void transaction            | ✓ | ✓ | `canVoidTransaction` (folded into `canVoid` predicate) |
 | Cancel subscription         | ✓ | ✓ | `canCancelSubscription` |
 | Collect payment             | ✓ | ✓ | `canCollectPayment` |
