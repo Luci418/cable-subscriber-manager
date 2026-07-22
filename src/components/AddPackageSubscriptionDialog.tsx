@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -117,8 +117,15 @@ export const AddPackageSubscriptionDialog = ({
 
   const hasActiveSubscription = (currentSubscriber?.activeCount || 0) > 0;
 
+  // Ref-based lock so a fast double-click can never fire two submits — React
+  // state updates are async, so `loading` in the guard below may still read
+  // `false` on the second synchronous invocation. The RPC also holds an
+  // advisory lock, but silently deduplicating in the UI avoids the duplicate
+  // error toast operators saw before.
+  const submittingRef = useRef(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!selectedPack || loading) {
       if (!selectedPack) toast.error('Please select a package');
       return;
@@ -127,8 +134,14 @@ export const AddPackageSubscriptionDialog = ({
       toast.error(`Please cancel the current ${serviceLabel.toLowerCase()} subscription first`);
       return;
     }
-    await addNewSubscription();
+    submittingRef.current = true;
+    try {
+      await addNewSubscription();
+    } finally {
+      submittingRef.current = false;
+    }
   };
+
 
   const addNewSubscription = async () => {
     setLoading(true);

@@ -1,4 +1,5 @@
-import { useState, useEffect }      from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle }    from '@/components/ui/card';
 import { Button }        from '@/components/ui/button';
 import { Input }         from '@/components/ui/input';
@@ -7,11 +8,12 @@ import { Textarea }      from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge }         from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus, ExternalLink } from 'lucide-react';
 import { useAuth }       from '@/hooks/useAuth';
 import { useComplaints }  from '@/hooks/useComplaints';
 import { toast }          from 'sonner';
-import { SubscriberCombobox, type SubscriberComboboxValue } from '@/components/ui-ext';
+import { EmptyState, SubscriberCombobox, type SubscriberComboboxValue } from '@/components/ui-ext';
+
 
 interface ComplaintsProps {
   onBack: () => void;
@@ -19,11 +21,22 @@ interface ComplaintsProps {
 
 export const Complaints = ({ onBack }: ComplaintsProps) => {
   const { user } = useAuth();
-  const { complaints, loading, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
+  const { complaints, loading, error, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
 
-  const [filteredComplaints, setFilteredComplaints] = useState(complaints);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  // URL-persisted filters — pressing back from a detail view or sharing a
+  // link keeps the operator in the same slice they were investigating.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get('q') ?? '';
+  const statusFilter = searchParams.get('status') ?? 'all';
+  const patchParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [k, v] of Object.entries(patch)) {
+      if (!v || v === 'all') next.delete(k);
+      else next.set(k, v);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
   const [selectedComplaint, setSelectedComplaint] = useState<(typeof complaints)[0] | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -32,30 +45,24 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   const [resolveNotes, setResolveNotes] = useState('');
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
-  useEffect(() => {
-    filterComplaints();
-  }, [complaints, searchTerm, statusFilter]);
-
-  const filterComplaints = () => {
+  const filteredComplaints = useMemo(() => {
     let filtered = [...complaints];
-
     if (statusFilter !== 'all') {
       filtered = filtered.filter((c) => c.status === statusFilter);
     }
-
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (c) =>
           (c.subscriber_name || '').toLowerCase().includes(q) ||
           c.description.toLowerCase().includes(q) ||
-          c.id.toLowerCase().includes(q)
+          c.id.toLowerCase().includes(q),
       );
     }
-
     filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    setFilteredComplaints(filtered);
-  };
+    return filtered;
+  }, [complaints, searchTerm, statusFilter]);
+
 
   const handleAddComplaint = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -292,14 +299,14 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                   id="search"
                   placeholder="Search by ID, name, or description…"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => patchParams({ q: e.target.value })}
                   className="pl-10"
                 />
               </div>
             </div>
             <div className="w-48">
               <Label htmlFor="status">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(v) => patchParams({ status: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -315,9 +322,21 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
         </CardContent>
       </Card>
 
+
       {/* Complaints List */}
       <div className="space-y-4">
-        {filteredComplaints.length === 0 ? (
+        {error ? (
+          <Card>
+            <CardContent className="p-0">
+              <EmptyState
+                variant="error"
+                title="Couldn't load complaints"
+                description={error}
+                onRetry={reloadComplaints}
+              />
+            </CardContent>
+          </Card>
+        ) : filteredComplaints.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -337,8 +356,19 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{complaint.subscriber_name || 'Unknown'}</h3>
+                      {complaint.subscriber_id_text && (
+                        <Link
+                          to={`/customers/${complaint.subscriber_id_text}/overview`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          title="Open customer profile"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {complaint.subscriber_id_text}
+                        </Link>
+                      )}
                       <Badge variant={getPriorityColor(complaint.priority) as any}>
                         {complaint.priority}
                       </Badge>
@@ -348,7 +378,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      ID: {complaint.id} • Subscriber: {complaint.subscriber_id_text || complaint.subscriber_id}
+                      ID: {complaint.id}
                     </p>
                     <p className="text-sm">
                       <strong>Category:</strong> {complaint.category}
@@ -364,6 +394,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
           ))
         )}
       </div>
+
 
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>

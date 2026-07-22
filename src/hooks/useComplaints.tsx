@@ -14,11 +14,15 @@ export interface ComplaintWithSubscriber extends ComplaintRow {
 export const useComplaints = (userId: string | undefined) => {
   const [complaints, setComplaints] = useState<ComplaintWithSubscriber[]>([]);
   const [loading, setLoading] = useState(true);
+  // Load-time error is surfaced separately from mutation errors so pages
+  // can render an EmptyState with a Retry button instead of an empty list.
+  const [error, setError] = useState<string | null>(null);
 
   const loadComplaints = async () => {
     if (!userId) return;
 
     setLoading(true);
+    setError(null);
     const { data, error } = await supabase
       .from("complaints")
       .select(`
@@ -29,10 +33,11 @@ export const useComplaints = (userId: string | undefined) => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error(friendlyDbError(error, "Failed to load complaints"));
+      const msg = friendlyDbError(error, "Failed to load complaints");
+      toast.error(msg);
       console.error(error);
+      setError(msg);
     } else {
-      // Flatten joined subscriber data
       const normalized = (data || []).map((row: any) => ({
         ...row,
         subscriber_name: row.subscribers?.name,
@@ -42,6 +47,7 @@ export const useComplaints = (userId: string | undefined) => {
     }
     setLoading(false);
   };
+
 
   useEffect(() => {
     loadComplaints();
@@ -141,9 +147,11 @@ export const useComplaints = (userId: string | undefined) => {
   return {
     complaints,
     loading,
+    error,
     addComplaint,
     updateComplaint,
     deleteComplaint,
     reloadComplaints: loadComplaints,
   };
 };
+

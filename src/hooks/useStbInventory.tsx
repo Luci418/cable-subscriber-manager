@@ -204,12 +204,22 @@ export const useStbInventory = (userId: string | undefined) => {
     return true;
   };
 
-  const markAsRepaired = async (stbId: string) => {
-    return await updateStb(stbId, { 
-      status: 'available', 
-      notes: 'Repaired and available' 
+  const markAsRepaired = async (stbId: string, repairNotes?: string) => {
+    // Routes through the mark_device_repaired RPC so the transition is
+    // atomic and the operator's repair notes land in device_status_log.
+    const { error } = await (supabase as any).rpc('mark_device_repaired', {
+      p_device_id: stbId,
+      p_repair_notes: repairNotes ?? null,
     });
+    if (error) {
+      toast.error(friendlyDbError(error, 'Failed to mark device repaired'));
+      console.error(error);
+      return false;
+    }
+    await loadStbs();
+    return true;
   };
+
 
   const decommission = async (stbId: string, reason?: string) => {
     const stb = stbs.find(s => s.id === stbId);

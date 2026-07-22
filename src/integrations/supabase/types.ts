@@ -505,6 +505,36 @@ export type Database = {
         }
         Relationships: []
       }
+      settings_audit: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          field_name: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          field_name: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       stb_inventory: {
         Row: {
           created_at: string
@@ -1265,6 +1295,10 @@ export type Database = {
       mark_device_faulty: {
         Args: { p_device_id: string; p_reason?: string }
         Returns: Json
+      }
+      mark_device_repaired: {
+        Args: { p_device_id: string; p_repair_notes?: string }
+        Returns: undefined
       }
       pair_device: {
         Args: {
