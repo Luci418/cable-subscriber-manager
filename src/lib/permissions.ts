@@ -33,6 +33,14 @@ interface Permissions {
   isTechnician: boolean;
   canVoidTransaction: boolean;
   canCancelSubscription: boolean;
+  /**
+   * Archive and reactivate share the same role set. `canManageCustomerLifecycle`
+   * is the canonical name; `canArchiveCustomer` is kept as a deprecated alias
+   * for backwards compatibility with older call sites and will be removed in a
+   * future cleanup.
+   */
+  canManageCustomerLifecycle: boolean;
+  /** @deprecated use canManageCustomerLifecycle */
   canArchiveCustomer: boolean;
   canPairDevice: boolean;
   canReplaceDevice: boolean;
@@ -50,6 +58,7 @@ const EMPTY: Permissions = {
   isTechnician: false,
   canVoidTransaction: false,
   canCancelSubscription: false,
+  canManageCustomerLifecycle: false,
   canArchiveCustomer: false,
   canPairDevice: false,
   canReplaceDevice: false,
@@ -79,16 +88,18 @@ const derive = (roles: AppRole[]): Permissions => {
     isAdmin,
     isCollectionAgent,
     isTechnician,
-    canVoidTransaction:    isAdmin,
-    canCancelSubscription: isAdmin,
-    canArchiveCustomer:    isAdmin,
-    canPairDevice:         isAdmin || isTechnician,
-    canReplaceDevice:      isAdmin || isTechnician,
-    canCollectPayment:     isAdmin || isCollectionAgent,
-    canModifySettings:     isOwner,
-    canViewCredentials:    canViewCredentials(roles),
+    canVoidTransaction:         isAdmin,
+    canCancelSubscription:      isAdmin,
+    canManageCustomerLifecycle: isAdmin,
+    canArchiveCustomer:         isAdmin,
+    canPairDevice:              isAdmin || isTechnician,
+    canReplaceDevice:           isAdmin || isTechnician,
+    canCollectPayment:          isAdmin || isCollectionAgent,
+    canModifySettings:          isOwner,
+    canViewCredentials:         canViewCredentials(roles),
   };
 };
+
 
 /**
  * PermissionsProvider — fetches the signed-in user's roles ONCE per session
