@@ -299,14 +299,14 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
                   id="search"
                   placeholder="Search by ID, name, or description…"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => patchParams({ q: e.target.value })}
                   className="pl-10"
                 />
               </div>
             </div>
             <div className="w-48">
               <Label htmlFor="status">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(v) => patchParams({ status: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -321,6 +321,7 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Complaints List */}
       <div className="space-y-4">
