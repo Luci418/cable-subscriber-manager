@@ -4,6 +4,8 @@ import { HardDrive, Tv, Wifi, Wrench, CheckCircle2, XCircle, Link2Off, Loader2, 
 import { PageHeader, SectionCard, EmptyState, KeyValue } from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +30,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePermissions } from '@/lib/permissions';
+
 
 /**
  * /equipment/:serial — per-device workspace.
@@ -96,6 +99,8 @@ export default function EquipmentDetail() {
   const [vendorRow, setVendorRow] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [repairNotes, setRepairNotes] = useState('');
+
 
   const reload = async () => {
     if (!serial) return;
@@ -172,7 +177,7 @@ export default function EquipmentDetail() {
       let ok: any = false;
       let msg = '';
       if (pending.kind === 'faulty') { ok = await markAsFaulty(device.id); msg = 'Marked as faulty'; }
-      else if (pending.kind === 'repaired') { ok = await markAsRepaired(device.id); msg = 'Marked as repaired'; }
+      else if (pending.kind === 'repaired') { ok = await markAsRepaired(device.id, repairNotes.trim() || undefined); msg = 'Marked as repaired'; }
       else if (pending.kind === 'decommission') { ok = await decommission(device.id); msg = 'Decommissioned'; }
       else if (pending.kind === 'unpair') { ok = await unassignStb(device.id); msg = 'Device unpaired'; }
       if (ok !== false) {
@@ -183,8 +188,10 @@ export default function EquipmentDetail() {
     } finally {
       setBusy(false);
       setPending(null);
+      setRepairNotes('');
     }
   };
+
 
   const confirmCopy: Record<PendingAction['kind'], { title: string; body: string; confirm: string; destructive?: boolean }> = {
     faulty: {
