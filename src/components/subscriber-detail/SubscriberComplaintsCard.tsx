@@ -64,7 +64,7 @@ export function SubscriberComplaintsCard({ subscriberId, subscriberIdText }: Pro
           <AlertCircle className="h-4 w-4" />
           Complaints
           {openCount > 0 && (
-            <Badge variant="warning" className="ml-1">{openCount} open</Badge>
+            <Badge variant={"warning" as any} className="ml-1">{openCount} open</Badge>
           )}
         </CardTitle>
         <Button asChild variant="ghost" size="sm">
