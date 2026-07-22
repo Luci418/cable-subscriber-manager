@@ -21,11 +21,22 @@ interface ComplaintsProps {
 
 export const Complaints = ({ onBack }: ComplaintsProps) => {
   const { user } = useAuth();
-  const { complaints, loading, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
+  const { complaints, loading, error, addComplaint, updateComplaint, deleteComplaint, reloadComplaints } = useComplaints(user?.id);
 
-  const [filteredComplaints, setFilteredComplaints] = useState(complaints);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  // URL-persisted filters — pressing back from a detail view or sharing a
+  // link keeps the operator in the same slice they were investigating.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get('q') ?? '';
+  const statusFilter = searchParams.get('status') ?? 'all';
+  const patchParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [k, v] of Object.entries(patch)) {
+      if (!v || v === 'all') next.delete(k);
+      else next.set(k, v);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
   const [selectedComplaint, setSelectedComplaint] = useState<(typeof complaints)[0] | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -34,30 +45,24 @@ export const Complaints = ({ onBack }: ComplaintsProps) => {
   const [resolveNotes, setResolveNotes] = useState('');
   const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
-  useEffect(() => {
-    filterComplaints();
-  }, [complaints, searchTerm, statusFilter]);
-
-  const filterComplaints = () => {
+  const filteredComplaints = useMemo(() => {
     let filtered = [...complaints];
-
     if (statusFilter !== 'all') {
       filtered = filtered.filter((c) => c.status === statusFilter);
     }
-
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (c) =>
           (c.subscriber_name || '').toLowerCase().includes(q) ||
           c.description.toLowerCase().includes(q) ||
-          c.id.toLowerCase().includes(q)
+          c.id.toLowerCase().includes(q),
       );
     }
-
     filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    setFilteredComplaints(filtered);
-  };
+    return filtered;
+  }, [complaints, searchTerm, statusFilter]);
+
 
   const handleAddComplaint = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
