@@ -1,4 +1,5 @@
-import { useState, useEffect }      from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle }    from '@/components/ui/card';
 import { Button }        from '@/components/ui/button';
 import { Input }         from '@/components/ui/input';
@@ -7,11 +8,12 @@ import { Textarea }      from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge }         from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Clock, CheckCircle2, Search, Plus, ExternalLink } from 'lucide-react';
 import { useAuth }       from '@/hooks/useAuth';
 import { useComplaints }  from '@/hooks/useComplaints';
 import { toast }          from 'sonner';
-import { SubscriberCombobox, type SubscriberComboboxValue } from '@/components/ui-ext';
+import { EmptyState, SubscriberCombobox, type SubscriberComboboxValue } from '@/components/ui-ext';
+
 
 interface ComplaintsProps {
   onBack: () => void;
