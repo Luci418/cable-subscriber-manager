@@ -12,8 +12,9 @@ for the rationale behind each role.
 
 | Action | Owner | Admin (Office) | Collection Agent | Technician | Backend gate | UI helper |
 |---|:---:|:---:|:---:|:---:|---|---|
-| Archive customer            | ✓ | ✓ |   |   | `archive_subscriber` RPC → `can_archive_customer()` | `canArchiveCustomer` |
-| Reactivate customer         | ✓ | ✓ |   |   | `reactivate_subscriber` RPC → `can_archive_customer()` | `canArchiveCustomer` |
+| Archive customer            | ✓ | ✓ |   |   | `archive_subscriber` RPC → `can_archive_customer()` | `canManageCustomerLifecycle` |
+| Reactivate customer         | ✓ | ✓ |   |   | `reactivate_subscriber` RPC → `can_archive_customer()` | `canManageCustomerLifecycle` |
+
 | Void transaction            | ✓ | ✓ |   |   | `trg_transactions_enforce_void_role` + `void_transaction` RPC → `can_void_transaction()` | `canVoidTransaction` |
 | Cancel subscription (+ refund) | ✓ | ✓ |   |   | `cancel_subscription` RPC → `can_cancel_subscription()` | `canCancelSubscription` |
 | Collect payment             | ✓ | ✓ | ✓ |   | (transactions insert; role-recorded via `created_by`) | `canCollectPayment` |
