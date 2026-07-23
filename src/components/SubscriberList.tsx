@@ -16,7 +16,7 @@ import { PageHeader, Toolbar, DataTable, EmptyState, Pagination, Money, SectionC
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useRegions } from '@/hooks/useRegions';
-import { useSubscribersPaged, type ServiceFilter, type StatusFilter, type BalanceFilter } from '@/hooks/useSubscribersPaged';
+import { useSubscribersPaged, type ServiceFilter, type StatusFilter, type BalanceFilter, type ConnectionFilter } from '@/hooks/useSubscribersPaged';
 import { computeNextActionChip, chipToneClasses } from '@/lib/financialPosition';
 import { CollectPaymentDialog } from '@/components/CollectPaymentDialog';
 import type { Subscriber } from '@/hooks/useSubscribers';
