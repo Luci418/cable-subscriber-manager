@@ -104,6 +104,34 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
         );
       }
 
+      // Connection filter: subscribers with / without an active subscription
+      // for a specific service. Pre-fetch the active subscriber_ids and
+      // apply .in()/.not.in() to the main query.
+      if (connection !== 'any') {
+        const svc = connection.includes('cable') ? 'cable' : 'internet';
+        const want = connection.startsWith('active');
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: activeSubs } = await (supabase as any)
+          .from('subscriptions')
+          .select('subscriber_id')
+          .eq('user_id', userId)
+          .eq('service_type', svc)
+          .eq('status', 'active')
+          .gt('end_date', today);
+        const ids = Array.from(new Set((activeSubs ?? []).map((r: any) => r.subscriber_id)));
+        // Only surface subscribers that actually have this service enabled.
+        q = (q as any).contains('services', [svc]);
+        if (want) {
+          if (ids.length === 0) {
+            setRows([]); setTotal(0); setLoading(false); return;
+          }
+          q = (q as any).in('id', ids);
+        } else if (ids.length > 0) {
+          q = (q as any).not('id', 'in', `(${ids.join(',')})`);
+        }
+      }
+
+
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
       q = q.order('created_at', { ascending: false }).range(from, to);
