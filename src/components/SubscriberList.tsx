@@ -16,7 +16,7 @@ import { PageHeader, Toolbar, DataTable, EmptyState, Pagination, Money, SectionC
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useRegions } from '@/hooks/useRegions';
-import { useSubscribersPaged, type ServiceFilter, type StatusFilter, type BalanceFilter } from '@/hooks/useSubscribersPaged';
+import { useSubscribersPaged, type ServiceFilter, type StatusFilter, type BalanceFilter, type ConnectionFilter } from '@/hooks/useSubscribersPaged';
 import { computeNextActionChip, chipToneClasses } from '@/lib/financialPosition';
 import { CollectPaymentDialog } from '@/components/CollectPaymentDialog';
 import type { Subscriber } from '@/hooks/useSubscribers';
@@ -64,11 +64,13 @@ export const SubscriberList = ({
   const region = params.get('region') ?? 'all';
   const status = (params.get('status') ?? 'active') as StatusFilter;
   const balance = (params.get('balance') ?? 'all') as BalanceFilter;
+  const connection = (params.get('connection') ?? 'any') as ConnectionFilter;
   const page = Math.max(1, Number(params.get('page') ?? '1'));
+
 
   const setParam = (key: string, value: string | null, resetPage = true) => {
     const next = new URLSearchParams(params);
-    if (value == null || value === '' || (key !== 'q' && value === 'all')) next.delete(key);
+    if (value == null || value === '' || (key !== 'q' && (value === 'all' || value === 'any'))) next.delete(key);
     else next.set(key, value);
     if (resetPage) next.delete('page');
     setParams(next, { replace: true });
@@ -87,10 +89,12 @@ export const SubscriberList = ({
     region,
     status,
     balance,
+    connection,
     page,
     pageSize: PAGE_SIZE,
     refreshKey,
   });
+
 
   const [collect, setCollect] = useState<{
     sub: Subscriber;
@@ -344,6 +348,17 @@ export const SubscriberList = ({
                 <SelectItem value="settled">Settled</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={connection} onValueChange={(v) => setParam('connection', v)}>
+              <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Connection" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any connection</SelectItem>
+                {cableEnabled && <SelectItem value="active_cable">Active cable</SelectItem>}
+                {cableEnabled && <SelectItem value="no_active_cable">No active cable</SelectItem>}
+                {internetEnabled && <SelectItem value="active_internet">Active internet</SelectItem>}
+                {internetEnabled && <SelectItem value="no_active_internet">No active internet</SelectItem>}
+              </SelectContent>
+            </Select>
+
           </>
         }
         className="mb-4"

@@ -17,6 +17,12 @@ import type { SubscriptionBlob } from '@/lib/activeSubs';
 export type ServiceFilter = 'all' | 'cable' | 'internet';
 export type StatusFilter = 'all' | 'active' | 'prospect' | 'archived';
 export type BalanceFilter = 'all' | 'dues' | 'credit' | 'settled';
+export type ConnectionFilter =
+  | 'any'
+  | 'active_cable'
+  | 'no_active_cable'
+  | 'active_internet'
+  | 'no_active_internet';
 
 export interface UseSubscribersPagedOptions {
   userId: string | undefined;
@@ -25,11 +31,13 @@ export interface UseSubscribersPagedOptions {
   region: string; // 'all' or a region name
   status: StatusFilter;
   balance: BalanceFilter;
+  connection?: ConnectionFilter;
   page: number; // 1-indexed
   pageSize: number;
   /** Bump to force refetch (e.g. after import). */
   refreshKey?: number;
 }
+
 
 export interface UseSubscribersPagedResult {
   rows: Subscriber[];
@@ -39,12 +47,13 @@ export interface UseSubscribersPagedResult {
 }
 
 export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscribersPagedResult {
-  const { userId, search, service, region, status, balance, page, pageSize, refreshKey } = opts;
+  const { userId, search, service, region, status, balance, connection = 'any', page, pageSize, refreshKey } = opts;
 
   const [rows, setRows] = useState<Subscriber[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
 
   // Debounce the search input on the hook side so callers don't have to.
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -54,9 +63,10 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
   }, [search]);
 
   const queryKey = useMemo(
-    () => JSON.stringify({ userId, debouncedSearch, service, region, status, balance, page, pageSize, refreshKey }),
-    [userId, debouncedSearch, service, region, status, balance, page, pageSize, refreshKey],
+    () => JSON.stringify({ userId, debouncedSearch, service, region, status, balance, connection, page, pageSize, refreshKey }),
+    [userId, debouncedSearch, service, region, status, balance, connection, page, pageSize, refreshKey],
   );
+
 
   useEffect(() => {
     if (!userId) return;
@@ -93,6 +103,34 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
           `name.ilike.%${s}%,mobile.ilike.%${s}%,subscriber_id.ilike.%${s}%`,
         );
       }
+
+      // Connection filter: subscribers with / without an active subscription
+      // for a specific service. Pre-fetch the active subscriber_ids and
+      // apply .in()/.not.in() to the main query.
+      if (connection !== 'any') {
+        const svc = connection.includes('cable') ? 'cable' : 'internet';
+        const want = connection.startsWith('active');
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: activeSubs } = await (supabase as any)
+          .from('subscriptions')
+          .select('subscriber_id')
+          .eq('user_id', userId)
+          .eq('service_type', svc)
+          .eq('status', 'active')
+          .gt('end_date', today);
+        const ids = Array.from(new Set((activeSubs ?? []).map((r: any) => r.subscriber_id)));
+        // Only surface subscribers that actually have this service enabled.
+        q = (q as any).contains('services', [svc]);
+        if (want) {
+          if (ids.length === 0) {
+            setRows([]); setTotal(0); setLoading(false); return;
+          }
+          q = (q as any).in('id', ids);
+        } else if (ids.length > 0) {
+          q = (q as any).not('id', 'in', `(${ids.join(',')})`);
+        }
+      }
+
 
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;

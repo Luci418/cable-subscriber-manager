@@ -85,35 +85,51 @@ export const AddPackageSubscriptionDialog = ({
     }
   }, [open, user?.id]);
 
-  // Load active-subscription count AND the pinned provider for this service
-  // so pack filtering matches the DB invariant.
+  // Load active-subscription count scoped to the specific device when one
+  // is provided (multi-STB subscribers). Falls back to per-service scope
+  // for legacy single-device usage. This matches the DB uniqueness
+  // constraint UNIQUE(device_id) WHERE status='active'.
   const loadSubscriber = async () => {
     if (!subscriberId) return;
     setSubscriberLoading(true);
-    const [viewRes, subRes] = await Promise.all([
-      (supabase as any)
-        .from('v_subscriber_active_subscription')
-        .select('subscription_id')
-        .eq('subscriber_id', subscriberId)
-        .eq('service_type', serviceType),
-      (supabase as any)
-        .from('subscribers')
-        .select('cable_provider_id, internet_provider_id')
-        .eq('id', subscriberId)
-        .maybeSingle(),
-    ]);
-    const activeCount = (viewRes?.data as any[] | null)?.length || 0;
+
+    let activeCount = 0;
+    let pinnedProvider: string | null = null;
+
+    if (deviceId) {
+      const { data } = await (supabase as any)
+        .from('subscriptions')
+        .select('id, provider_id')
+        .eq('device_id', deviceId)
+        .eq('status', 'active');
+      activeCount = (data ?? []).length;
+      pinnedProvider = activeCount > 0 ? (data![0]?.provider_id ?? null) : null;
+    } else {
+      const [viewRes, subRes] = await Promise.all([
+        (supabase as any)
+          .from('v_subscriber_active_subscription')
+          .select('subscription_id')
+          .eq('subscriber_id', subscriberId)
+          .eq('service_type', serviceType),
+        (supabase as any)
+          .from('subscribers')
+          .select('cable_provider_id, internet_provider_id')
+          .eq('id', subscriberId)
+          .maybeSingle(),
+      ]);
+      activeCount = (viewRes?.data as any[] | null)?.length || 0;
+      pinnedProvider = activeCount > 0
+        ? (serviceType === 'internet'
+            ? subRes?.data?.internet_provider_id
+            : subRes?.data?.cable_provider_id) ?? null
+        : null;
+    }
+
     setCurrentSubscriber({ activeCount });
-    // Only pin the provider when at least one active sub exists — otherwise
-    // let the operator pick any provider's pack (first sub for this service).
-    const pinned = activeCount > 0
-      ? (serviceType === 'internet'
-          ? subRes?.data?.internet_provider_id
-          : subRes?.data?.cable_provider_id) ?? null
-      : null;
-    setActiveProviderId(pinned);
+    setActiveProviderId(pinnedProvider);
     setSubscriberLoading(false);
   };
+
 
   const hasActiveSubscription = (currentSubscriber?.activeCount || 0) > 0;
 
