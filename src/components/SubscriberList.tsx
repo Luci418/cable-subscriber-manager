@@ -64,7 +64,9 @@ export const SubscriberList = ({
   const region = params.get('region') ?? 'all';
   const status = (params.get('status') ?? 'active') as StatusFilter;
   const balance = (params.get('balance') ?? 'all') as BalanceFilter;
+  const connection = (params.get('connection') ?? 'any') as ConnectionFilter;
   const page = Math.max(1, Number(params.get('page') ?? '1'));
+
 
   const setParam = (key: string, value: string | null, resetPage = true) => {
     const next = new URLSearchParams(params);
