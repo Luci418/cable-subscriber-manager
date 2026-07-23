@@ -70,7 +70,7 @@ export const SubscriberList = ({
 
   const setParam = (key: string, value: string | null, resetPage = true) => {
     const next = new URLSearchParams(params);
-    if (value == null || value === '' || (key !== 'q' && value === 'all')) next.delete(key);
+    if (value == null || value === '' || (key !== 'q' && (value === 'all' || value === 'any'))) next.delete(key);
     else next.set(key, value);
     if (resetPage) next.delete('page');
     setParams(next, { replace: true });
@@ -89,10 +89,12 @@ export const SubscriberList = ({
     region,
     status,
     balance,
+    connection,
     page,
     pageSize: PAGE_SIZE,
     refreshKey,
   });
+
 
   const [collect, setCollect] = useState<{
     sub: Subscriber;
