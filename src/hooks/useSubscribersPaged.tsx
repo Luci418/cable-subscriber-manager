@@ -63,9 +63,10 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
   }, [search]);
 
   const queryKey = useMemo(
-    () => JSON.stringify({ userId, debouncedSearch, service, region, status, balance, page, pageSize, refreshKey }),
-    [userId, debouncedSearch, service, region, status, balance, page, pageSize, refreshKey],
+    () => JSON.stringify({ userId, debouncedSearch, service, region, status, balance, connection, page, pageSize, refreshKey }),
+    [userId, debouncedSearch, service, region, status, balance, connection, page, pageSize, refreshKey],
   );
+
 
   useEffect(() => {
     if (!userId) return;
