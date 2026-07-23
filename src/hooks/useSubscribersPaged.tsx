@@ -47,12 +47,13 @@ export interface UseSubscribersPagedResult {
 }
 
 export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscribersPagedResult {
-  const { userId, search, service, region, status, balance, page, pageSize, refreshKey } = opts;
+  const { userId, search, service, region, status, balance, connection = 'any', page, pageSize, refreshKey } = opts;
 
   const [rows, setRows] = useState<Subscriber[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
 
   // Debounce the search input on the hook side so callers don't have to.
   const [debouncedSearch, setDebouncedSearch] = useState(search);
