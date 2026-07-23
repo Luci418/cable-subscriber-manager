@@ -348,6 +348,17 @@ export const SubscriberList = ({
                 <SelectItem value="settled">Settled</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={connection} onValueChange={(v) => setParam('connection', v)}>
+              <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Connection" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any connection</SelectItem>
+                {cableEnabled && <SelectItem value="active_cable">Active cable</SelectItem>}
+                {cableEnabled && <SelectItem value="no_active_cable">No active cable</SelectItem>}
+                {internetEnabled && <SelectItem value="active_internet">Active internet</SelectItem>}
+                {internetEnabled && <SelectItem value="no_active_internet">No active internet</SelectItem>}
+              </SelectContent>
+            </Select>
+
           </>
         }
         className="mb-4"
