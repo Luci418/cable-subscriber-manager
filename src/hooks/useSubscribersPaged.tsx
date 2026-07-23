@@ -17,6 +17,12 @@ import type { SubscriptionBlob } from '@/lib/activeSubs';
 export type ServiceFilter = 'all' | 'cable' | 'internet';
 export type StatusFilter = 'all' | 'active' | 'prospect' | 'archived';
 export type BalanceFilter = 'all' | 'dues' | 'credit' | 'settled';
+export type ConnectionFilter =
+  | 'any'
+  | 'active_cable'
+  | 'no_active_cable'
+  | 'active_internet'
+  | 'no_active_internet';
 
 export interface UseSubscribersPagedOptions {
   userId: string | undefined;
@@ -25,11 +31,13 @@ export interface UseSubscribersPagedOptions {
   region: string; // 'all' or a region name
   status: StatusFilter;
   balance: BalanceFilter;
+  connection?: ConnectionFilter;
   page: number; // 1-indexed
   pageSize: number;
   /** Bump to force refetch (e.g. after import). */
   refreshKey?: number;
 }
+
 
 export interface UseSubscribersPagedResult {
   rows: Subscriber[];
