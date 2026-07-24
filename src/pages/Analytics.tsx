@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
+import { usePacks } from '@/hooks/usePacks';
 import { cn } from '@/lib/utils';
 
 type ServiceFilter = 'all' | 'cable' | 'internet';
