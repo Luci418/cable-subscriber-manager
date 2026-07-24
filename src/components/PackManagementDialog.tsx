@@ -83,6 +83,7 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       billing_type: formData.billing_type,
       validity_days: formData.billing_type === 'prepaid' ? formData.validity_days : null,
       provider_id: formData.provider_id,
+      provider_cost: formData.provider_cost.trim() === '' ? null : parseFloat(formData.provider_cost),
     };
 
     const success = editingId
@@ -105,8 +106,10 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       billing_type: (pack.billing_type as BillingType) || 'postpaid',
       validity_days: pack.validity_days ?? 30,
       provider_id: pack.provider_id || '',
+      provider_cost: pack.provider_cost != null ? String(pack.provider_cost) : '',
     });
   };
+
 
   const handleDelete = async (id: string) => {
     const { confirm } = await import('@/lib/confirm');
