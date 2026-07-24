@@ -419,6 +419,128 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [providers, subsScoped, txnsInRange, service]);
 
+  // ---------- margin analysis (per pack / per provider) ----------
+  // Uses each pack's `provider_cost` × current active-subscription count.
+  // Packs without provider_cost set are excluded from cost totals and flagged
+  // in the table as 'cost not set'.
+  const marginPerPack = useMemo(() => {
+    const packByKey = new Map<string, any>();
+    (packs as any[]).forEach(p => {
+      const svc = p.service_type || 'cable';
+      if (service !== 'all' && svc !== service) return;
+      packByKey.set(`${p.name}::${svc}`, p);
+    });
+
+    // count active subs per pack (from timeline arrays)
+    const subCount = new Map<string, number>();
+    subsScoped.forEach(s => {
+      if (service === 'all' || service === 'cable') {
+        ((s as any)._activeCable || []).forEach((a: any) => {
+          if (!a?.packName) return;
+          const k = `${a.packName}::cable`;
+          subCount.set(k, (subCount.get(k) || 0) + 1);
+        });
+      }
+      if (service === 'all' || service === 'internet') {
+        ((s as any)._activeInternet || []).forEach((a: any) => {
+          if (!a?.packName) return;
+          const k = `${a.packName}::internet`;
+          subCount.set(k, (subCount.get(k) || 0) + 1);
+        });
+      }
+    });
+
+    // attribute revenue from packPerf (already keyed as `${name} · ${Service}`)
+    const revByKey = new Map<string, number>();
+    packPerf.forEach(p => {
+      // p.name = `${packName} · Cable|Internet`
+      const idx = p.name.lastIndexOf(' · ');
+      if (idx < 0) return;
+      const packName = p.name.slice(0, idx);
+      const svc = p.name.slice(idx + 3).toLowerCase();
+      revByKey.set(`${packName}::${svc}`, p.revenue);
+    });
+
+    const rows: Array<{
+      key: string;
+      packName: string;
+      service: string;
+      providerId: string | null;
+      providerName: string;
+      subs: number;
+      gross: number;
+      unitCost: number | null;
+      cost: number | null;
+      net: number | null;
+      marginPct: number | null;
+    }> = [];
+
+    const providerById = new Map(providers.map(p => [p.id, p]));
+
+    // Include every active pack that has subscribers OR revenue OR is defined
+    const allKeys = new Set<string>([...packByKey.keys(), ...subCount.keys(), ...revByKey.keys()]);
+    allKeys.forEach(k => {
+      const [packName, svc] = k.split('::');
+      const p = packByKey.get(k);
+      const subs = subCount.get(k) || 0;
+      const gross = revByKey.get(k) || 0;
+      if (subs === 0 && gross === 0) return;
+      const unitCost = p?.provider_cost != null ? Number(p.provider_cost) : null;
+      const cost = unitCost != null ? unitCost * subs : null;
+      const net = cost != null ? gross - cost : null;
+      const marginPct = cost != null && gross > 0 ? (net! / gross) * 100 : null;
+      const providerId = p?.provider_id || null;
+      rows.push({
+        key: k,
+        packName,
+        service: svc,
+        providerId,
+        providerName: providerId ? (providerById.get(providerId)?.name || 'Unknown') : 'Unassigned',
+        subs,
+        gross,
+        unitCost,
+        cost,
+        net,
+        marginPct,
+      });
+    });
+    return rows.sort((a, b) => b.gross - a.gross);
+  }, [packs, subsScoped, packPerf, providers, service]);
+
+  const marginPerProvider = useMemo(() => {
+    const map = new Map<string, {
+      providerName: string;
+      subs: number;
+      gross: number;
+      cost: number;
+      hasCost: boolean;
+      missingCostPacks: number;
+    }>();
+    marginPerPack.forEach(r => {
+      const key = `${r.providerName}::${r.service}`;
+      const cur = map.get(key) || { providerName: `${r.providerName} · ${r.service === 'internet' ? 'Internet' : 'Cable'}`, subs: 0, gross: 0, cost: 0, hasCost: false, missingCostPacks: 0 };
+      cur.subs += r.subs;
+      cur.gross += r.gross;
+      if (r.cost != null) { cur.cost += r.cost; cur.hasCost = true; }
+      else { cur.missingCostPacks += 1; }
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).map(v => {
+      const net = v.hasCost ? v.gross - v.cost : null;
+      const marginPct = net != null && v.gross > 0 ? (net / v.gross) * 100 : null;
+      return { ...v, net, marginPct };
+    }).sort((a, b) => b.gross - a.gross);
+  }, [marginPerPack]);
+
+  const marginTotals = useMemo(() => {
+    const gross = marginPerPack.reduce((s, r) => s + r.gross, 0);
+    const cost = marginPerPack.reduce((s, r) => s + (r.cost || 0), 0);
+    const packsMissingCost = marginPerPack.filter(r => r.cost == null && r.subs > 0).length;
+    return { gross, cost, net: gross - cost, packsMissingCost };
+  }, [marginPerPack]);
+
+
+
 
   // ---------- aging buckets ----------
   const aging = useMemo(() => {
