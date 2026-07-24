@@ -255,6 +255,7 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          provider_cost: number | null
           provider_id: string | null
           service_type: string
           user_id: string
@@ -268,6 +269,7 @@ export type Database = {
           is_active?: boolean
           name: string
           price: number
+          provider_cost?: number | null
           provider_id?: string | null
           service_type?: string
           user_id: string
@@ -281,6 +283,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          provider_cost?: number | null
           provider_id?: string | null
           service_type?: string
           user_id?: string

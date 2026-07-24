@@ -20,6 +20,7 @@ type Pack = Database["public"]["Tables"]["packs"]["Row"] & {
   billing_type?: string;
   validity_days?: number | null;
   provider_id?: string | null;
+  provider_cost?: number | null;
 };
 
 type ServiceType = 'cable' | 'internet';
@@ -37,7 +38,9 @@ const emptyForm = {
   billing_type: 'postpaid' as BillingType,
   validity_days: 30,
   provider_id: '' as string,
+  provider_cost: '' as string,
 };
+
 
 export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialogProps) => {
   const { user } = useAuth();
@@ -80,6 +83,7 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       billing_type: formData.billing_type,
       validity_days: formData.billing_type === 'prepaid' ? formData.validity_days : null,
       provider_id: formData.provider_id,
+      provider_cost: formData.provider_cost.trim() === '' ? null : parseFloat(formData.provider_cost),
     };
 
     const success = editingId
@@ -102,8 +106,10 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       billing_type: (pack.billing_type as BillingType) || 'postpaid',
       validity_days: pack.validity_days ?? 30,
       provider_id: pack.provider_id || '',
+      provider_cost: pack.provider_cost != null ? String(pack.provider_cost) : '',
     });
   };
+
 
   const handleDelete = async (id: string) => {
     const { confirm } = await import('@/lib/confirm');
@@ -284,22 +290,36 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label>Provider</Label>
-                    <Select
-                      value={formData.provider_id}
-                      onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={providersForService.length === 0 ? 'No providers — add one first' : 'Select provider'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {providersForService.map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Provider</Label>
+                      <Select
+                        value={formData.provider_id}
+                        onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={providersForService.length === 0 ? 'No providers — add one first' : 'Select provider'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {providersForService.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Provider cost (your cost) <span className="text-muted-foreground font-normal">— optional</span></Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={formData.provider_cost}
+                        onChange={(e) => setFormData({ ...formData, provider_cost: e.target.value })}
+                        placeholder="Wholesale cost"
+                      />
+                    </div>
                   </div>
+
 
                   {service === 'cable' && (
                     <div className="space-y-1.5">
