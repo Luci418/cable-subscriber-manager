@@ -290,22 +290,36 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label>Provider</Label>
-                    <Select
-                      value={formData.provider_id}
-                      onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={providersForService.length === 0 ? 'No providers — add one first' : 'Select provider'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {providersForService.map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Provider</Label>
+                      <Select
+                        value={formData.provider_id}
+                        onValueChange={(v) => setFormData({ ...formData, provider_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={providersForService.length === 0 ? 'No providers — add one first' : 'Select provider'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {providersForService.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Provider cost (your cost) <span className="text-muted-foreground font-normal">— optional</span></Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={formData.provider_cost}
+                        onChange={(e) => setFormData({ ...formData, provider_cost: e.target.value })}
+                        placeholder="Wholesale cost"
+                      />
+                    </div>
                   </div>
+
 
                   {service === 'cable' && (
                     <div className="space-y-1.5">
