@@ -64,6 +64,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   const txnLoading = false;
   const { cableEnabled, internetEnabled, bothEnabled } = useEnabledServices();
   const { providers } = useProviders(user?.id);
+  const { packs } = usePacks(user?.id);
 
   const [service, setService] = useState<ServiceFilter>('all');
   const [preset, setPreset] = useState<PresetKey>('30d');
