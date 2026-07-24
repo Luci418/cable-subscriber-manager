@@ -20,6 +20,7 @@ type Pack = Database["public"]["Tables"]["packs"]["Row"] & {
   billing_type?: string;
   validity_days?: number | null;
   provider_id?: string | null;
+  provider_cost?: number | null;
 };
 
 type ServiceType = 'cable' | 'internet';
@@ -37,7 +38,9 @@ const emptyForm = {
   billing_type: 'postpaid' as BillingType,
   validity_days: 30,
   provider_id: '' as string,
+  provider_cost: '' as string,
 };
+
 
 export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialogProps) => {
   const { user } = useAuth();
