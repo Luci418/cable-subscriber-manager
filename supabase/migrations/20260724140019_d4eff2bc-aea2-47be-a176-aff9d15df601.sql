@@ -1,0 +1,2 @@
+ALTER TABLE public.packs ADD COLUMN IF NOT EXISTS provider_cost numeric NULL;
+COMMENT ON COLUMN public.packs.provider_cost IS 'Wholesale cost paid to the upstream provider per subscription period. NULL = not set (excluded from margin calculations).';
