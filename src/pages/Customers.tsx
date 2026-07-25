@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { SubscriberList } from '@/components/SubscriberList';
 import { ImportDialog } from '@/components/ImportDialog';
-import { PackManagementDialog } from '@/components/PackManagementDialog';
 import { RegionManagementDialog } from '@/components/RegionManagementDialog';
-import { ProviderManagementDialog } from '@/components/ProviderManagementDialog';
 import { useAppData } from '@/contexts/AppDataContext';
 import { exportToCSV } from '@/lib/csv';
 
@@ -21,9 +19,7 @@ export default function Customers() {
   const { subscribers, transactions, reloadSubscribers } = useAppData();
 
   const [showImport, setShowImport] = useState(false);
-  const [showPacks, setShowPacks] = useState(false);
   const [showRegions, setShowRegions] = useState(false);
-  const [showProviders, setShowProviders] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleExport = () => {
@@ -38,9 +34,9 @@ export default function Customers() {
         onAddNew={() => navigate('/customers/new')}
         onExport={handleExport}
         onImport={() => setShowImport(true)}
-        onManagePacks={() => setShowPacks(true)}
+        onManagePacks={() => navigate('/catalog')}
         onManageRegions={() => setShowRegions(true)}
-        onManageProviders={() => setShowProviders(true)}
+        onManageProviders={() => navigate('/catalog?tab=providers')}
         onManageStbs={() => navigate('/equipment')}
         refreshKey={refreshKey}
       />
@@ -53,9 +49,7 @@ export default function Customers() {
           setRefreshKey((k) => k + 1);
         }}
       />
-      <PackManagementDialog open={showPacks} onOpenChange={setShowPacks} />
       <RegionManagementDialog open={showRegions} onOpenChange={setShowRegions} />
-      <ProviderManagementDialog open={showProviders} onOpenChange={setShowProviders} />
     </>
   );
 }
