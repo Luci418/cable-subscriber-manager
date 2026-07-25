@@ -19,6 +19,7 @@ import {
   MessageSquare,
   BarChart3,
   Settings as SettingsIcon,
+  Package,
   Tv,
   Wifi,
   LogOut,
@@ -66,7 +67,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Inventory',
-    items: [{ to: '/equipment', title: 'Equipment', icon: Router, matchPrefix: '/equipment' }],
+    items: [
+      { to: '/equipment', title: 'Equipment', icon: Router, matchPrefix: '/equipment' },
+      { to: '/catalog', title: 'Catalog', icon: Package, matchPrefix: '/catalog' },
+    ],
   },
   {
     label: 'Insights',

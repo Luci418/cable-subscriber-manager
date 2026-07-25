@@ -653,6 +653,7 @@ export type Database = {
           cable_provider_id: string | null
           created_at: string
           customer_status: Database["public"]["Enums"]["customer_status"]
+          hathway_customer_nbr: string | null
           id: string
           internet_balance: number
           internet_provider_id: string | null
@@ -680,6 +681,7 @@ export type Database = {
           cable_provider_id?: string | null
           created_at?: string
           customer_status?: Database["public"]["Enums"]["customer_status"]
+          hathway_customer_nbr?: string | null
           id?: string
           internet_balance?: number
           internet_provider_id?: string | null
@@ -707,6 +709,7 @@ export type Database = {
           cable_provider_id?: string | null
           created_at?: string
           customer_status?: Database["public"]["Enums"]["customer_status"]
+          hathway_customer_nbr?: string | null
           id?: string
           internet_balance?: number
           internet_provider_id?: string | null

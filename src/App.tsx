@@ -11,6 +11,7 @@ import Customers from "./pages/Customers";
 import CustomerNew from "./pages/CustomerNew";
 import CustomerDetail from "./pages/CustomerDetail";
 import Equipment from "./pages/Equipment";
+import Catalog from "./pages/Catalog";
 import EquipmentDetail from "./pages/EquipmentDetail";
 import { Billing } from "./pages/Billing";
 import { Analytics } from "./pages/Analytics";
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="customers/:id" element={<Navigate to="overview" replace />} />
               <Route path="customers/:id/:tab" element={<CustomerDetail />} />
               <Route path="billing" element={<Billing />} />
+              <Route path="catalog" element={<Catalog />} />
               <Route path="equipment" element={<Equipment />} />
               <Route path="equipment/:serial" element={<EquipmentDetail />} />
               <Route path="analytics" element={<AnalyticsRoute />} />

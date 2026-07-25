@@ -29,13 +29,12 @@ pg_prove -v test/db/*.sql
 | `03_payment_allocations_immutable.sql` | DELETE and UPDATE both fail. |
 | `04_device_assignment_log_immutable.sql` | DELETE fails, non-lifecycle columns cannot be updated, credential columns are mutable only while `closed_at IS NULL`. |
 | `05_role_gates.sql` | `can_void_transaction`, `can_archive_customer`, `can_view_credentials` return the correct boolean for owner / admin_office / collection_agent / technician / no-role. |
+| `06_create_subscription.sql` | Active-subscription constraint is device-scoped (not subscriber-scoped); provider mismatch on an already-active device is rejected. |
+| `07_cancel_subscription.sql` | Refund cap is enforced; the RPC requires the `cancel_subscription` role. |
+| `08_pair_device.sql` | Role gate rejects unpermitted callers; device/service-type mismatch is blocked. |
+| `09_mark_device.sql` | `mark_device_faulty` closes the assignment log without touching subscription status; `mark_device_repaired` accepts empty notes. |
+| `10_rls_isolation.sql` | User A cannot read or write user B's subscribers / transactions under RLS. |
+| `11_fifo_allocation.sql` | A default payment allocates to the older subscription first when multiple active subs exist. |
 
-## Not covered by Sprint 1 (deferred to Sprint 2)
+Sprint 2 added 16 assertions across `06_*` – `11_*.sql`, bringing the total to 31.
 
-- FIFO allocation behaviour (`transactions_fifo_allocate_trg`) — requires
-  realistic seed data across multiple subscribers; scheduled with the RPC
-  suite.
-- `create_subscription` / `cancel_subscription` / `pair_device` RPC role
-  gates — deferred alongside the RPC-behaviour tests in Sprint 2 per the
-  architecture doc.
-- RLS isolation between users — deferred to Sprint 2.
