@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Save, Download, Upload, Building2, Tv, Wifi, Receipt, CreditCard, Layers, ShieldCheck, Database } from 'lucide-react';
+import { Save, Download, Upload, Building2, Tv, Wifi, Receipt, CreditCard, Layers, ShieldCheck, Database, Plug, FileUp } from 'lucide-react';
 import { PageHeader, SectionCard } from '@/components/ui-ext';
 import { cn } from '@/lib/utils';
 import { createBackup, restoreBackup } from '@/lib/storage';
@@ -37,8 +37,9 @@ const SECTIONS: NavEntry[] = [
   { slug: 'payment',  label: 'Payment',       icon: CreditCard,  hint: 'UPI VPA, backdating' },
   { slug: 'services', label: 'Services',      icon: Layers,      hint: 'Enabled service modules' },
   { slug: 'receipts', label: 'Receipts',      icon: Receipt,     hint: 'Prefix, footer, locale' },
-  { slug: 'roles',    label: 'Team & Roles',  icon: ShieldCheck, hint: 'Staff and permissions' },
-  { slug: 'backup',   label: 'Backup',        icon: Database,    hint: 'Export & restore' },
+  { slug: 'roles',        label: 'Team & Roles',  icon: ShieldCheck, hint: 'Staff and permissions' },
+  { slug: 'integrations', label: 'Integrations',  icon: Plug,        hint: 'Hathway, GTPL, importers' },
+  { slug: 'backup',       label: 'Backup',        icon: Database,    hint: 'Export & restore' },
 ];
 
 export const Settings = () => {
@@ -290,6 +291,9 @@ export const Settings = () => {
           )}
 
           {section === 'roles' && <RolesManagement />}
+
+          {section === 'integrations' && <IntegrationsSection readOnly={readOnly} />}
+
 
           {section === 'backup' && (
             <div className="space-y-4">
