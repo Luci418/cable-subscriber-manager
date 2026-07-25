@@ -363,3 +363,135 @@ const ReconcileAllButton = () => {
     </Button>
   );
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// Integrations — stub UI for upstream operator report imports.
+//
+// The first connector is Hathway. This batch establishes the UI pattern:
+// an "enabled" toggle, a last-synced timestamp, an "Import Report" file
+// picker (CSV / Excel) and a rolling sync log. The actual parse + upsert
+// pipeline is deliberately deferred until Hathway's report structure is
+// confirmed; a locally-stored log records manual picks in the meantime
+// so operators can see the shell responding.
+//
+// GTPL will drop in as a second card using the exact same pattern.
+// ─────────────────────────────────────────────────────────────────────
+type SyncLogEntry = {
+  id: string;
+  at: string;
+  filename: string;
+  processed: number;
+  created: number;
+  updated: number;
+  errors: number;
+  note: string;
+};
+
+const HATHWAY_LOG_KEY = 'lovable.integrations.hathway.log';
+const HATHWAY_ENABLED_KEY = 'lovable.integrations.hathway.enabled';
+
+const readLog = (key: string): SyncLogEntry[] => {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+};
+
+const IntegrationsSection = ({ readOnly }: { readOnly: boolean }) => {
+  const [enabled, setEnabled] = useState<boolean>(() => localStorage.getItem(HATHWAY_ENABLED_KEY) === '1');
+  const [log, setLog] = useState<SyncLogEntry[]>(() => readLog(HATHWAY_LOG_KEY));
+
+  const lastSynced = log[0]?.at;
+
+  const toggleEnabled = (v: boolean) => {
+    setEnabled(v);
+    localStorage.setItem(HATHWAY_ENABLED_KEY, v ? '1' : '0');
+    toast.success(`Hathway integration ${v ? 'enabled' : 'disabled'}`);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      // NB: parse + upsert intentionally deferred. Record the pick so
+      // the log surface has data during development.
+      const entry: SyncLogEntry = {
+        id: crypto.randomUUID(),
+        at: new Date().toISOString(),
+        filename: file.name,
+        processed: 0,
+        created: 0,
+        updated: 0,
+        errors: 0,
+        note: 'Import parser not yet implemented — file received but not processed.',
+      };
+      const next = [entry, ...log].slice(0, 10);
+      setLog(next);
+      localStorage.setItem(HATHWAY_LOG_KEY, JSON.stringify(next));
+      toast.info('Report received. Parser lands in a follow-up batch.');
+    };
+    input.click();
+  };
+
+  return (
+    <div className="space-y-6">
+      <SectionCard
+        title="Hathway"
+        description="Import subscriber and billing reports from Hathway to reconcile balances against the upstream ledger."
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div className="min-w-0">
+              <p className="font-medium">Enable Hathway sync</p>
+              <p className="text-sm text-muted-foreground">
+                Turn on to allow importing Hathway reports. Store your Hathway customer numbers on subscriber profiles for matching.
+              </p>
+            </div>
+            <Switch checked={enabled} onCheckedChange={toggleEnabled} disabled={readOnly} />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Last synced</p>
+              <p className="text-xs text-muted-foreground">
+                {lastSynced ? new Date(lastSynced).toLocaleString() : 'Never — no reports imported yet.'}
+              </p>
+            </div>
+            <Button onClick={handleImport} disabled={!enabled || readOnly} variant="outline">
+              <FileUp className="mr-2 h-4 w-4" /> Import Report
+            </Button>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2">Recent imports</p>
+            {log.length === 0 ? (
+              <p className="text-xs text-muted-foreground rounded-md border border-dashed p-3">
+                No imports yet.
+              </p>
+            ) : (
+              <div className="rounded-md border divide-y text-sm">
+                {log.map(e => (
+                  <div key={e.id} className="p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{e.filename}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(e.at).toLocaleString()} · {e.processed} processed · {e.created} created · {e.updated} updated
+                        {e.errors > 0 && <span className="text-destructive"> · {e.errors} errors</span>}
+                      </div>
+                      {e.note && <div className="text-xs text-muted-foreground mt-1 italic">{e.note}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="GTPL" description="Coming soon — will use the same import pattern as Hathway.">
+        <p className="text-sm text-muted-foreground">Not yet available.</p>
+      </SectionCard>
+    </div>
+  );
+};
+
