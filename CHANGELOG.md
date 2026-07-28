@@ -10,6 +10,12 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Docs — Fresh-thread handoff + provider integration re-scope (2026-07-28)
+- Added `docs/HANDOFF.md`: one-page onboarding for a new Claude / Gemini / ChatGPT thread, including the minimum-viable file-attachment list.
+- Rewrote `.lovable/plan.md`: provider integration pivots from a diff-and-apply sync engine to a **write-through-first** model. Operator acts in the SMS; the app records a `provider_action_intent`; operator is assisted to reproduce the action on the portal (checklist → deep-link → optional out-of-process browser automation). Reactive snapshot reconciliation is retained as a safety net only. No code shipped in this batch.
+- `docs/PROJECT_STATUS.md`: marked Phase 6.5 complete, listed all sub-batches (A–M), moved "provider integration" into Active work as planning-only.
+- `docs/README.md`: linked HANDOFF as the new starting point.
+
 ### Phase 4a — Normalized `subscriptions` + `payment_allocations` (2026-06-13)
 - Adopted BUSINESS_MODEL v3.2 (uploaded as the new authoritative spec). Doc replaces all prior versions; key v3.2 changes: device-level uniqueness, separate `payment_allocations` table, simplified cash-only refund formula, `subscription_id` added to `transactions`, hard end_date immutability in v1.
 - New `public.subscriptions` table — first-class subscription rows with immutable snapshots (`pack_name_snapshot`, `pack_price_snapshot`, `billing_type_snapshot`, `validity_days_snapshot`, `total_days`, `total_charged`, `start_date`, `duration`, `previous_subscription_id`), `device_id` + `device_serial_snapshot` device pointer, renewal lineage via `previous_subscription_id`, cancel fields, refund_amount, v2-ready suspend columns (nullable). Indexes for next-action chip and operator dashboards. RLS scoped to `auth.uid()`.
