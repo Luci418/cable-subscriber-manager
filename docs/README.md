@@ -7,7 +7,8 @@ existing file instead of creating parallel versions.
 
 | Document | Purpose |
 |---|---|
-| [PROJECT_STATUS.md](./PROJECT_STATUS.md) | **Start here.** Current milestone, completed phases, deferred work, technical debt, architecture evolution. |
+| [HANDOFF.md](./HANDOFF.md) | **Start here for a fresh AI thread.** Project state + file-attachment list. |
+| [PROJECT_STATUS.md](./PROJECT_STATUS.md) | Current milestone, completed phases, deferred work, technical debt. |
 | [SYSTEM_INVARIANTS.md](./SYSTEM_INVARIANTS.md) | Rules that must never be broken; where each is enforced; test coverage status. |
 | [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md) | Go-live checklist + Technical Debt section. |
 | [ARCHITECTURE_DECISIONS.md](./ARCHITECTURE_DECISIONS.md) | ADR log. Add a new entry; do not silently rewrite. |

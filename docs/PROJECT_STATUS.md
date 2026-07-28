@@ -4,16 +4,30 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-08 (Phase 6.5 Batch C)
+Last updated: 2026-07-28 (Provider integration re-scoped to write-through)
 
 ---
 
 ## Current milestone
 
-**Phase 6.5 — Consolidation Sprint & UX Foundation: IN PROGRESS.**
-Batches A (correctness), B (legacy pack columns) and C (JSONB blob
-retirement) have shipped. Remaining: encrypted technician credentials
-and navigation IA + Device Detail worked example.
+**Phase 6.5 — Consolidation Sprint & UX Foundation: COMPLETE.**
+All planned batches shipped: correctness fixes, legacy column
+retirement (JSONB blobs, `current_pack*`, `stb_number`), roles +
+permissions, encrypted credentials, reconciliation RPCs, standardized
+confirmation dialogs, catalog page, pack margin analytics, and
+Testing Sprints 1 & 2 (Vitest + pgTAP, 31 assertions).
+
+## Active work
+
+**Provider integration — planning only, nothing shipped yet.**
+Design pivoted on 2026-07-28 from a diff-and-apply sync engine to a
+**write-through-first** model: operator acts in our app, the app records
+a `provider_action_intent`, and the operator is guided to reproduce the
+action on the Hathway/BSNL portal (checklist → deep-link → optional
+out-of-process browser automation). Reactive snapshot reconciliation
+survives as a safety net. See `.lovable/plan.md` for the full plan;
+`docs/PROVIDER_INTEGRATION_ARCHITECTURE.md` documents the earlier v2
+design (kept for context).
 
 ## Completed milestones
 
@@ -28,10 +42,20 @@ and navigation IA + Device Detail worked example.
 | 5.1 | Services[] decoupled from device pairing; declared-intent model | ✅ |
 | 5.2 | Add-Service flow on subscriber profile (Cable⇄Internet symmetry fix) | ✅ |
 | 5.3 | Error-propagation audit + `updateSubscriber` maybeSingle() fix + QA gate | ✅ |
-| 6 | `app_role` enum, `user_roles`, `has_role()`, `can_*` gates on all RPCs, RolesManagement UI, PERMISSION_MATRIX + ROLE_DESIGN docs | ✅ |
-| 6.5-A | `is_pack_in_use` canonical rewrite, `check_device_deletable` RPC + UI gate, `deleteSubscriber` routed through `check_subscriber_deletable`, immutability triggers on `subscriptions` / `payment_allocations` / `device_assignment_log` | ✅ |
-| 6.5-B | Dropped `current_pack` / `current_internet_pack`; pruned all pack-label compat writes; frontend migrated to view-derived active/timeline pack names | ✅ |
-| 6.5-C | Dropped JSONB blob columns (`current_subscription`, `subscription_history`, `internet_subscription`, `internet_subscription_history`); rewrote `subscribers_enforce_invariants`, `check_subscriber_deletable`, `create_subscription`, `cancel_subscription`, `expire_lapsed_subscriptions` against the normalised `subscriptions` table | ✅ |
+| 6 | `app_role` enum, `user_roles`, `has_role()`, `can_*` gates, RolesManagement UI, PERMISSION_MATRIX + ROLE_DESIGN docs | ✅ |
+| 6.5-A | `is_pack_in_use` rewrite, deletable-check RPCs, immutability triggers on `subscriptions` / `payment_allocations` / `device_assignment_log` | ✅ |
+| 6.5-B | Dropped `current_pack` / `current_internet_pack`; frontend migrated to view-derived pack names | ✅ |
+| 6.5-C | Dropped JSONB blob columns; rewrote invariants + create/cancel/expire RPCs against normalised `subscriptions` | ✅ |
+| 6.5-D | Routing + IA (tabbed subscriber profile, per-device page, billing worklist, settings sub-routes) | ✅ |
+| 6.5-E | Customer list redesign, server-side pagination, async subscriber combobox, standardized confirm dialogs | ✅ |
+| 6.5-F | Production audit, `payment_method` standardization, `reconcile_subscriber_balance` + `balance_audit` | ✅ |
+| 6.5-G | Encrypted credentials tab (`pgcrypto`), PermissionsProvider context | ✅ |
+| 6.5-H | Testing Sprint 1 (46 Vitest + 15 pgTAP) and Sprint 2 (+16 pgTAP) | ✅ |
+| 6.5-I | `stb_number` column retirement (Batch D) | ✅ |
+| 6.5-J | Settings audit trail, `mark_device_repaired` RPC, URL-persistent filters, complaint↔subscriber cross-links | ✅ |
+| 6.5-K | Multi-STB and NULL-provider fixes; "no active connection" filter | ✅ |
+| 6.5-L | `packs.provider_cost` + Analytics Margin section | ✅ |
+| 6.5-M | Catalog page (`/catalog`), Hathway integration stub in Settings, `hathway_customer_nbr` column | ✅ |
 
 
 ## Active work
