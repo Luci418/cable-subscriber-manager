@@ -58,16 +58,11 @@ design (kept for context).
 | 6.5-M | Catalog page (`/catalog`), Hathway integration stub in Settings, `hathway_customer_nbr` column | ✅ |
 
 
-## Active work
+## Next milestone — Provider Integration Phase A′
 
-Consolidation Sprint (this document, `SYSTEM_INVARIANTS.md`,
-`TESTING_ARCHITECTURE.md`, `DESTRUCTIVE_OPERATIONS_AUDIT.md`,
-`LEGACY_DEPENDENCY_AUDIT.md`, docs reorganisation).
-
-## Next milestone — Phase 6.5
-
-UX & navigation refinement. Not scoped here. See future planning doc when
-opened; current backlog lives in `FUTURE_EVOLUTION.md`.
+Write-through-first provider integration for Hathway (Cable) and BSNL
+(Internet). Full plan in `.lovable/plan.md`. Reactive snapshot
+reconciliation retained as safety net.
 
 ## Deferred work
 
@@ -80,12 +75,11 @@ inside `PRODUCTION_READINESS.md`.
 
 ## Known regressions
 
-None open. Last regression closed: Add-Service Cable/Internet asymmetry
-(Phase 5.2) + silent-success on `updateSubscriber` (Phase 5.3).
+None open.
 
 ## Current blockers
 
-None. Project is unblocked for Phase 6.5.
+None.
 
 ---
 
