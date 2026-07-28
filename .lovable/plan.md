@@ -1,158 +1,138 @@
+# Provider Integration — Revised Direction (2026-07-28)
 
-# Provider Synchronization Engine — Final Implementation Plan
+Supersedes the earlier "diff-and-apply sync engine" framing. The operator
+raised a decisive workflow question that reshapes the design:
 
-Supersedes the "importer" framing in `docs/PROVIDER_INTEGRATION_ARCHITECTURE.md`. Reports are treated as **evidence of business events**, not as rows to mirror. Every sync produces a reviewable diff between yesterday's provider snapshot and today's, plus a plan the operator approves before anything writes.
+> "Instead of doing things on the Hathway portal and syncing to our app, I'd
+> rather do it in our app first — and then either (a) go do the same on
+> Hathway manually, or (b) have a script open Hathway, log in, and either
+> auto-perform the action or at least land me on the right screen."
 
-## 1. Critical assessment of the discussion
+That flips the model from **reactive reconciliation** (Hathway → us) to
+**proactive write-through** (us → Hathway, then reconcile).
 
-Points to keep:
-- **Event detection over row import** (ChatGPT). Correct — this matches how you actually operate through the Hathway operator portal.
-- **Snapshot-vs-snapshot diff, not snapshot-vs-SMS** (ChatGPT). Prevents misclassifying "already synced" as "new event".
-- **Configurable Synchronization Policy per provider** with three field classes: provider-owned / operator-owned / shared-ask.
-- **Clickable review dashboard** with drill-down to per-subscriber diffs before commit.
-- **Auto-create charges for detected provider events** using your local catalog price (not Hathway's DPO Total Price).
-- **Provider Pack Mapping table** — never match packs by free-text name.
-- **Per-row success/failure**, atomic per subscriber, not atomic per run.
-- **`charge_source` enum** to distinguish `MANUAL` vs `SYNC_HATHWAY` vs `SYNC_BSNL`.
-- **Rollback per import run** using recorded diffs (Git-inspired diffs, not actual Git).
+## 1. Two integration modes — pick per action
 
-Points to reject or soften:
-- Do **not** infer terminations from absence — require positive evidence (Dashboard `INACTIVE`/`SUSPENDED`, Daily Plan Cancellation Report, or explicit Customer Master flag).
-- Do **not** auto-create subscribers into `active` from Hathway. New provider rows go into a **Needs Review** queue; operator decides link/create/ignore.
-- Do **not** ship the full "ProviderAdapter interface + canonical model" abstraction yet. One concrete Hathway path first; extract the interface only when the BSNL path is being built.
-- No Git integration — implement diff/rollback in-app.
+The system will support two complementary modes. Neither is exclusive; both
+converge on the same local ledger and audit trail.
 
-## 2. What we build for Hathway (Cable)
+### Mode A — Write-through with provider assist  *(new; default for renewals, pack changes, new activations, cancellations)*
 
-### 2.1 Sync workflow (operator-facing)
+The operator performs the action in **our app first**. The app then helps
+push the same action to the provider portal, via one of three assist tiers:
 
-```text
-Settings → Integrations → Hathway
-  ├─ Upload "Customer Master Summary" (.xls TSV)
-  ├─ Upload "Dashboard / Service Status" (.xls TSV)
-  │
-  ▼
-Parse (tab-split, strip leading ')
-  ▼
-Build Provider Snapshot #N
-  ▼
-Diff vs Provider Snapshot #N-1
-  ▼
-Detect Business Events
-  ▼
-Apply Synchronization Policy + Pack Mapping
-  ▼
-────── Review Dashboard ──────
-  🟢 5 New subscribers        (click → per-row diff + link/create/ignore)
-  🟡 18 Renewals              (click → old→new expiry, charge preview)
-  🟣 2 Package changes        (click → old→new pack, adjustment preview)
-  🔴 1 Cancellation           (positive evidence only)
-  🔵 7 Provider status changes
-  🟠 3 New devices in inventory
-  ⚠  4 Conflicts (name/mobile drift on operator-owned fields)
-  ❓ 2 Unmapped packs         (blocks apply until mapped)
-  ⚪ 412 No change
-  ▼
-Operator approves (all / subset)
-  ▼
-Apply — per-subscriber transactional
-  ▼
-Persist ImportRun + per-event ImportEvent rows (for rollback + audit)
+| Tier | What it does | Cost | Risk |
+|---|---|---|---|
+| **A0. Checklist** | After the local action, show a modal with "Now do this on Hathway: 1) log in, 2) go to Pack Management, 3) select MAHARAJ-003, 4) apply plan 'Kannada'". Operator marks it done. | Free, ships this batch. | None. Manual work remains. |
+| **A1. Deep-link + prefill** | Open the Hathway portal URL for that specific customer/screen in a new tab (bookmarklet-style). Operator still clicks the final "Apply". | Free, needs URL reverse-engineering per provider. | Low — no automation, just navigation. |
+| **A2. Browser automation** | A user-run browser extension or local Playwright script logs in, navigates, and submits. App emits an "intent" JSON the script consumes. | High effort; fragile against portal changes. | Medium — credentials on user's machine, breaks when portal HTML changes. |
+
+**Recommendation:** ship **A0 immediately**, design the intent JSON so **A1
+and A2 can plug in later without changing the app**. Do not build A2
+in-app — it belongs in a separate user-installed helper (browser extension
+or CLI) that reads the intent queue over a signed URL. Reason: Hathway's
+portal has no automation-friendly API, uses session cookies + CSRF, and
+their T&Cs generally forbid scraping. Keeping automation out-of-process
+means the SMS itself stays clean, auditable, and never stores portal
+credentials server-side.
+
+### Mode B — Reactive snapshot reconciliation  *(the earlier plan, scoped down)*
+
+Even with write-through, the provider portal remains the source of truth for
+**what actually happened upstream**. Periodically (weekly, or on demand)
+the operator uploads the Customer Master + Dashboard reports and the app:
+
+- Diffs against the previous snapshot.
+- Flags **drift** where our app and Hathway disagree (e.g. a renewal we
+  pushed didn't take, or Hathway extended an expiry we didn't).
+- Surfaces it in the same Review Dashboard the earlier plan described.
+
+Mode B becomes a **safety net**, not the primary workflow. That drops most
+of the auto-create-charge complexity from the earlier plan — charges are
+already created by Mode A. Mode B mostly detects "we forgot" and "portal
+did something we didn't".
+
+## 2. Provider Action Intent — the shared contract
+
+Every write-through action produces a row in a new `provider_action_intent`
+table. This is the single object A0/A1/A2 all consume.
+
+```
+provider_action_intent
+  id                 uuid pk
+  provider_id        fk providers
+  subscriber_id      fk subscribers
+  local_txn_id       fk transactions  (the local charge/refund already written)
+  action_type        enum: renew | new_activation | pack_change | cancel | reactivate
+  intent_jsonb       { hathway_customer_nbr, target_pack_key, effective_date, ... }
+  status             enum: pending | acknowledged | confirmed | failed | skipped
+  operator_note      text
+  created_at, updated_at, closed_by
 ```
 
-### 2.2 Event types detected
-- `subscriber_new`, `subscriber_terminated` (positive evidence only)
-- `subscription_new`, `subscription_renewed` (expiry moved forward, same pack)
-- `subscription_pack_changed`
-- `provider_status_changed` (ACTIVE / INACTIVE / SUSPENDED)
-- `device_new`, `device_returned`
-- `field_drift` (shared fields diverging — surfaced, never auto-applied)
+- **A0** renders `intent_jsonb` as a checklist and flips status on operator
+  confirmation.
+- **A1** builds a deep-link URL from `intent_jsonb`.
+- **A2** (future extension) polls `pending` rows over a signed endpoint,
+  performs the automation, and PATCHes `status` + evidence back.
+- **Mode B** diffing marks intents as `confirmed` when the next snapshot
+  proves the upstream state matches.
 
-### 2.3 Synchronization Policy (per provider, persisted)
+## 3. Internet (BSNL) — unchanged shape, matches this model naturally
 
-Three columns per field: **Provider-owned** (always overwrite), **Operator-owned** (never overwrite, drift shown as info), **Shared** (operator toggles per-provider default; individual conflicts surface in Review).
+BSNL is already fully write-through today: operator records the monthly
+cycle in our app, then pays BSNL via CSC. The "provider assist" for BSNL is
+just an A0 checklist ("pay ₹X to BSNL, CSC ref goes here"). No portal to
+automate. The `provider_action_intent` table serves BSNL cycles identically.
 
-Default policy for Hathway:
-- Provider-owned: `hathway_customer_nbr`, VC/STB serial, provider status, plan name (mapped), plan start/end.
-- Operator-owned: notes, credentials, region, collection agent, internal tags, complaint history.
-- Shared (default off): subscriber name, mobile, address.
+## 4. What ships next (Batch: Provider Integration Phase A′)
 
-### 2.4 Auto-charge rules
+Scope is deliberately smaller than the previous plan.
 
-On approved `subscription_renewed` or `subscription_new`:
-- Look up mapped local pack → use `packs.price` (your selling price) as the charge amount.
-- Create a `transactions` row with `source = 'subscription_charge'`, new `charge_source = 'SYNC_HATHWAY'`, linked to the created/extended subscription and the ImportRun.
-- The existing balance recompute trigger takes it from there.
+1. **Schema:** `provider_action_intent`, `provider_pack_map`,
+   `provider_snapshot`, plus `charge_source` enum (`MANUAL`, `SYNC_HATHWAY`,
+   `SYNC_BSNL`, `WRITETHROUGH_HATHWAY`, `WRITETHROUGH_BSNL`) and
+   `transactions.charge_source` column. RLS + GRANTs.
+2. **Pack mapping UI** in Catalog → Packs: assign each local pack a
+   `provider_pack_key`. Required before write-through is enabled.
+3. **Write-through hooks** on existing RPCs (`create_subscription`,
+   `cancel_subscription`, and a new `change_pack`) — every call also
+   inserts a `provider_action_intent` row.
+4. **"Push to Provider" tray** — a new sidebar item under Integrations
+   showing pending intents grouped by provider. Each row expands into an
+   A0 checklist. A "Mark done" button flips to `acknowledged`.
+5. **Mode B (snapshot reconcile)** — parse Customer Master + Dashboard,
+   store `provider_snapshot`, diff against previous, but the review UI
+   is simpler: it only shows **drift vs. expected state** (intents that
+   never confirmed, or upstream changes with no matching intent). No
+   auto-charge creation — charges already exist from Mode A.
+6. **Deep-link table** (`provider_deeplink_template`) — per action_type,
+   a URL template with `{hathway_customer_nbr}` placeholders. Populated
+   by the operator by pasting URLs from their browser. Enables A1
+   without any code changes.
 
-On `subscription_pack_changed`: compute pro-rated delta if remaining days exist; create an adjustment charge with the same `charge_source`.
+Explicitly **not** in this batch: browser automation (A2), scheduled
+polling, GTPL adapter, credential-storing "auto-login" server-side.
 
-Never auto-mark as paid. Payments remain operator-collected.
+## 5. Why this is better than the previous plan
 
-## 3. What we build for BSNL Internet
+- **Matches how the operator actually works** — the app leads, the portal
+  follows.
+- **Ledger integrity is unconditional** — local charges are written the
+  moment the operator confirms, not conditional on a successful sync.
+- **Sync becomes reconciliation, not integration** — much smaller surface,
+  much lower blast radius.
+- **Automation is optional and out-of-process** — no portal credentials on
+  our servers, no legal ambiguity in the core app.
+- **BSNL and Hathway share one model** even though only one has a portal.
 
-BSNL FMS/Teevra has no public API and the business model is different (always-on postpaid; you pay BSNL via CSC and forward the invoice). So the sync engine's Hathway shape does **not** translate directly. What we ship for BSNL now:
+## 6. Open items to confirm before build starts
 
-- **Manual monthly cycle** stays as-is for payments — no auto-import.
-- **Reuse from Cable side**:
-  - Same **Synchronization Policy** UI, same **ImportRun / ImportEvent** tables, same **Review Dashboard** shell, same **charge_source** enum (add `SYNC_BSNL` value now).
-  - Same **Provider Pack Mapping** table (BSNL plans → local packs).
-- **BSNL-specific manual entry surface** (Settings → Integrations → BSNL):
-  - "Record monthly cycle" form per subscriber (or bulk): plan, billing month, BSNL bill amount (your cost), due date, paid-to-BSNL date, CSC reference.
-  - Creates one `provider_cycle` row (new small table) and a local charge using the mapped local pack price. Cost stored for margin analytics (already have `packs.provider_cost`).
-- **Optional light importer**: if you later export a CSV from Teevra/FMS by hand, the same pipeline accepts it — the parser is per-provider, the pipeline is shared. Not built this batch beyond a stubbed file picker.
-
-Explicitly **not** shipping for BSNL now: auto-status polling, auto-disconnection tracking, portal scraping.
-
-## 4. Schema additions (new migration)
-
-- `provider_sync_policy(provider_id, field_name, mode)` — modes: `provider_owned | operator_owned | shared_on | shared_off`. Seeded with the Hathway/BSNL defaults above.
-- `provider_pack_map(provider_id, provider_pack_key, provider_pack_name, local_pack_id)` — unique on `(provider_id, provider_pack_key)`.
-- `provider_snapshot(provider_id, taken_at, source_file_hash, canonical_jsonb)` — one row per successful parse; used as the "yesterday" side of the next diff.
-- `import_run(id, provider_id, uploaded_by, uploaded_at, source_file_name, source_file_hash, status, summary_jsonb, approved_at, approved_by)`.
-- `import_event(id, run_id, event_type, subscriber_id nullable, provider_row_key, before_jsonb, after_jsonb, plan_action jsonb, apply_status, apply_error, applied_txn_id nullable)`.
-- `provider_cycle(id, subscriber_id, provider_id, billing_month, provider_cost, csc_reference, paid_to_provider_at, local_charge_txn_id)` — BSNL manual cycle.
-- Enum `charge_source` add `SYNC_HATHWAY`, `SYNC_BSNL` (existing `MANUAL` unchanged); add nullable `charge_source` and `import_run_id` columns to `transactions`.
-- New columns on `subscribers` (Hathway snapshot mirror, display-only): `hathway_plan_name`, `hathway_plan_start`, `hathway_plan_end`, `hathway_status`, `hathway_synced_at`. (`hathway_customer_nbr` already exists.)
-
-All tables get RLS + GRANTs per project conventions. `import_event` immutable via trigger except `apply_status`/`apply_error`/`applied_txn_id`.
-
-## 5. Rollback
-
-Each `import_event` stores `before_jsonb` and `applied_txn_id`. "Rollback Import #N" opens a review of the same events in reverse:
-- Charges → `void_transaction` with reason `sync_rollback`.
-- Subscription creates → cancel with zero refund.
-- Subscription renewals → shrink expiry back to `before.end_date`.
-- Field updates → restore `before_jsonb` values.
-Rollback is itself an approvable plan, not a one-click destructive action.
-
-## 6. UI surface
-
-- **Settings → Integrations → Hathway** (upgrade existing stub):
-  - Sync Policy editor (field grid with provider/operator/shared toggles).
-  - Pack Mapping table (provider plan name ↔ local pack).
-  - "New Sync" wizard: upload Customer Master → upload Dashboard (optional) → Review Dashboard → Approve.
-  - Run History (list of ImportRuns with counts, status, "View" and "Rollback").
-- **Settings → Integrations → BSNL**:
-  - Same Sync Policy + Pack Mapping surfaces.
-  - "Record monthly cycle" form (single + bulk).
-  - Run History showing manual cycles per month.
-- **Subscriber profile → Overview**: read-only "Provider Snapshot" card (per provider) showing plan, expiry, provider status, last synced. Drift on shared fields shows a small "Sync suggestion" chip.
-- **Catalog → Packs**: new "Mapped provider packs" column so operators see mapping status alongside price.
-
-## 7. Phasing
-
-- **Phase A (this batch)**: schema migration, Hathway parser (Customer Master + Dashboard), Snapshot store, Diff engine, Review Dashboard, Policy editor, Pack Mapping, Apply with auto-charge, ImportRun/Event, Provider Snapshot card. No rollback UI yet.
-- **Phase B**: Rollback UI, drift inbox, BSNL manual cycle form + `provider_cycle` writes, BSNL Pack Mapping.
-- **Phase C (deferred)**: BSNL CSV importer if a stable export becomes available; GTPL adapter when needed (reuse pipeline, add parser).
-
-## 8. Explicit non-goals
-- No GTPL work (deferred indefinitely per user).
-- No scheduled/automatic polling — all syncs operator-initiated via upload.
-- No provider-side payment reconciliation (LCO Party Ledger etc.) — deferred until a populated sample exists.
-- No mutation of operator-entered fields without explicit shared-field policy opt-in.
-- No inferring terminations from absence.
-
-## 9. Open items to confirm before Phase A starts
-1. For Hathway Customer Master, is `Account Number` stable across renewals for the same subscriber? (Assumed yes; needed for snapshot keying.)
-2. Should the auto-created charge date = provider event date (`Start Date` on the new row) or the sync-apply date? Recommend **provider event date**, source stamped as sync.
-3. For BSNL, do you want one `provider_cycle` per subscriber-month, or aggregated by pack? Recommend per-subscriber-month.
+1. Is the operator OK with A0 (checklist) as the day-one experience,
+   with A1/A2 added later based on real pain?
+2. For pack changes mid-cycle: does Hathway pro-rate, or does the operator
+   just note the change and let it apply at next renewal? Affects whether
+   `change_pack` writes a partial charge or defers.
+3. Should `provider_action_intent` be surfaced on the subscriber profile
+   ("2 provider actions pending for this customer") in addition to the
+   global tray? Recommend yes.
