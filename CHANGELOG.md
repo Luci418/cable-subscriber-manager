@@ -16,6 +16,85 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 - `docs/PROJECT_STATUS.md`: marked Phase 6.5 complete, listed all sub-batches (A–M), moved "provider integration" into Active work as planning-only.
 - `docs/README.md`: linked HANDOFF as the new starting point.
 
+### Backfill — Phases 4b through 6.5-M (2026-06-14 → 2026-07-27)
+
+> Reconstructed on 2026-07-29 from `docs/PROJECT_STATUS.md`,
+> `docs/LEGACY_DEPENDENCY_AUDIT.md` and the migration history. These
+> milestones shipped without individual changelog entries; this block
+> closes the gap required by ADR-010 (append-only history). Dates are
+> milestone dates, not necessarily individual commit dates.
+
+- **Phase 4b — view-based reads.** Added `v_subscriber_active_subscription`
+  and `v_subscriber_subscription_timeline`; frontend migrated to the
+  view-backed `_activeCable` / `_activeInternet` / `_timelineCable` /
+  `_timelineInternet` arrays. Legacy JSONB writes retained as mirrors.
+- **Phase 5 — multi-device.** Multi-device pairing per subscriber, device
+  replacement, unpair-with-reason, `device_assignment_log` coverage for
+  every pair/unpair/replace.
+- **Phase 5.1 — declared intent.** `services[]` decoupled from device
+  pairing; `stb_inventory` became the realised state, `services[]` the
+  declared intent. `subscribers_enforce_invariants` reworked accordingly.
+- **Phase 5.2 — Add-Service flow.** Cable⇄Internet symmetry fix on the
+  subscriber profile.
+- **Phase 5.3 — error propagation audit.** `updateSubscriber` switched to
+  `maybeSingle()`; every write call site must verify its return value
+  before `toast.success` (QA gate, Part H).
+- **Phase 6 — roles & permissions.** `app_role` enum, `user_roles` table,
+  `has_role()` and `can_*()` SECURITY DEFINER gates, RolesManagement UI,
+  PERMISSION_MATRIX.md and ROLE_DESIGN.md.
+- **6.5-A** — `is_pack_in_use` rewritten against `subscriptions.pack_id`;
+  deletable-check RPCs; immutability triggers on `subscriptions`,
+  `payment_allocations`, `device_assignment_log`.
+- **6.5-B (2026-07-07)** — dropped `current_pack` / `current_internet_pack`;
+  frontend migrated to view-derived pack names.
+- **6.5-C (2026-07-08)** — dropped the JSONB blob columns
+  (`current_subscription`, `subscription_history`, `internet_subscription`,
+  `internet_subscription_history`); invariants and create/cancel/expire RPCs
+  rewritten against the normalised `subscriptions` table.
+- **6.5-D** — routing + IA: tabbed subscriber profile (`/customers/:id/:tab`),
+  per-device workspace (`/equipment/:serial`), billing worklist, settings
+  sub-routes.
+- **6.5-E** — customer list redesign, server-side pagination
+  (`useSubscribersPaged`), async `SubscriberCombobox`, standardized confirm
+  dialogs via `src/lib/confirm.tsx`.
+- **6.5-F (2026-07-17)** — production audit
+  (`docs/PRODUCTION_AUDIT_2026-07.md`), `payment_method` standardization,
+  `reconcile_subscriber_balance` / `reconcile_all_balances` RPCs +
+  `balance_audit` table + UI. Dropped the `grant_owner_on_signup()` trigger;
+  first-owner provisioning is now a documented manual SQL step.
+- **6.5-G** — Credentials tab with `pgcrypto`-encrypted storage
+  (ISP / WiFi / Hardware / Connection cards), gated by `canViewCredentials`;
+  roles moved into `PermissionsProvider` context to remove UI lag.
+- **6.5-H** — Testing Sprint 1 and Sprint 2: 46 Vitest unit tests and 11
+  pgTAP files (44 assertions).
+- **6.5-I (2026-07-21)** — Batch D: `subscribers.stb_number` retired along
+  with `sync_stb_inventory_on_subscriber_change` and the obsolete
+  `reconcile_stb_inventory()` RPC. Device identity now derived from
+  `stb_inventory` + `subscriptions.device_serial_snapshot`.
+- **6.5-J** — Settings audit trail, `mark_device_repaired` RPC,
+  double-click guards, retry buttons, complaint↔subscriber cross-links,
+  URL-persistent filters, `canArchiveCustomer` renamed to
+  `canManageCustomerLifecycle`.
+- **6.5-K** — multi-STB and NULL-provider fixes; "no active connection"
+  filter on the customer list.
+- **6.5-L** — `packs.provider_cost` + Analytics Margin section (packs
+  missing cost data excluded from margin maths).
+- **6.5-M** — Catalog page (`/catalog`), Hathway integration stub in
+  Settings with sync log, `hathway_customer_nbr` column.
+
+### Docs — Consistency pass across the doc set (2026-07-29)
+- Backfilled the changelog gap above.
+- BUSINESS_MODEL.md carries an editor's note: it remains authoritative for
+  *rules*, but its Build Priority Order is historical and PROJECT_STATUS.md
+  wins on status.
+- Canonical invariant range fixed at **INV-01…INV-45** everywhere.
+- `services[]` question closed: the column stays as declared intent; the
+  remaining `unpair_device` auto-removal is recorded as tracked debt.
+- Test counts corrected everywhere to **46 Vitest tests** and **11 pgTAP
+  files / 44 assertions**; TESTING_ARCHITECTURE.md marks Sprints 1–2 shipped.
+- DEVELOPER_GUIDE.md staleness banner widened to cover the business-logic
+  and hook sections that predate the RPC-mediated model (ADR-012).
+
 ### Phase 4a — Normalized `subscriptions` + `payment_allocations` (2026-06-13)
 - Adopted BUSINESS_MODEL v3.2 (uploaded as the new authoritative spec). Doc replaces all prior versions; key v3.2 changes: device-level uniqueness, separate `payment_allocations` table, simplified cash-only refund formula, `subscription_id` added to `transactions`, hard end_date immutability in v1.
 - New `public.subscriptions` table — first-class subscription rows with immutable snapshots (`pack_name_snapshot`, `pack_price_snapshot`, `billing_type_snapshot`, `validity_days_snapshot`, `total_days`, `total_charged`, `start_date`, `duration`, `previous_subscription_id`), `device_id` + `device_serial_snapshot` device pointer, renewal lineage via `previous_subscription_id`, cancel fields, refund_amount, v2-ready suspend columns (nullable). Indexes for next-action chip and operator dashboards. RLS scoped to `auth.uid()`.
