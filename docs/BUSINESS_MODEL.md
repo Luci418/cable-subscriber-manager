@@ -1,6 +1,22 @@
 # Business Model & Invariant Handoff
 ## Subscriber Management System — Complete Implementation Brief for Lovable
-### Version 3.2 — Phase 4 Schema Final (device-level uniqueness, transaction ownership model)
+### Version 3.3 — Phase 6.5 reality pass (device-level uniqueness, transaction ownership model)
+
+> **Editor's note (2026-07-29 — read this first):**
+> This document is still the authoritative source for **business rules and
+> invariants**. It is *not* a status document.
+> - For *what is built*, `docs/PROJECT_STATUS.md` wins. Phases 3 through 6.5
+>   (A–M) are complete; **Part Fourteen — Build Priority Order is historical**
+>   and describes work that has already shipped.
+> - The canonical invariant range is **INV-01 … INV-45** (Part Twelve plus the
+>   "Additional Invariants" section). `docs/SYSTEM_INVARIANTS.md` is the
+>   engineering view of the same set — it never introduces new IDs.
+> - The `services[]` question raised on 2026-06-20 is **closed** (see that
+>   section): the column is kept as declared intent.
+> - Schema details here reflect the Phase 4 design. Columns retired since
+>   then (`current_pack*`, the JSONB subscription blobs, `stb_number`) are
+>   listed in `docs/LEGACY_DEPENDENCY_AUDIT.md`; treat that file as the
+>   overlay on top of any schema section below.
 
 > **Authority:** This document is the single authoritative source for business
 > rules, lifecycle decisions, and invariants for this system.
@@ -11,6 +27,7 @@
 > **Scope:** Covers all worksheet sections A through J in full.
 > Every answer came directly from the operator. Nothing is assumed.
 > No items remain marked [OPEN] — all questions are now resolved.
+
 >
 > **Instructions for Lovable:** Read this document before writing any Phase 3,
 > 4, or 5 migration, RPC, or UI component. Every implementation decision
@@ -134,7 +151,28 @@ Customer
 
 ---
 
-### Open Question (2026-06-20): is `services[]` declared intent, or a derived cache?
+### CLOSED (2026-07-29): `services[]` is declared intent — was Open Question (2026-06-20)
+
+> **Decision:** `services[]` is **declared intent** and the column is
+> **kept** — no derivation, no drop. This matches
+> `docs/LEGACY_DEPENDENCY_AUDIT.md` ("Keep — reframed as declared intent").
+> The prospect-before-installation workflow below is real, which settles the
+> decision rule in favour of "YES".
+>
+> **Residual deviation (tracked debt, not an open question):** the decision
+> rule says the auto-writes should be removed. Today `pair_device` still
+> appends the device's service type, and `unpair_device` still removes it on
+> last-device unpair. The append is harmless — realising an intent implies
+> the intent — but the **removal on unpair contradicts declared-intent
+> semantics** (a customer whose STB goes to the workshop stops "wanting"
+> Cable). Fix = drop the `array_remove` branch in `unpair_device`. Logged in
+> PROJECT_STATUS.md → Technical Debt Register. Until then, treat the removal
+> as a known bug, not as the model.
+
+The original analysis is retained below for context.
+
+#### Original analysis (2026-06-20)
+
 
 This question must be resolved before any further behavior change to the
 `services[]` column or the `pair_device` / `unpair_device` auto-writes.
@@ -170,13 +208,10 @@ device of that type), then re-pair on return. If the operator wants
   types) ∪ `subscriptions` (active subs' service types), and the column
   dropped per Batch C/D of the legacy column audit.
 
-**Status:** unresolved. No behavior change applied. Documented here to
-prevent silent drift between the data model and the operator workflow.
+**Status: CLOSED 2026-07-29 — declared intent, column kept.** See the
+decision block at the top of this section. The only outstanding item is the
+`unpair_device` auto-removal, tracked as debt in PROJECT_STATUS.md.
 
-**Answer when known:** _TBD — operator interviews / commercial-rollout
-testing._ Once decided, update this section with the answer and the
-corresponding cleanup (either remove the auto-writes, or schedule
-`services[]` for derivation + drop).
 
 ---
 
@@ -1513,7 +1548,13 @@ migration.
 
 ---
 
-# PART TWELVE — COMPLETE INVARIANT MATRIX
+# PART TWELVE — COMPLETE INVARIANT MATRIX (INV-01 … INV-38)
+
+> The matrix continues in **"Additional Invariants — INV-39 through INV-45"**
+> later in this document. Together those two tables are the **single canonical
+> invariant set: INV-01 … INV-45**. No other document may mint new IDs;
+> `docs/SYSTEM_INVARIANTS.md` only records how each one is enforced today.
+
 
 ---
 
@@ -1596,7 +1637,13 @@ No open questions remain.
 
 ---
 
-# PART FOURTEEN — BUILD PRIORITY ORDER
+# PART FOURTEEN — BUILD PRIORITY ORDER *(HISTORICAL — all shipped)*
+
+> **This section is history, not a backlog.** Every item below shipped in
+> Phases 3–6.5. Kept for traceability between invariants and the order they
+> were implemented. For current and next work, read
+> `docs/PROJECT_STATUS.md` and `.lovable/plan.md`.
+
 
 ---
 

@@ -10,13 +10,31 @@
 > [Production Readiness](./PRODUCTION_READINESS.md) ·
 > [Future Evolution](./FUTURE_EVOLUTION.md).
 
-> ⚠️ **Schema sections are partly stale.** The ER diagram (§4) and table
-> definitions (§5) predate the cable/internet split, the per-service balance
-> columns (`cable_balance`, `internet_balance`), the per-service subscription
-> blobs, and the Provider entity (see ADR-007). The authoritative schema is
-> the live Supabase project; a focused refresh of these sections is tracked
-> in `docs/AUDIT_REPORT.md` §6. Other sections (components, hooks, patterns,
-> RLS, PDF generation) remain accurate.
+> ⚠️ **Stale sections — read before copying any code from this file
+> (reviewed 2026-07-29).** The following are known out of date:
+>
+> - **§ Entity Relationship Diagram and § Database Schema** — predate the
+>   cable/internet split, per-service balance columns, the Provider entity
+>   (ADR-007), the normalised `subscriptions` + `payment_allocations` tables
+>   (Phase 4), and the retirement of the JSONB subscription blobs,
+>   `current_pack*` and `stb_number` (Batches B–D). **The JSONB columns
+>   described here no longer exist.**
+> - **§ Business Logic → Subscription Lifecycle / Balance Management** — the
+>   refund and lifecycle flow shown mutates JSONB blobs client-side. That
+>   model is dead. Create/cancel/expire/pair/unpair/replace are **atomic
+>   SECURITY DEFINER RPCs** (ADR-012); the client calls `supabase.rpc(...)`
+>   and never performs multi-step UPDATEs. Balance is written only by the
+>   `recalc_subscriber_balance` trigger — never sum transactions in the UI.
+> - **§ Custom Hooks (`useSubscribers`, `usePacks`) and § Common Patterns**
+>   — the code samples show pre-RPC multi-step writes and optimistic
+>   updates. Following them reintroduces exactly the race conditions ADR-012
+>   was written to close. Read the live hook source instead.
+>
+> Accurate sections: project overview, architecture decisions, tech stack,
+> application structure, auth flow, RLS, PDF generation, best practices.
+> The authoritative schema is the live database; the authoritative rules are
+> `BUSINESS_MODEL.md` + `SYSTEM_INVARIANTS.md`; the authoritative status is
+> `PROJECT_STATUS.md`.
 
 ---
 

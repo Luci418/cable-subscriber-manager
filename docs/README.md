@@ -19,7 +19,7 @@ existing file instead of creating parallel versions.
 | Document | Purpose |
 |---|---|
 | [PROJECT_VISION.md](./PROJECT_VISION.md) | Why the system exists; who it serves; what it is *not*. |
-| [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) | Authoritative domain model + invariant catalogue (INV-01…INV-33). |
+| [BUSINESS_MODEL.md](./BUSINESS_MODEL.md) | Authoritative domain model + canonical invariant catalogue (INV-01…INV-45). Rules only — PROJECT_STATUS.md wins on status. |
 | [BUSINESS_RULES.md](./BUSINESS_RULES.md) | Plain-language summary of behaviour. Cross-refs BUSINESS_MODEL. |
 | [ANALYTICS_STRATEGY.md](./ANALYTICS_STRATEGY.md) | Every metric, why it exists, who uses it. |
 | [FUTURE_EVOLUTION.md](./FUTURE_EVOLUTION.md) | Possibilities. Not commitments. |
