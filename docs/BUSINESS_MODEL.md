@@ -208,13 +208,10 @@ device of that type), then re-pair on return. If the operator wants
   types) ∪ `subscriptions` (active subs' service types), and the column
   dropped per Batch C/D of the legacy column audit.
 
-**Status:** unresolved. No behavior change applied. Documented here to
-prevent silent drift between the data model and the operator workflow.
+**Status: CLOSED 2026-07-29 — declared intent, column kept.** See the
+decision block at the top of this section. The only outstanding item is the
+`unpair_device` auto-removal, tracked as debt in PROJECT_STATUS.md.
 
-**Answer when known:** _TBD — operator interviews / commercial-rollout
-testing._ Once decided, update this section with the answer and the
-corresponding cleanup (either remove the auto-writes, or schedule
-`services[]` for derivation + drop).
 
 ---
 
