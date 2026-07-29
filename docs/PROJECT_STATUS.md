@@ -4,7 +4,7 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-28 (Provider integration re-scoped to write-through)
+Last updated: 2026-07-29 (documentation consistency pass)
 
 ---
 

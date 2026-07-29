@@ -4,7 +4,14 @@
 become productive on this project without re-deriving the last six months
 of decisions. Read this first, then open the files listed at the bottom.
 
-Last updated: 2026-07-28.
+Last updated: 2026-07-29 (documentation consistency pass).
+
+**Doc precedence when two files disagree:** `PROJECT_STATUS.md` wins on
+*status*; `BUSINESS_MODEL.md` wins on *rules and invariants* (canonical set
+INV-01…INV-45); `SYSTEM_INVARIANTS.md` wins on *how a rule is enforced in
+code today*; `LEGACY_DEPENDENCY_AUDIT.md` overrides any schema description
+elsewhere. `DEVELOPER_GUIDE.md` is stale in the sections flagged by its
+banner — do not copy code from them.
 
 ---
 
