@@ -63,5 +63,12 @@ keep working while callers migrate.
   Deriving it purely from `stb_inventory ∪ subscriptions` loses the
   "prospect who wants Cable but is not yet paired" state.
 
+  **Decision closed 2026-07-29** (BUSINESS_MODEL.md, "CLOSED (2026-07-29):
+  `services[]` is declared intent"). One residual deviation remains and is
+  tracked as debt, not as an open question: `unpair_device` still removes
+  the service type on last-device unpair, which contradicts declared-intent
+  semantics. `pair_device`'s append is fine. Fix = drop the `array_remove`
+  branch in `unpair_device`.
+
 - **`src/lib/storage.ts`** — non-blocking. Retire one caller at a time
   as they are touched for other reasons.

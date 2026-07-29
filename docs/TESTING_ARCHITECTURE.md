@@ -1,8 +1,15 @@
 # Testing Architecture
 
-**Not an implementation.** This document describes the target testing
-architecture for the project. Testing is introduced incrementally, one
-layer at a time; this file states the plan and the order.
+**Status (2026-07-29): Sprints 1 and 2 are SHIPPED.** Layers 1 (pgTAP)
+and 2 (Vitest over pure functions) exist today: `test/db/` holds 11 pgTAP
+files with 44 assertions, and `src/lib/*.test.ts` holds 46 Vitest tests
+(`financialPosition`, `ledgerRendering`, `activeSubs`, `subscriberIdGenerator`).
+Run them with `bun run test` and `bun run test:db`.
+
+Everything below layer 2 — migration hygiene, component tests, routing
+guards, Playwright E2E, CI — is still **target architecture, not built**.
+Testing is introduced incrementally, one layer at a time; this file states
+the plan and the order.
 
 ## Guiding principles
 
@@ -43,8 +50,11 @@ with the same image used by Supabase.
 5. **RLS isolation** — sign in as user A, attempt to read/write user
    B's rows; assert empty result / permission error.
 
-**When to introduce:** Sprint 1 of testing rollout. Highest ROI, lowest
-setup cost.
+**Status: SHIPPED (Sprint 1 + 2).** 11 files, 44 assertions covering
+immutability triggers (transactions, subscriptions, payment_allocations,
+device_assignment_log), role gates, `create_subscription` /
+`cancel_subscription` / `pair_device` / `mark_device_*` behaviour, RLS
+isolation and FIFO allocation.
 
 ### 2. Backend business rules (unit tests over pure functions)
 
@@ -64,7 +74,9 @@ DB.
    multi-device).
 4. `assetTimeline.ts` — timeline merge from device history.
 
-**When to introduce:** Sprint 1, in parallel with pgTAP.
+**Status: SHIPPED (Sprint 1).** 46 Vitest tests across `financialPosition`,
+`ledgerRendering`, `activeSubs`, `subscriberIdGenerator`. `assetTimeline` is
+still uncovered.
 
 ### 3. Migration hygiene
 
@@ -154,11 +166,14 @@ container. Cache node_modules + Playwright browsers.
 
 **When to introduce:** Sprint 4 (only meaningful once the tests exist).
 
-## Recommended first implementation milestone
+## Testing Sprint 1 — DONE (2026-07-20), extended by Sprint 2 (2026-07-27)
 
-**Testing Sprint 1** — pgTAP + Vitest for pure functions.
+**Testing Sprint 1** — pgTAP + Vitest for pure functions. Delivered as
+described below; Sprint 2 added 6 more pgTAP files (RPC integration + RLS).
+Tests live in `test/db/` and alongside the sources in `src/lib/*.test.ts`
+(no `test/unit/` directory — Vitest suites sit next to the code they cover).
 
-Deliverables:
+Delivered:
 - `test/db/` with pgTAP suites covering immutability triggers and role
   gates on every write RPC.
 - `test/unit/` with Vitest suites for `financialPosition`,
@@ -167,8 +182,8 @@ Deliverables:
   command, both documented in DEVELOPER_GUIDE.md.
 - No CI yet — prove the workflow locally first.
 
-That milestone alone would move ~15 rows in `SYSTEM_INVARIANTS.md` from
-🔴/🟡 to 🟢.
+**Next milestone: Sprint 3** — migration-hygiene script (layer 3) and
+component/permission tests (layer 4). Not started.
 
 ## Anti-goals
 
