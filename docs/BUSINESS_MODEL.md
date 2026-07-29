@@ -151,7 +151,28 @@ Customer
 
 ---
 
-### Open Question (2026-06-20): is `services[]` declared intent, or a derived cache?
+### CLOSED (2026-07-29): `services[]` is declared intent — was Open Question (2026-06-20)
+
+> **Decision:** `services[]` is **declared intent** and the column is
+> **kept** — no derivation, no drop. This matches
+> `docs/LEGACY_DEPENDENCY_AUDIT.md` ("Keep — reframed as declared intent").
+> The prospect-before-installation workflow below is real, which settles the
+> decision rule in favour of "YES".
+>
+> **Residual deviation (tracked debt, not an open question):** the decision
+> rule says the auto-writes should be removed. Today `pair_device` still
+> appends the device's service type, and `unpair_device` still removes it on
+> last-device unpair. The append is harmless — realising an intent implies
+> the intent — but the **removal on unpair contradicts declared-intent
+> semantics** (a customer whose STB goes to the workshop stops "wanting"
+> Cable). Fix = drop the `array_remove` branch in `unpair_device`. Logged in
+> PROJECT_STATUS.md → Technical Debt Register. Until then, treat the removal
+> as a known bug, not as the model.
+
+The original analysis is retained below for context.
+
+#### Original analysis (2026-06-20)
+
 
 This question must be resolved before any further behavior change to the
 `services[]` column or the `pair_device` / `unpair_device` auto-writes.
