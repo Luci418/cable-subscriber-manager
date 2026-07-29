@@ -7,8 +7,12 @@ requires either (a) preserving the invariant or (b) an ADR + migration that
 consciously retires it. Silent violations are the most expensive class of
 bug in this system.
 
-Source of truth for the *why* is `BUSINESS_MODEL.md` (INV-01…INV-33). This
-document is the *engineering* view: what code enforces each rule today.
+Source of truth for the *why* is `BUSINESS_MODEL.md`, which holds the **single
+canonical invariant set: INV-01 … INV-45** (Part Twelve = INV-01…INV-38,
+"Additional Invariants" = INV-39…INV-45). This document is the *engineering*
+view: what code enforces each rule today. It never mints new IDs — if a rule
+here has no INV number, it is an implementation guard, not an invariant.
+
 
 Legend for **Tested?** — 🟢 covered, 🟡 partial (manual only), 🔴 no coverage.
 
