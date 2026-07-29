@@ -1631,7 +1631,13 @@ No open questions remain.
 
 ---
 
-# PART FOURTEEN — BUILD PRIORITY ORDER
+# PART FOURTEEN — BUILD PRIORITY ORDER *(HISTORICAL — all shipped)*
+
+> **This section is history, not a backlog.** Every item below shipped in
+> Phases 3–6.5. Kept for traceability between invariants and the order they
+> were implemented. For current and next work, read
+> `docs/PROJECT_STATUS.md` and `.lovable/plan.md`.
+
 
 ---
 
