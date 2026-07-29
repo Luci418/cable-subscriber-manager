@@ -35,6 +35,7 @@ CI against a throwaway Postgres 15 container. Local dev: docker compose
 with the same image used by Supabase.
 
 **Priority coverage (in order):**
+
 1. **Immutability triggers** — `transactions`, `transaction_notes`,
    `subscriber_status_log`. Each should have a "DELETE fails" and
    "UPDATE of protected column fails" test.
@@ -51,9 +52,9 @@ with the same image used by Supabase.
    B's rows; assert empty result / permission error.
 
 **Status: SHIPPED (Sprint 1 + 2).** 11 files, 44 assertions covering
-immutability triggers (transactions, subscriptions, payment_allocations,
+immutability triggers (transactions, subscriptions, payment*allocations,
 device_assignment_log), role gates, `create_subscription` /
-`cancel_subscription` / `pair_device` / `mark_device_*` behaviour, RLS
+`cancel_subscription` / `pair_device` / `mark_device*\*` behaviour, RLS
 isolation and FIFO allocation.
 
 ### 2. Backend business rules (unit tests over pure functions)
@@ -66,6 +67,7 @@ DB.
 **Recommended tools:** Vitest (already available via bun).
 
 **Priority coverage:**
+
 1. `financialPosition.ts` — balance derivation from a transaction
    fixture.
 2. `subscriberIdGenerator.ts` — prefix formation, sequence progression,
@@ -84,6 +86,7 @@ still uncovered.
 public-schema table must GRANT explicitly.
 
 **Recommended tools:** Custom shell/CI script that:
+
 - Applies all migrations against a fresh DB.
 - Greps every `CREATE TABLE public.` for a matching `GRANT` in the same
   file.
@@ -102,6 +105,7 @@ subscriber shape.
 `supabase` client.
 
 **Priority coverage:**
+
 1. `usePermissions` — every branch (owner, admin_office,
    collection_agent, technician, no-role user).
 2. `SubscriberDetail` — Add-Service flow (the Phase 5.2 regression must
@@ -130,6 +134,7 @@ DB + real UI.
 Run against a seeded test tenant.
 
 **Priority coverage (the "seven paths"):**
+
 1. Add subscriber → pair STB → assign pack → collect payment → print
    receipt.
 2. Cancel subscription with refund → verify ledger + balance.
@@ -150,6 +155,7 @@ Run against a seeded test tenant.
 run before every release.
 
 **Location:** `QA_TEST_PLAN.md` (exists). Add a release checklist:
+
 - Run `npm audit`, resolve criticals.
 - Restore a backup into a scratch project; run smoke test.
 - Run the seven E2E paths (manual until Sprint 3).
@@ -159,7 +165,8 @@ run before every release.
 ### 8. CI
 
 **Purpose:** Every push runs (1) + (2); every PR runs (1) + (2) + (4)
-+ (5); tagged release runs everything including (6).
+
+- (5); tagged release runs everything including (6).
 
 **Recommended tools:** GitHub Actions matrix with a Postgres service
 container. Cache node_modules + Playwright browsers.
@@ -174,9 +181,10 @@ Tests live in `test/db/` and alongside the sources in `src/lib/*.test.ts`
 (no `test/unit/` directory — Vitest suites sit next to the code they cover).
 
 Delivered:
+
 - `test/db/` with pgTAP suites covering immutability triggers and role
   gates on every write RPC.
-- `test/unit/` with Vitest suites for `financialPosition`,
+- `src/lib/*.test.ts` with Vitest suites for `financialPosition`,
   `subscriberIdGenerator`, `activeSubs`.
 - A local `bunx vitest run` command and a `pg_prove test/db/*.sql`
   command, both documented in DEVELOPER_GUIDE.md.
