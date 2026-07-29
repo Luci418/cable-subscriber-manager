@@ -15,7 +15,7 @@ All planned batches shipped: correctness fixes, legacy column
 retirement (JSONB blobs, `current_pack*`, `stb_number`), roles +
 permissions, encrypted credentials, reconciliation RPCs, standardized
 confirmation dialogs, catalog page, pack margin analytics, and
-Testing Sprints 1 & 2 (Vitest + pgTAP, 31 assertions).
+Testing Sprints 1 & 2 (46 Vitest tests + 11 pgTAP files / 44 assertions).
 
 ## Active work
 
@@ -50,7 +50,7 @@ design (kept for context).
 | 6.5-E | Customer list redesign, server-side pagination, async subscriber combobox, standardized confirm dialogs | ✅ |
 | 6.5-F | Production audit, `payment_method` standardization, `reconcile_subscriber_balance` + `balance_audit` | ✅ |
 | 6.5-G | Encrypted credentials tab (`pgcrypto`), PermissionsProvider context | ✅ |
-| 6.5-H | Testing Sprint 1 (46 Vitest + 15 pgTAP) and Sprint 2 (+16 pgTAP) | ✅ |
+| 6.5-H | Testing Sprint 1 (46 Vitest + 5 pgTAP files) and Sprint 2 (+6 pgTAP files); 11 files, 44 assertions total | ✅ |
 | 6.5-I | `stb_number` column retirement (Batch D) | ✅ |
 | 6.5-J | Settings audit trail, `mark_device_repaired` RPC, URL-persistent filters, complaint↔subscriber cross-links | ✅ |
 | 6.5-K | Multi-STB and NULL-provider fixes; "no active connection" filter | ✅ |

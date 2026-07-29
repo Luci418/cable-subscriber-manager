@@ -31,7 +31,7 @@ pairing, device replacement, roles + RLS + permission gates, encrypted
 credentials, legacy column retirement (JSONB blobs, `current_pack*`,
 `stb_number`), reconciliation RPCs, audit trails, standardized confirm
 dialogs, catalog page, pack margin analytics, Testing Sprint 1 & 2
-(pgTAP + Vitest, 31 assertions).
+(pgTAP + Vitest: 46 Vitest tests, 11 pgTAP files / 44 assertions).
 
 **Currently in planning, not built:** provider integration (Hathway
 snapshot import + write-through to provider portal). See `.lovable/plan.md`
@@ -44,7 +44,7 @@ and the provider portal follows.
 ## 3. The most important rules a new thread must respect
 
 1. **Read `docs/SYSTEM_INVARIANTS.md` before proposing schema or RPC
-   changes.** INV-01…INV-44 are enforced by triggers; breaking one will
+   changes.** INV-01…INV-45 (canonical set, defined only in `docs/BUSINESS_MODEL.md`) are enforced by triggers; breaking one will
    fail at insert time, not review time.
 2. **Never touch legacy paths in code without checking
    `docs/LEGACY_DEPENDENCY_AUDIT.md` first.** Several columns look alive
@@ -83,7 +83,7 @@ src/
                      activeSubs, subscriberIdGenerator, timeSync, confirm)
   integrations/supabase/ — auto-generated client + types (do not edit)
 supabase/migrations/  — SQL migrations (append-only, timestamped)
-test/db/         — pgTAP tests (16 files, 31 assertions)
+test/db/         — pgTAP tests (11 files, 44 assertions)
 docs/            — all long-form documentation (see docs/README.md)
 .lovable/plan.md — current active build plan
 ```
@@ -109,7 +109,7 @@ Two design iterations happened. A new thread should understand both:
 
 - `bun run test` — Vitest unit tests (46 tests). Covers financialPosition,
   ledgerRendering, activeSubs, subscriberIdGenerator.
-- `bun run test:db` — pgTAP against a throwaway Postgres (31 assertions).
+- `bun run test:db` — pgTAP against a throwaway Postgres (11 files, 44 assertions).
   Covers immutability triggers, role gates, RPC behaviour, RLS isolation,
   FIFO allocation.
 - No E2E/browser tests yet. Regression is manual per `docs/QA_TEST_PLAN.md`.
