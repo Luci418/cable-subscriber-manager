@@ -1548,7 +1548,13 @@ migration.
 
 ---
 
-# PART TWELVE — COMPLETE INVARIANT MATRIX
+# PART TWELVE — COMPLETE INVARIANT MATRIX (INV-01 … INV-38)
+
+> The matrix continues in **"Additional Invariants — INV-39 through INV-45"**
+> later in this document. Together those two tables are the **single canonical
+> invariant set: INV-01 … INV-45**. No other document may mint new IDs;
+> `docs/SYSTEM_INVARIANTS.md` only records how each one is enforced today.
+
 
 ---
 
