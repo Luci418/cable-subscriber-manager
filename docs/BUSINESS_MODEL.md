@@ -1,6 +1,22 @@
 # Business Model & Invariant Handoff
 ## Subscriber Management System — Complete Implementation Brief for Lovable
-### Version 3.2 — Phase 4 Schema Final (device-level uniqueness, transaction ownership model)
+### Version 3.3 — Phase 6.5 reality pass (device-level uniqueness, transaction ownership model)
+
+> **Editor's note (2026-07-29 — read this first):**
+> This document is still the authoritative source for **business rules and
+> invariants**. It is *not* a status document.
+> - For *what is built*, `docs/PROJECT_STATUS.md` wins. Phases 3 through 6.5
+>   (A–M) are complete; **Part Fourteen — Build Priority Order is historical**
+>   and describes work that has already shipped.
+> - The canonical invariant range is **INV-01 … INV-45** (Part Twelve plus the
+>   "Additional Invariants" section). `docs/SYSTEM_INVARIANTS.md` is the
+>   engineering view of the same set — it never introduces new IDs.
+> - The `services[]` question raised on 2026-06-20 is **closed** (see that
+>   section): the column is kept as declared intent.
+> - Schema details here reflect the Phase 4 design. Columns retired since
+>   then (`current_pack*`, the JSONB subscription blobs, `stb_number`) are
+>   listed in `docs/LEGACY_DEPENDENCY_AUDIT.md`; treat that file as the
+>   overlay on top of any schema section below.
 
 > **Authority:** This document is the single authoritative source for business
 > rules, lifecycle decisions, and invariants for this system.
@@ -11,6 +27,7 @@
 > **Scope:** Covers all worksheet sections A through J in full.
 > Every answer came directly from the operator. Nothing is assumed.
 > No items remain marked [OPEN] — all questions are now resolved.
+
 >
 > **Instructions for Lovable:** Read this document before writing any Phase 3,
 > 4, or 5 migration, RPC, or UI component. Every implementation decision
