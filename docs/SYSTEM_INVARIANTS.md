@@ -43,9 +43,9 @@ Legend for **Tested?** — 🟢 covered, 🟡 partial (manual only), 🔴 no cov
 
 | Invariant | Why it exists | Enforced where | Tested? | Docs |
 |---|---|---|---|---|
-| Only one subscriber may hold an `assigned` inventory row | Physical reality — one STB, one house | `stb_inventory` update in `pair_device` (device must be `available` first); `sync_stb_inventory_on_subscriber_change` trigger | 🟡 | STB inventory memory |
+| INV-10 — Only one subscriber may hold an `assigned` inventory row | Physical reality — one STB, one house | Unique partial index on `stb_inventory(subscriber_id)` where `status='assigned'`; `pair_device` requires the device to be `available` first | 🟢 `08_pair_device.sql` | STB inventory memory |
 | Unpair blocked while an active subscription is tied to the device | Cannot orphan billing | `unpair_device` RPC — `IF v_active_count > 0 THEN RAISE` | 🔴 | BUSINESS_MODEL.md |
-| Inventory is the authority for pairing; `subscribers.stb_number` is a cache | Prevents divergence | `subscribers_enforce_invariants` — writing `stb_number` requires an agreeing `stb_inventory` row | 🟡 | LEGACY_DEPENDENCY_AUDIT.md |
+| INV-08/INV-09 — `stb_inventory` is the sole authority for pairing | Prevents divergence | `subscribers.stb_number` was **dropped in Batch D (2026-07-21)** along with `sync_stb_inventory_on_subscriber_change`. Device identity = `stb_inventory WHERE subscriber_id=… AND status='assigned'`, plus `subscriptions.device_serial_snapshot` for history | 🟡 | LEGACY_DEPENDENCY_AUDIT.md |
 | Device service type must match subscription service type | Cannot pair an ONU to a cable subscription | `create_subscription` + `replace_device` service-type checks | 🔴 | — |
 | Replacement device must be `available` and same service type as old | Prevents swap-into-conflict | `replace_device` RPC | 🔴 | — |
 | `services[]` cannot be removed while an active subscription exists for that service | Data integrity — cancel first | `subscribers_enforce_invariants` trigger | 🔴 | — |
