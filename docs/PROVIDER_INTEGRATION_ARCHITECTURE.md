@@ -213,7 +213,7 @@ stages, tables, or UI screens.
 
 | Concern | Current SMS captures? | Provider adds? | Gap |
 |---|---|---|---|
-| Upstream subscriber id | Yes (`hathway_customer_nbr`, `gtpl_customer_nbr`) | — | None |
+| Upstream subscriber id | Yes (`hathway_customer_nbr`, superseded by the provider link table) | — | None |
 | Device inventory | Yes (`stb_inventory`) | Confirms status | None |
 | Service status per device | Yes (`stb_inventory.status`) | Yes (Dashboard) | Need drift check |
 | Current pack + expiry | Yes (`subscriptions`) | Yes (Customer Master) | Need pack-name → local pack mapping table |
@@ -268,9 +268,9 @@ production use.
    controlled `decommissioned` transition.
    *Gate:* populated sample.
 
-7. **Phase 6 — GTPL adapter.** Register the second adapter using the same
-   pipeline.
-   *Gate:* GTPL sample exports in hand.
+7. **Phase 6 — Second provider adapter.** Register another adapter using
+   the same pipeline.
+   *Gate:* sample exports from that provider in hand.
 
 ## 13. Open questions to answer before implementation
 
