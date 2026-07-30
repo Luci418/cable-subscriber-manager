@@ -112,7 +112,7 @@ Scope is deliberately smaller than the previous plan.
    without any code changes.
 
 Explicitly **not** in this batch: browser automation (A2), scheduled
-polling, GTPL adapter, credential-storing "auto-login" server-side.
+polling, credential-storing "auto-login" server-side.
 
 ## 5. Why this is better than the previous plan
 

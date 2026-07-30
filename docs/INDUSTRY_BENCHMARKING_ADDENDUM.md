@@ -16,7 +16,7 @@ Cross-check the 9 operator workflows in the review doc against patterns from rea
 | **Sonar Software** | Tier-2/3 US ISPs | Reference for ledger/passbook UX, dunning, and accounting integration. |
 | **UISP (Ubiquiti)** | ISP CRM + NMS (free) | Reference for device-centric subscriber model and map view. |
 | **Powercode** | Mid-market ISPs | Reference for collection workflows and tax handling. |
-| **India LCO/MSO billing** (Hathway/GTPL local LCO panels, CAS/SMS vendors like Cisco VideoGuard, Conax, Verimatrix India deployments, Catvision, SkyPro, plus open LCO billing apps) | India cable | Reference for STB pairing terminology, prepaid recharge model, and TRAI NTO-2 statement formats. |
+| **India LCO/MSO billing** (Hathway local LCO panels, CAS/SMS vendors like Cisco VideoGuard, Conax, Verimatrix India deployments, Catvision, SkyPro, plus open LCO billing apps) | India cable | Reference for STB pairing terminology, prepaid recharge model, and TRAI NTO-2 statement formats. |
 | **TRAI references** | Regulator | Manual of Practice for SMS (Subscriber Management System) under NTO-2.0 + Telecommunication (Broadcasting & Cable) Services Interconnection Regulations 2017/2020. |
 
 > No deep-research links pasted — this is a synthesis from public docs, vendor product tours, and India operator community knowledge. Treat as starting brief; flag anything you want me to confirm with a targeted web fetch.

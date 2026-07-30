@@ -38,7 +38,7 @@ const SECTIONS: NavEntry[] = [
   { slug: 'services', label: 'Services',      icon: Layers,      hint: 'Enabled service modules' },
   { slug: 'receipts', label: 'Receipts',      icon: Receipt,     hint: 'Prefix, footer, locale' },
   { slug: 'roles',        label: 'Team & Roles',  icon: ShieldCheck, hint: 'Staff and permissions' },
-  { slug: 'integrations', label: 'Integrations',  icon: Plug,        hint: 'Hathway, GTPL, importers' },
+  { slug: 'integrations', label: 'Integrations',  icon: Plug,        hint: 'Hathway, importers' },
   { slug: 'backup',       label: 'Backup',        icon: Database,    hint: 'Export & restore' },
 ];
 
@@ -374,7 +374,7 @@ const ReconcileAllButton = () => {
 // confirmed; a locally-stored log records manual picks in the meantime
 // so operators can see the shell responding.
 //
-// GTPL will drop in as a second card using the exact same pattern.
+// Future providers drop in as additional cards using the same pattern.
 // ─────────────────────────────────────────────────────────────────────
 type SyncLogEntry = {
   id: string;
@@ -488,9 +488,6 @@ const IntegrationsSection = ({ readOnly }: { readOnly: boolean }) => {
         </div>
       </SectionCard>
 
-      <SectionCard title="GTPL" description="Coming soon — will use the same import pattern as Hathway.">
-        <p className="text-sm text-muted-foreground">Not yet available.</p>
-      </SectionCard>
     </div>
   );
 };

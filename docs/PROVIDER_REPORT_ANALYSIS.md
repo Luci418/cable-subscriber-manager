@@ -8,7 +8,7 @@
 ## 1. Purpose & scope
 
 The SMS is preparing to integrate with upstream MSO/DPO systems, starting with
-**Hathway** and later **GTPL**. Before writing any importer we must first
+**Hathway**. Before writing any importer we must first
 understand which provider reports carry authoritative business data, which are
 operational deltas, and which are only human-facing artefacts. This document
 catalogues the reports visible in the Hathway LCO portal, analyses the two
