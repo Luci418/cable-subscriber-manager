@@ -183,9 +183,11 @@ Tests live in `test/db/` and alongside the sources in `src/lib/*.test.ts`
 Delivered:
 
 - `test/db/` with pgTAP suites covering immutability triggers and role
-  gates on every write RPC.
-- `src/lib/*.test.ts` with Vitest suites for `financialPosition`,
-  `subscriberIdGenerator`, `activeSubs`.
+  gates on every write RPC (11 files, 44 assertions today).
+- Vitest suites next to their sources — `src/lib/financialPosition.test.ts`,
+  `src/lib/subscriberIdGenerator.test.ts`, `src/lib/activeSubs.test.ts`,
+  `src/lib/ledgerRendering.test.ts` (46 tests). There is no `test/unit/`
+  directory.
 - A local `bunx vitest run` command and a `pg_prove test/db/*.sql`
   command, both documented in DEVELOPER_GUIDE.md.
 - No CI yet — prove the workflow locally first.
