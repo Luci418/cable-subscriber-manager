@@ -8,7 +8,7 @@
 
 **Goals**
 
-- Support **Hathway** now and **GTPL** next, with additional MSOs later,
+- Support **Hathway** now, and additional MSOs later,
   without duplicating business logic per provider.
 - Keep the SMS's local ledger and inventory authoritative for money,
   operator actions, and audit; let provider data mirror upstream state.
@@ -119,7 +119,7 @@ raw ──▶ │ Ingestion│──▶│ Parsing│──▶│Normalization�
 
 **Match key order** (first hit wins, later keys used as tiebreakers):
 
-1. `hathway_customer_nbr` / `gtpl_customer_nbr` on `subscribers`
+1. Provider customer number on the subscriber↔provider link
 2. VC Id on device inventory
 3. STB / device serial on device inventory
 4. RMN (phone) — advisory only, never a sole match
@@ -188,13 +188,13 @@ picker, rolling log. The proposed growth path (no work in this batch):
 The stub does not need to be redesigned yet; it just needs to be aware it
 will grow.
 
-## 10. GTPL & future-provider extensibility
+## 10. Future-provider extensibility
 
 Provider-specific:
 
-- Raw report shapes (CSV/XLS/API).
+- Raw report shapes (CSV/TSV/XLS/API).
 - Report names and cadence quirks.
-- Match-key vocabulary (`gtpl_customer_nbr` vs `hathway_customer_nbr`).
+- Match-key vocabulary (which provider ids/serials exist).
 - Capability declaration (does this provider expose a wallet? asset
   return? plan cancellation delta?).
 
@@ -205,7 +205,7 @@ Shared:
 - Preview / audit / drift tables.
 - UI screens.
 
-The second adapter (GTPL) should be able to be added by implementing the
+A second provider should be addable by implementing the
 `ProviderAdapter` contract and registering it — no changes to pipeline
 stages, tables, or UI screens.
 
