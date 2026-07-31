@@ -41,7 +41,7 @@ and must be reused instead of re-created.
 | Existing | Used for |
 |---|---|
 | `providers` | Provider identity + (new) `sync_policy`. |
-| `packs.provider_cost` | Wholesale cost. **DPO Total Price is informational only** — pre-filled as an *unverified suggestion*, never auto-assigned. Real cost comes from the settlement statement. |
+| `packs.provider_cost` | Wholesale cost. **Operator-maintained**: entered from the known wholesale rate and updated when the provider's rate changes. DPO Total Price is informational only — pre-filled as an *unverified suggestion*, never auto-assigned. |
 | `transactions` (`source`, `provider_id`, `subscription_id`, immutability + FIFO triggers) | Every sync-created charge. No parallel ledger. |
 | `stb_inventory` | Device ↔ subscriber resolution. |
 | `subscribers.hathway_customer_nbr` | **Legacy read path.** Kept, not removed, not double-written this batch. New writes go to `subscriber_provider_state.provider_customer_number`. A backfill + drop is a later batch. |
@@ -50,7 +50,7 @@ and must be reused instead of re-created.
 
 ### 1.4 Business rules confirmed and carried into the plan
 
-1. **Absence is never termination.** Only an explicit inactive/suspended
+1. **Absence is never termination.** Only an explicit non-`ACTIVE`
    `service_status` counts as evidence. Missing rows only age
    `last_seen_in_snapshot_at`; 14+ days stale surfaces as an
    informational "not seen recently" list.
@@ -60,9 +60,74 @@ and must be reused instead of re-created.
 3. **Charge amount is always the local catalog price** (operator-editable
    on the review screen), never `dpo_total_price`.
 4. **Per-row partial success.** One bad row never blocks the run.
-5. **Sample-data caveat.** The 400-row Customer Master sample resolves to
-   1–2 real subscribers (same name, same mobile, same LCO code). Treat it
-   as shape evidence only — do **not** tune matching heuristics to it.
+5. **The sample export is genuine data, not a demo.** Hathway
+   bulk-allocated 400 STBs under a promotional arrangement (month 1 free,
+   operator pays month 2, month 3 free), uploaded under the operator's own
+   name as a placeholder; real names/addresses/mobiles fill in as boxes get
+   assigned. Do **not** discard it as synthetic — but its current
+   one-or-two-distinct-names shape is *not* steady state. Phase 2/3
+   fixtures must not overfit to "every row has the same customer name".
+
+### 1.5 Design decisions locked in (2026-07-31)
+
+**A. `subscriber_provider_state` is the long-term model, deliberately.**
+It generalises past the `subscribers.cable_provider_id` /
+`internet_provider_id` column pair, which only works because there happen to
+be exactly two service types today. One row per subscriber × provider scales
+to any provider count with no further schema change.
+
+**B. `providers.sync_policy jsonb` — eight fixed booleans, one hard rule.**
+No independent lifecycle, so no table. But `sync_policy` may only be read
+through a `getSyncPolicy(provider)` helper that merges the stored JSON over
+the **current defaults**. Direct `sync_policy.<key>` access is forbidden
+anywhere in the codebase. A missing key takes its documented default, never
+`false`/`undefined` — otherwise a future ninth flag silently disables itself
+for every existing provider row. (INV-50)
+
+**C. Idempotency is an explicit guarantee, not an emergent property.**
+- A charge is only ever created as part of **committing** a
+  `provider_import_run`.
+- A run is only ever diffed against the most recent **committed** run for
+  that `(provider_id, report_type)`.
+- Therefore re-uploading an already-committed file always diffs to 100%
+  `no_change` and creates zero transactions.
+- Corollary: a cancelled review (never approved) leaves **no baseline**.
+  Cancelling and re-uploading the same or a newer file must not cause any
+  event to be silently treated as already-synced. (INV-48)
+
+**D. Synchronization is an operator-approved reconciliation process**
+(upload → review → approve), **not** continuous or automatic replication.
+Nothing is written before Approve; no scheduled or background imports exist.
+
+**E. Ledger authority.** Provider reports are evidence that a business event
+occurred upstream, never the ledger itself. Sync never edits, deletes or
+rewrites an existing transaction; it creates new business events or flags
+discrepancies. Corrections are explicit operator actions (adjustment,
+reversal, reconciliation). (INV-46, INV-47)
+
+**F. Identity ownership.** Sync never changes subscriber identity fields
+(name, address, mobile, GST, notes, billing preferences) unless the operator
+has explicitly enabled that field in `sync_policy`. Defaults deny. (INV-49)
+
+**G. `provider_status` stores the raw provider string, always.** Business
+logic derives `is_active = (raw === 'ACTIVE')` separately. Unrecognised
+values are never discarded, normalised, or bucketed — they are shown to the
+operator verbatim. Only `ACTIVE` is verified from the sample (400/400 rows);
+Hathway's full status vocabulary is unknown, so **no list of inactive states
+is hardcoded**.
+
+**H. Canonical subscriber match order.**
+1. `vc_id` (exact)
+2. `serial_number` (exact)
+3. `subscribers.hathway_customer_nbr` vs. the report's `account_number`
+   (exact) — the column exists for exactly this purpose, from 6.5-M
+4. mobile → *suggested candidate only*, surfaced in review, never auto-applied
+5. otherwise → `needs_review`
+
+Defensive rule: if the `vc_id` match and the `serial_number` match resolve to
+**two different existing subscribers**, do not silently pick one — surface it
+as a **conflict** inside `needs_review`.
+
 
 ---
 
