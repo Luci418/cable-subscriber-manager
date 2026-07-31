@@ -144,7 +144,12 @@ phase before its predecessor is green.
 - GRANTs + RLS (`user_id = auth.uid()`) on every new table, `service_role`
   included; immutability trigger on `provider_import_runs` results.
 - `can_sync_provider(_uid)` security-definer (owner, admin_office).
-- **Done when:** migration applied, pgTAP asserts RLS isolation + role gate.
+- `getSyncPolicy(provider)` helper + documented default map shipped in the
+  same phase, so no call site ever touches `sync_policy` keys directly
+  (INV-50).
+- **Done when:** migration applied, pgTAP asserts RLS isolation + role gate,
+  Vitest asserts an unknown/absent flag resolves to its default.
+
 
 ### Phase 2 — Parser + canonical model (pure, no DB)
 - `src/lib/providers/hathway/parseCustomerMaster.ts`,
@@ -158,17 +163,28 @@ phase before its predecessor is green.
 - `detectEvents(previousSnapshot, currentRows)` →
   `new_activation | renewal | plan_change | status_change | no_change`,
   keyed on `vc_id`; no-previous-snapshot ⇒ all `new_activation`.
+- Baseline = latest **committed** run only; a cancelled run is never a
+  baseline (INV-48).
+- `service_status` handling: `is_active = (raw === 'ACTIVE')`; every other
+  value is "not active" generically. Raw string is preserved verbatim.
 - Stale-row detection (`last_seen_in_snapshot_at` ≥ 14 days).
-- **Done when:** Vitest covers every transition plus the
-  "absence ≠ termination" rule.
+- **Done when:** Vitest covers every transition, the "absence ≠ termination"
+  rule, and re-diffing an identical committed snapshot ⇒ all `no_change`.
+  The non-`ACTIVE` path is **logic-verified but not sample-verified** — no
+  real non-`ACTIVE` row exists yet; annotate those tests as such.
 
 ### Phase 4 — Resolution layer
 - Pack resolution via `provider_pack_mappings` → `unmapped_pack`.
-- Subscriber resolution `vc_id`/serial → `stb_inventory` → subscriber;
-  otherwise `needs_review` with an optional suggested mobile candidate.
-- Sync-policy filter applied before anything is proposed as a write.
-- **Done when:** Vitest covers matched / unmapped / needs_review /
-  policy-suppressed paths.
+- Subscriber resolution in the canonical order (§1.5-H): `vc_id` →
+  `serial_number` → `hathway_customer_nbr` vs. `account_number` → mobile
+  (suggested candidate, review-only) → `needs_review`.
+- **Conflict guard:** `vc_id` and `serial_number` resolving to two different
+  subscribers ⇒ `needs_review` conflict, never a silent pick.
+- Sync-policy filter (via `getSyncPolicy`) applied before anything is
+  proposed as a write; identity fields denied by default (INV-49).
+- **Done when:** Vitest covers matched (each key) / conflict / unmapped /
+  needs_review / policy-suppressed paths.
+
 
 ### Phase 5 — Review screen
 - Upload → parse → diff → bucketed review UI with counts, drill-downs,
