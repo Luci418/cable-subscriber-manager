@@ -197,30 +197,36 @@ phase before its predecessor is green.
 
 ### Phase 6 — Commit
 - `commit_provider_import(...)` RPC, per-row transactional:
-  upsert `subscriber_provider_state`; insert charge
-  (`source='provider_sync'`, `provider_id`, `service_type='cable'`);
-  create pack rows for newly mapped plans; status-only rows write no
-  transaction; `needs_review → create new` creates a `prospect`
-  (no auto-pairing).
+  upsert `subscriber_provider_state` (raw `provider_status` verbatim);
+  insert charge (`source='provider_sync'`, `provider_id`,
+  `service_type='cable'`); create pack rows for newly mapped plans;
+  status-only rows write no transaction; `needs_review → create new`
+  creates a `prospect` (no auto-pairing).
+- **Insert-only.** No existing transaction is ever updated or deleted
+  (INV-46, INV-47).
 - Writes `provider_import_runs` with per-row results and becomes the new
   baseline.
-- **Done when:** pgTAP proves role gating, per-row partial success, and
-  that a re-run of the same file produces `no_change`.
+- **Done when:** pgTAP proves role gating, per-row partial success,
+  insert-only behaviour, that a re-run of the same file produces
+  `no_change` with zero transactions, and that a cancelled run leaves no
+  baseline behind.
 
 ### Phase 7 — Dashboard Status import
 - Separate picker, no review screen. Match by `vc_id`, update
-  `provider_status` + `last_seen_in_snapshot_at`, plain
+  `provider_status` (raw string) + `last_seen_in_snapshot_at`, plain
   updated/not-found/skipped summary, logged as its own run.
 
 ### Phase 8 — Settings → Integrations
 - Per-provider: Pack Mappings CRUD (auto-populated from review screen),
-  Sync Policy checkboxes, run history. Gated on `can_sync_provider`.
+  Sync Policy checkboxes (rendered from the default map, so a new flag
+  appears automatically), run history. Gated on `can_sync_provider`.
 
 ### Phase 9 — Docs & tests
-- Update `PROVIDER_INTEGRATION_ARCHITECTURE.md`, `SYSTEM_INVARIANTS.md`
-  (new invariants for absence≠termination and catalog-price charging),
-  `BUSINESS_RULES.md`, `CHANGELOG.md`, and correct the Mode-A framing in
-  `.lovable/plan.md`.
+- Update `PROVIDER_INTEGRATION_ARCHITECTURE.md`, `BUSINESS_RULES.md`,
+  `CHANGELOG.md`, and correct the Mode-A framing in `.lovable/plan.md`.
+- `BUSINESS_MODEL.md` INV-46 … INV-50 and the `SYSTEM_INVARIANTS.md`
+  "Provider Synchronization" section are already written (2026-07-31);
+  flip their Tested? markers as each phase lands.
 
 ---
 
@@ -231,10 +237,22 @@ settlement tracking (`provider_bill`); scheduled or automated imports;
 customer notifications on import events; multi-file batch upload;
 any second provider adapter.
 
-## Part 4 — Open questions for the operator
+## Part 4 — Operator questions (resolved 2026-07-31)
 
-1. Is the sample export demo data or a genuine bulk/reseller account?
-2. A recent settlement statement / invoice — needed to set real
-   `provider_cost` and to define what financial reconciliation compares.
-3. Does VC Id ever differ from STB No on this account's box types?
-4. Exact vocabulary of `Service Status` values in Dashboard Data.
+1. **Sample export — genuine, not demo.** 400 STBs bulk-allocated by
+   Hathway under a promotional arrangement (month 1 free, operator pays
+   month 2, month 3 free), uploaded under the operator's own name as a
+   placeholder. Real identity data fills in as boxes get assigned. Keep the
+   sample; do not overfit fixtures to its repeated-name shape (§1.4-5).
+2. **Settlement statement — none exists yet** (no recharge has happened).
+   `provider_cost` is operator-maintained from the known wholesale rate and
+   updated when the rate changes. The existing "pre-filled unverified
+   suggestion, operator edits" flow already matches; doc language corrected
+   in §1.3.
+3. **VC Id vs. STB No — uncertain**, possibly an old convention, not visible
+   in current data. Handled defensively by the Phase 4 conflict guard
+   (§1.5-H).
+4. **`Service Status` vocabulary — unconfirmed.** Only `ACTIVE` is verified
+   (400/400 rows). No inactive list is hardcoded; `ACTIVE` is the sole
+   positive case (§1.5-G).
+
