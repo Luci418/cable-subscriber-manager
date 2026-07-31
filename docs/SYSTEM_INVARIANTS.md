@@ -8,8 +8,8 @@ consciously retires it. Silent violations are the most expensive class of
 bug in this system.
 
 Source of truth for the *why* is `BUSINESS_MODEL.md`, which holds the **single
-canonical invariant set: INV-01 … INV-45** (Part Twelve = INV-01…INV-38,
-"Additional Invariants" = INV-39…INV-45). This document is the *engineering*
+canonical invariant set: INV-01 … INV-50** (Part Twelve = INV-01…INV-38,
+"Additional Invariants" = INV-39…INV-50). This document is the *engineering*
 view: what code enforces each rule today. It never mints new IDs — if a rule
 here has no INV number, it is an implementation guard, not an invariant.
 
@@ -82,7 +82,24 @@ See `DESTRUCTIVE_OPERATIONS_AUDIT.md` for the full matrix. Core rule:
 | Active/timeline reads use `v_subscriber_active_subscription` / `v_subscriber_subscription_timeline`, never the JSONB blobs | Blobs are caches, may drift | `useSubscribers.tsx` reads views; grep-audited each phase | 🟡 | LEGACY_DEPENDENCY_AUDIT.md |
 | Time comparisons use `src/lib/timeSync.ts`, not `new Date()` | Device clocks are not trustworthy | Convention; grep-audited | 🔴 | time-synchronization memory |
 
+## Provider Synchronization
+
+Status: **planned** (see `PROVIDER_SYNC_IMPLEMENTATION_PLAN.md`). Nothing is
+shipped yet — every row below is 🔴 until the corresponding phase lands.
+
+| Invariant | Why it exists | Enforced where | Tested? | Docs |
+|---|---|---|---|---|
+| INV-46 — Provider reports are evidence, never the ledger. Only a **committed** `provider_import_run` may create a transaction; on disagreement the SMS ledger stands until an operator resolves it | The provider portal is not an accounting system; silent overwrite of financial state is unrecoverable | `commit_provider_import` RPC as sole sync write path (Phase 6) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
+| INV-47 — Sync never edits, deletes, or rewrites existing transactions; corrections are explicit operator actions (adjustment, reversal, reconciliation) | Preserves the append-only ledger under an automated writer | `transactions_enforce_immutability` trigger + insert-only commit RPC | 🔴 | ADR-011 |
+| INV-48 — Idempotency: diff only against the latest **committed** run for `(provider_id, report_type)`; cancelled reviews leave no baseline | Re-uploading a file must never double-charge, and cancelling must never mark events as already-synced | Baseline query `WHERE status='committed' ORDER BY imported_at DESC LIMIT 1` (Phase 3/6) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md §Idempotency |
+| INV-49 — Sync never changes subscriber identity fields (name, address, mobile, GST, notes, billing prefs) unless explicitly enabled in `sync_policy` | The SMS owns customer identity; provider data is operational | Sync-policy filter before any proposed write; defaults deny (Phase 4) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
+| INV-50 — `sync_policy` is read only via `getSyncPolicy(provider)`, merging stored JSON over current defaults; a missing key takes its documented default | A future ninth flag must not silently disable itself for every existing provider row | Code constraint — no direct `sync_policy.<key>` access (Phase 1/4) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
+| Absence is never termination — only an explicit non-`ACTIVE` `service_status` is evidence | A row missing from an export usually means an export quirk, not a disconnection | Diff engine (Phase 3); missing rows only age `last_seen_in_snapshot_at` | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md §1.4 |
+| Mobile is never an auto-match — only a suggested candidate inside `needs_review` | Households share numbers | Resolution layer (Phase 4) | 🔴 | BUSINESS_RULES §1.1 |
+| Charge amount is always the local catalog price, never `dpo_total_price` | The provider's DPO figure is informational, not a sell price | Review screen + commit RPC (Phase 5/6) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
+
 ---
+
 
 ## Testing status legend
 
