@@ -8,7 +8,7 @@
 > - For *what is built*, `docs/PROJECT_STATUS.md` wins. Phases 3 through 6.5
 >   (A–M) are complete; **Part Fourteen — Build Priority Order is historical**
 >   and describes work that has already shipped.
-> - The canonical invariant range is **INV-01 … INV-45** (Part Twelve plus the
+> - The canonical invariant range is **INV-01 … INV-50** (Part Twelve plus the
 >   "Additional Invariants" section). `docs/SYSTEM_INVARIANTS.md` is the
 >   engineering view of the same set — it never introduces new IDs.
 > - The `services[]` question raised on 2026-06-20 is **closed** (see that
@@ -1550,9 +1550,9 @@ migration.
 
 # PART TWELVE — COMPLETE INVARIANT MATRIX (INV-01 … INV-38)
 
-> The matrix continues in **"Additional Invariants — INV-39 through INV-45"**
+> The matrix continues in **"Additional Invariants — INV-39 through INV-50"**
 > later in this document. Together those two tables are the **single canonical
-> invariant set: INV-01 … INV-45**. No other document may mint new IDs;
+> invariant set: INV-01 … INV-50**. No other document may mint new IDs;
 > `docs/SYSTEM_INVARIANTS.md` only records how each one is enforced today.
 
 
@@ -2111,7 +2111,7 @@ Phase 4b (follow-up migration, after Phase 4a is stable in production):
 
 ---
 
-## Additional Invariants — INV-39 through INV-45
+## Additional Invariants — INV-39 through INV-50
 
 Added to the invariant matrix in Part 12.
 
@@ -2124,6 +2124,11 @@ Added to the invariant matrix in Part 12.
 | INV-43 | Subscription | No hard deletes. Status transitions are one-directional. Immutable history | Trigger: blocks DELETE; blocks invalid status transitions |
 | INV-44 | Payment allocations | `payment_allocations` rows are immutable after insert. Corrections use reversal rows with negative amounts | Trigger: blocks UPDATE and DELETE on payment_allocations |
 | INV-45 | Payment allocations | The FIFO trigger is the only writer of allocation rows with allocated_by='fifo_trigger'. No direct INSERT from application code | Code constraint: enforced by code review; no direct INSERT in application layer |
+| INV-46 | Provider sync | Provider reports are **evidence** that a business event occurred upstream, never the ledger itself. Only a **committed** `provider_import_run` may create a transaction. Where a report and the SMS ledger disagree, the ledger stands until an operator explicitly resolves it through a new sync run or a manual adjustment | `commit_provider_import` RPC is the sole sync write path; no parallel ledger |
+| INV-47 | Provider sync | The import process never edits, deletes, or rewrites existing financial transactions. Sync creates new business events or flags discrepancies for review. Corrections are explicit operator actions (adjustment, reversal, reconciliation), never a silent sync side-effect | `transactions_enforce_immutability` trigger + commit RPC inserts only |
+| INV-48 | Provider sync | Sync is **idempotent**: a run is diffed only against the most recent *committed* run for the same `(provider_id, report_type)`. Re-uploading an already-committed file yields 100% `no_change` and zero transactions. A cancelled review writes no baseline, so cancelling and re-uploading never causes an event to be treated as already-synced | Diff engine baseline query `WHERE status='committed' ORDER BY imported_at DESC LIMIT 1` |
+| INV-49 | Provider sync | Provider synchronization never changes subscriber identity fields (name, address, mobile, GST, notes, billing preferences) unless the operator has explicitly enabled that field in `sync_policy`. Provider reports are operational data; the SMS owns customer identity by default | Sync-policy filter applied before any proposed write; defaults deny |
+| INV-50 | Provider sync | `sync_policy` is read only through `getSyncPolicy(provider)`, which merges stored JSON over the current defaults. A **missing key takes its documented default**, never `false`/`undefined` | Code constraint: no direct `sync_policy.<key>` access anywhere else |
 
 ---
 
@@ -2173,6 +2178,8 @@ Phase 4b (separate deployment after Phase 4a is confirmed stable):
 *transaction ownership model formalised; device_id excluded from transactions;*
 *subscription_id added to transactions as nullable display reference;*
 *INV-39 reworded to reflect multi-device model; INV-45 added.*
+*Changes from v3.3: provider-synchronization invariants INV-46 … INV-50 added*
+*(2026-07-31); canonical range is now INV-01 … INV-50.*
 *Any change to a business rule, invariant, or workflow decision must be*
 *reflected here before implementation begins.*
 
