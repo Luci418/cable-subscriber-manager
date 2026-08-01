@@ -136,19 +136,24 @@ as a **conflict** inside `needs_review`.
 Each phase is independently shippable and verifiable. Do not start a
 phase before its predecessor is green.
 
-### Phase 1 — Schema foundation
+### Phase 1 — Schema foundation ✅ SHIPPED (2026-08-01)
 - Migration: `provider_import_runs`, `provider_pack_mappings`,
   `subscriber_provider_state`; `providers.sync_policy jsonb`;
-  `stb_inventory.vc_id`; enum value `provider_sync` on
-  `transaction_source`.
+  `stb_inventory.vc_id` (+ partial unique index on `(user_id, vc_id)`);
+  enum value `provider_sync` on `transaction_source`.
 - GRANTs + RLS (`user_id = auth.uid()`) on every new table, `service_role`
-  included; immutability trigger on `provider_import_runs` results.
+  included; `updated_at` triggers; immutability trigger blocking any edit or
+  delete of a **committed** `provider_import_runs` row (INV-48).
 - `can_sync_provider(_uid)` security-definer (owner, admin_office).
-- `getSyncPolicy(provider)` helper + documented default map shipped in the
-  same phase, so no call site ever touches `sync_policy` keys directly
-  (INV-50).
-- **Done when:** migration applied, pgTAP asserts RLS isolation + role gate,
-  Vitest asserts an unknown/absent flag resolves to its default.
+- `src/lib/providers/syncPolicy.ts` — `SYNC_POLICY_DEFAULTS`,
+  `SYNC_POLICY_LABELS`, `getSyncPolicy(provider)`, `isSyncAllowed(...)`.
+  Direct `sync_policy.<key>` access is forbidden (INV-50).
+- **Done:** `test/db/12_provider_sync_schema.sql` (14 pgTAP assertions:
+  role gate, enum value, policy defaults, `vc_id` uniqueness, committed-run
+  immutability, RLS isolation ×3) and
+  `src/lib/providers/syncPolicy.test.ts` (8 Vitest tests, incl. an
+  unknown/absent flag resolving to its default).
+
 
 
 ### Phase 2 — Parser + canonical model (pure, no DB)
