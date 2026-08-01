@@ -145,6 +145,17 @@ phase before its predecessor is green.
   included; `updated_at` triggers; immutability trigger blocking any edit or
   delete of a **committed** `provider_import_runs` row (INV-48).
 - `can_sync_provider(_uid)` security-definer (owner, admin_office).
+- **Attribution (added 2026-08-01):** `provider_import_runs.imported_by`
+  (who uploaded) and `provider_import_runs.committed_by` (who approved) are
+  separate columns — they may legitimately be different people. Both are
+  `REFERENCES public.profiles(id) ON DELETE SET NULL`, matching the
+  `cancelled_by` / `archived_by` / `voided_by` audit convention in
+  `PERMISSION_MATRIX.md`. Phase 6's commit RPC must set `committed_by` to
+  the approving user, not reuse `imported_by`.
+- **`report_type` literals are exactly `'customer_master'` and
+  `'dashboard_status'`** (DB CHECK constraint). The older planning name
+  `customer_master_summary` is **not** valid — Phase 2 parsers and Phase 7
+  must use the shipped literals.
 - `src/lib/providers/syncPolicy.ts` — `SYNC_POLICY_DEFAULTS`,
   `SYNC_POLICY_LABELS`, `getSyncPolicy(provider)`, `isSyncAllowed(...)`.
   Direct `sync_policy.<key>` access is forbidden (INV-50).
