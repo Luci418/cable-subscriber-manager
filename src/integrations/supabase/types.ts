@@ -395,6 +395,7 @@ export type Database = {
       provider_import_runs: {
         Row: {
           committed_at: string | null
+          committed_by: string | null
           created_at: string
           events_detected: Json
           file_name: string | null
@@ -412,6 +413,7 @@ export type Database = {
         }
         Insert: {
           committed_at?: string | null
+          committed_by?: string | null
           created_at?: string
           events_detected?: Json
           file_name?: string | null
@@ -429,6 +431,7 @@ export type Database = {
         }
         Update: {
           committed_at?: string | null
+          committed_by?: string | null
           created_at?: string
           events_detected?: Json
           file_name?: string | null
@@ -445,6 +448,20 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "provider_import_runs_committed_by_fkey"
+            columns: ["committed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_import_runs_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "provider_import_runs_provider_id_fkey"
             columns: ["provider_id"]
