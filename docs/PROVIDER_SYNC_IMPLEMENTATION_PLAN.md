@@ -159,7 +159,8 @@ phase before its predecessor is green.
 - `src/lib/providers/syncPolicy.ts` — `SYNC_POLICY_DEFAULTS`,
   `SYNC_POLICY_LABELS`, `getSyncPolicy(provider)`, `isSyncAllowed(...)`.
   Direct `sync_policy.<key>` access is forbidden (INV-50).
-- **Done:** `test/db/12_provider_sync_schema.sql` (14 pgTAP assertions:
+- **Done:** `test/db/12_provider_sync_schema.sql` (17 pgTAP assertions:
+  attribution columns/FKs,
   role gate, enum value, policy defaults, `vc_id` uniqueness, committed-run
   immutability, RLS isolation ×3) and
   `src/lib/providers/syncPolicy.test.ts` (8 Vitest tests, incl. an
