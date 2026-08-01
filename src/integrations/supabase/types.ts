@@ -392,6 +392,130 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_import_runs: {
+        Row: {
+          committed_at: string | null
+          created_at: string
+          events_detected: Json
+          file_name: string | null
+          id: string
+          imported_at: string
+          imported_by: string | null
+          provider_id: string
+          report_type: string
+          results: Json
+          row_count: number
+          snapshot_data: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          committed_at?: string | null
+          created_at?: string
+          events_detected?: Json
+          file_name?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          provider_id: string
+          report_type: string
+          results?: Json
+          row_count?: number
+          snapshot_data?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          committed_at?: string | null
+          created_at?: string
+          events_detected?: Json
+          file_name?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          provider_id?: string
+          report_type?: string
+          results?: Json
+          row_count?: number
+          snapshot_data?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_import_runs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_import_runs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_pack_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          pack_id: string | null
+          provider_id: string
+          provider_plan_key: string
+          provider_plan_label: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pack_id?: string | null
+          provider_id: string
+          provider_plan_key: string
+          provider_plan_label?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pack_id?: string | null
+          provider_id?: string
+          provider_plan_key?: string
+          provider_plan_label?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_pack_mappings_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_pack_mappings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_pack_mappings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       providers: {
         Row: {
           created_at: string
@@ -400,6 +524,7 @@ export type Database = {
           name: string
           notes: string | null
           service_type: string
+          sync_policy: Json
           updated_at: string
           user_id: string
         }
@@ -410,6 +535,7 @@ export type Database = {
           name: string
           notes?: string | null
           service_type: string
+          sync_policy?: Json
           updated_at?: string
           user_id: string
         }
@@ -420,6 +546,7 @@ export type Database = {
           name?: string
           notes?: string | null
           service_type?: string
+          sync_policy?: Json
           updated_at?: string
           user_id?: string
         }
@@ -551,6 +678,7 @@ export type Database = {
           subscriber_id: string | null
           updated_at: string
           user_id: string
+          vc_id: string | null
         }
         Insert: {
           created_at?: string
@@ -564,6 +692,7 @@ export type Database = {
           subscriber_id?: string | null
           updated_at?: string
           user_id: string
+          vc_id?: string | null
         }
         Update: {
           created_at?: string
@@ -577,6 +706,7 @@ export type Database = {
           subscriber_id?: string | null
           updated_at?: string
           user_id?: string
+          vc_id?: string | null
         }
         Relationships: [
           {
@@ -591,6 +721,83 @@ export type Database = {
             columns: ["subscriber_id"]
             isOneToOne: false
             referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriber_provider_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_import_run_id: string | null
+          last_seen_in_snapshot_at: string | null
+          provider_customer_number: string | null
+          provider_id: string
+          provider_plan_end: string | null
+          provider_plan_name: string | null
+          provider_plan_start: string | null
+          provider_status: string | null
+          subscriber_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_import_run_id?: string | null
+          last_seen_in_snapshot_at?: string | null
+          provider_customer_number?: string | null
+          provider_id: string
+          provider_plan_end?: string | null
+          provider_plan_name?: string | null
+          provider_plan_start?: string | null
+          provider_status?: string | null
+          subscriber_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_import_run_id?: string | null
+          last_seen_in_snapshot_at?: string | null
+          provider_customer_number?: string | null
+          provider_id?: string
+          provider_plan_end?: string | null
+          provider_plan_name?: string | null
+          provider_plan_start?: string | null
+          provider_status?: string | null
+          subscriber_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriber_provider_state_last_import_run_id_fkey"
+            columns: ["last_import_run_id"]
+            isOneToOne: false
+            referencedRelation: "provider_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriber_provider_state_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriber_provider_state_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriber_provider_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1217,6 +1424,7 @@ export type Database = {
       can_modify_settings: { Args: { _uid?: string }; Returns: boolean }
       can_pair_device: { Args: { _uid?: string }; Returns: boolean }
       can_replace_device: { Args: { _uid?: string }; Returns: boolean }
+      can_sync_provider: { Args: { _uid: string }; Returns: boolean }
       can_view_credentials: { Args: { _uid?: string }; Returns: boolean }
       can_void_transaction: { Args: { _uid?: string }; Returns: boolean }
       cancel_subscription: {
@@ -1397,6 +1605,7 @@ export type Database = {
         | "adjustment"
         | "subscription_payment"
         | "opening_balance"
+        | "provider_sync"
       transaction_status: "posted" | "voided" | "reversal"
       void_reason_code:
         | "data_entry_error"
@@ -1544,6 +1753,7 @@ export const Constants = {
         "adjustment",
         "subscription_payment",
         "opening_balance",
+        "provider_sync",
       ],
       transaction_status: ["posted", "voided", "reversal"],
       void_reason_code: [
