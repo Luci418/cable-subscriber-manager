@@ -4,7 +4,15 @@
 -- value, and immutability of committed import runs (INV-48).
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(14);
+SELECT plan(17);
+
+-- -------------------------------------------------- attribution columns
+SELECT has_column('public', 'provider_import_runs', 'committed_by',
+  'provider_import_runs has a committed_by attribution column');
+SELECT col_is_fk('public', 'provider_import_runs', 'imported_by',
+  'imported_by references profiles(id)');
+SELECT col_is_fk('public', 'provider_import_runs', 'committed_by',
+  'committed_by references profiles(id)');
 
 -- ---------------------------------------------------------------- role gate
 \set owner_id  '''aaaaaaaa-0001-0000-0000-000000000001'''
