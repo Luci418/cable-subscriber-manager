@@ -115,12 +115,27 @@ describe("parseCustomerMaster", () => {
     expect(res.rows[0].vc_id).toBe("999");
   });
 
+  it("flags misaligned rows instead of silently parsing skewed columns", () => {
+    const skewed = cmRow({ name: "'ASHA\tK" }); // stray tab shifts every later field
+    const res = parseCustomerMaster([CM_HEADER, skewed, cmRow(), "'1\t'2"].join("\n"));
+    expect(res.rows).toHaveLength(1);
+    expect(res.errors.map((e) => e.row_number)).toEqual([1, 3]);
+    expect(res.errors[0].message).toMatch(/columns/);
+  });
+
+  it("tolerates a trailing empty column emitted by the exporter", () => {
+    const res = parseCustomerMaster([CM_HEADER, `${cmRow()}\t`].join("\n"));
+    expect(res.errors).toHaveLength(0);
+    expect(res.rows[0].vc_id).toBe("0123456789");
+  });
+
   it("returns an empty result for an empty file", () => {
     const res = parseCustomerMaster("");
     expect(res.rows).toHaveLength(0);
     expect(res.errors).toHaveLength(0);
     expect(res.headers).toHaveLength(0);
   });
+
 });
 
 const DS_HEADER = ["Sr.No.", "Service Status", "STB ID", "VC ID", "RMN", "Customer Name"].join("\t");
@@ -152,9 +167,33 @@ describe("parseDashboardStatus", () => {
     const res = parseDashboardStatus(text);
     expect(res.rows[0].service_status).toBe("TEMP SUSPENDED-NP");
     expect(isProviderActive(res.rows[0].service_status)).toBe(false);
-    expect(isProviderActive("ACTIVE")).toBe(true);
-    expect(isProviderActive("active")).toBe(false);
   });
+
+  it("compares status case-insensitively while storing it verbatim", () => {
+    const text = [DS_HEADER, ["'1", "'active", "'901", "'901", "'9", "'X"].join("\t")].join("\n");
+    const res = parseDashboardStatus(text);
+    expect(res.rows[0].service_status).toBe("active");
+    expect(isProviderActive("ACTIVE")).toBe(true);
+    expect(isProviderActive("active")).toBe(true);
+    expect(isProviderActive(" Active ")).toBe(true);
+    expect(isProviderActive(null)).toBe(false);
+    expect(isProviderActive("INACTIVE")).toBe(false);
+  });
+
+  it("rejects rows whose column count does not match the header", () => {
+    const text = [
+      DS_HEADER,
+      ["'1", "'ACTIVE", "'700", "'700", "'9", "'MR\tX"].join("\t"),
+      ["'2", "'ACTIVE", "'800"].join("\t"),
+      ["'3", "'ACTIVE", "'900", "'900", "'9", "'X"].join("\t"),
+    ].join("\n");
+    const res = parseDashboardStatus(text);
+    expect(res.rows).toHaveLength(1);
+    expect(res.rows[0].vc_id).toBe("900");
+    expect(res.errors.map((e) => e.row_number)).toEqual([1, 2]);
+    expect(res.errors[0].message).toMatch(/columns/);
+  });
+
 
   it("errors per row on a missing status or missing device id", () => {
     const text = [
