@@ -6,7 +6,7 @@
  */
 
 import type { ParseError, ParseResult, ProviderReportRow } from "./types";
-import { cleanCell, pick, splitTsv, toIsoDate, toNumber } from "./parseUtils";
+import { cleanCell, pick, rowShapeError, splitTsv, toIsoDate, toNumber } from "./parseUtils";
 
 const KNOWN_HEADERS = [
   "Account Number",
@@ -29,6 +29,13 @@ export function parseCustomerMaster(text: string): ParseResult {
   lines.forEach((cells, i) => {
     const row_number = i + 1;
     const raw = cells.join("\t");
+
+    const shape = rowShapeError(headers, cells);
+    if (shape) {
+      errors.push({ row_number, message: shape, raw });
+      return;
+    }
+
 
     const vc_id = pick(headers, cells, "VC Id", "VC ID", "VCId");
     const stb_no = pick(headers, cells, "New STB No", "STB No", "STB ID");

@@ -103,3 +103,15 @@ export function pick(
   }
   return null;
 }
+
+/**
+ * Guard against shifted/truncated rows: a stray tab or a clipped line makes
+ * every field past the shift point read from the wrong column. Trailing empty
+ * cells are tolerated (exports commonly emit a trailing tab).
+ */
+export function rowShapeError(headers: string[], cells: string[]): string | null {
+  let len = cells.length;
+  while (len > headers.length && cleanCell(cells[len - 1]) === "") len--;
+  if (len === headers.length) return null;
+  return `Row has ${cells.length} columns but the header declares ${headers.length} — refusing to parse misaligned data`;
+}
