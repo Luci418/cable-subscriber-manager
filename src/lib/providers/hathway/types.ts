@@ -51,7 +51,13 @@ export interface ParseResult {
   errors: ParseError[];
 }
 
-/** True when the raw provider status counts as active. Only `ACTIVE` does. */
+/**
+ * True when the raw provider status counts as active. Only `ACTIVE` qualifies.
+ * The comparison is case/whitespace-insensitive on purpose: storage stays
+ * verbatim (INV §1.5-G), but a future export that lowercases the status must
+ * not silently flip every subscriber to "not active".
+ */
 export function isProviderActive(rawStatus: string | null): boolean {
-  return rawStatus === "ACTIVE";
+  return (rawStatus ?? "").trim().toUpperCase() === "ACTIVE";
 }
+

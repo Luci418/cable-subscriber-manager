@@ -7,7 +7,7 @@
  */
 
 import type { ParseError, ParseResult, ProviderReportRow } from "./types";
-import { cleanCell, pick, splitTsv } from "./parseUtils";
+import { cleanCell, pick, rowShapeError, splitTsv } from "./parseUtils";
 
 const KNOWN_HEADERS = ["Service Status", "STB ID", "VC ID", "RMN", "Customer Name"];
 
@@ -19,6 +19,13 @@ export function parseDashboardStatus(text: string): ParseResult {
   lines.forEach((cells, i) => {
     const row_number = i + 1;
     const raw = cells.join("\t");
+
+    const shape = rowShapeError(headers, cells);
+    if (shape) {
+      errors.push({ row_number, message: shape, raw });
+      return;
+    }
+
 
     const vc_id = pick(headers, cells, "VC ID", "VC Id", "VCId");
     const stb_no = pick(headers, cells, "STB ID", "STB No", "New STB No");
