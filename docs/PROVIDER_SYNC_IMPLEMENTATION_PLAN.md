@@ -168,13 +168,23 @@ phase before its predecessor is green.
 
 
 
-### Phase 2 — Parser + canonical model (pure, no DB)
-- `src/lib/providers/hathway/parseCustomerMaster.ts`,
-  `parseDashboardStatus.ts`: TSV split on `\t`, strip leading `'`,
-  `DD-MON-YYYY` → ISO, numeric coercion.
-- Canonical row type shared by both reports.
-- **Done when:** Vitest suites cover both sample files, malformed rows,
-  and quoting/whitespace edge cases.
+### Phase 2 — Parser + canonical model ✅ SHIPPED (2026-08-02)
+- `src/lib/providers/hathway/parseUtils.ts` — TSV split on `\t`, BOM/quote/
+  Excel text-lock `'` stripping, `DD-MON-YYYY` (and `DD/MM/YYYY`, ISO) → ISO,
+  numeric coercion, case/space-insensitive header lookup.
+- `parseCustomerMaster.ts` (`report_type: 'customer_master'`) and
+  `parseDashboardStatus.ts` (`report_type: 'dashboard_status'`) — the shipped
+  DB CHECK literals, not `customer_master_summary`.
+- `types.ts` — canonical `ProviderReportRow` shared by both reports, plus
+  `isProviderActive(raw)` (`raw === 'ACTIVE'` only). Unknown columns are kept
+  verbatim in `extra`; `service_status` is never normalised (§1.5-G).
+- **Per-row partial success:** a row missing a device identifier (or, for the
+  dashboard report, a status) becomes a `ParseError`; malformed dates/prices
+  null only that field and keep the row.
+- **Done:** `src/lib/providers/hathway/parsers.test.ts` — 12 Vitest tests
+  covering both sample shapes, distinct-identity rows (no overfitting to the
+  repeated-name sample, §1.4-5), malformed rows, CRLF/blank-line/quoting edge
+  cases, and verbatim preservation of an unrecognised status.
 
 ### Phase 3 — Diff engine (pure)
 - `detectEvents(previousSnapshot, currentRows)` →
