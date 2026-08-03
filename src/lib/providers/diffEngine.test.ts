@@ -79,7 +79,18 @@ describe("detectEvents", () => {
     expect(r.events[0].changed).toEqual(expect.arrayContaining(["base_plan", "end_date"]));
   });
 
+  it("buckets a simultaneous renewal + status change as renewal but keeps both fields", () => {
+    const r = detectEvents(
+      [row()],
+      [row({ end_date: "2026-08-31", service_status: "SUSPENDED" })],
+    );
+    expect(r.events[0].type).toBe("renewal");
+    expect(r.events[0].changed).toEqual(expect.arrayContaining(["end_date", "service_status"]));
+    expect(r.events[0].is_active).toBe(false);
+  });
+
   it("classifies a status difference with no window change as status_change", () => {
+
     // Logic-verified only: no real non-ACTIVE row exists in any sample export yet.
     const r = detectEvents([row()], [row({ service_status: "SUSPENDED" })]);
     expect(r.events[0].type).toBe("status_change");
