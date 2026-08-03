@@ -36,13 +36,17 @@ describe("detectEvents", () => {
     expect(r.events.every((e) => e.previous === null)).toBe(true);
   });
 
-  it("a cancelled review leaves no baseline, so rows are new_activation again (INV-48)", () => {
-    // A cancelled run is simply never passed in as a baseline.
+  it("no baseline always means new_activation, however often it is re-run", () => {
+    // NOTE: this does NOT verify INV-48. The diff engine has no concept of run
+    // status — excluding a cancelled run from the baseline is a Phase 6 query
+    // concern (`WHERE status='committed' ORDER BY imported_at DESC LIMIT 1`)
+    // and is untested until that query exists.
     const first = detectEvents(null, [row()]);
     const second = detectEvents(null, [row()]);
     expect(first.counts.new_activation).toBe(1);
     expect(second.counts.new_activation).toBe(1);
   });
+
 
   it("re-diffing an identical committed snapshot yields all no_change", () => {
     const snapshot = [row(), row({ row_number: 2, vc_id: "VC002" })];
@@ -75,7 +79,18 @@ describe("detectEvents", () => {
     expect(r.events[0].changed).toEqual(expect.arrayContaining(["base_plan", "end_date"]));
   });
 
+  it("buckets a simultaneous renewal + status change as renewal but keeps both fields", () => {
+    const r = detectEvents(
+      [row()],
+      [row({ end_date: "2026-08-31", service_status: "SUSPENDED" })],
+    );
+    expect(r.events[0].type).toBe("renewal");
+    expect(r.events[0].changed).toEqual(expect.arrayContaining(["end_date", "service_status"]));
+    expect(r.events[0].is_active).toBe(false);
+  });
+
   it("classifies a status difference with no window change as status_change", () => {
+
     // Logic-verified only: no real non-ACTIVE row exists in any sample export yet.
     const r = detectEvents([row()], [row({ service_status: "SUSPENDED" })]);
     expect(r.events[0].type).toBe("status_change");
@@ -104,7 +119,10 @@ describe("detectEvents", () => {
     expect(r.counts.status_change).toBe(0);
   });
 
+  // Defensive only: Phase 2's parsers reject identifier-less rows before they
+  // ever become a ProviderReportRow, so this path is unreachable in practice.
   it("collects rows with no identifier instead of diffing them", () => {
+
     const r = detectEvents(null, [row({ row_number: 3, vc_id: null, stb_no: null })]);
     expect(r.events).toHaveLength(0);
     expect(r.unkeyed).toEqual([
