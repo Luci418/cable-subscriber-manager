@@ -36,13 +36,17 @@ describe("detectEvents", () => {
     expect(r.events.every((e) => e.previous === null)).toBe(true);
   });
 
-  it("a cancelled review leaves no baseline, so rows are new_activation again (INV-48)", () => {
-    // A cancelled run is simply never passed in as a baseline.
+  it("no baseline always means new_activation, however often it is re-run", () => {
+    // NOTE: this does NOT verify INV-48. The diff engine has no concept of run
+    // status — excluding a cancelled run from the baseline is a Phase 6 query
+    // concern (`WHERE status='committed' ORDER BY imported_at DESC LIMIT 1`)
+    // and is untested until that query exists.
     const first = detectEvents(null, [row()]);
     const second = detectEvents(null, [row()]);
     expect(first.counts.new_activation).toBe(1);
     expect(second.counts.new_activation).toBe(1);
   });
+
 
   it("re-diffing an identical committed snapshot yields all no_change", () => {
     const snapshot = [row(), row({ row_number: 2, vc_id: "VC002" })];
