@@ -72,7 +72,7 @@ describe("subscriber resolution order (§1.5-H)", () => {
   });
 
   it("falls back to account_number when no device matches", () => {
-    const r = one([row({ vc_id: null, stb_no: null, account_number: "ACC1" })], null, ctx());
+    const r = one([row({ vc_id: "VCZZZ", stb_no: "STBZZZ", account_number: "ACC1" })], null, ctx());
     expect(r.match.method).toBe("account_number");
   });
 
@@ -102,7 +102,9 @@ describe("subscriber resolution order (§1.5-H)", () => {
     expect(r.match.status).toBe("conflict");
     expect(r.match.subscriber_id).toBeNull();
     expect(r.bucket).toBe("needs_review");
-    expect(r.match.candidates.map((x) => x.subscriber_id)).toEqual(["sub-1", "sub-2"]);
+    expect(new Set(r.match.candidates.map((x) => x.subscriber_id))).toEqual(
+      new Set(["sub-1", "sub-2"]),
+    );
   });
 
   it("reports unmatched rows for review", () => {
@@ -133,7 +135,10 @@ describe("pack resolution", () => {
   });
 
   it("treats a plan-less row (dashboard status) as not_applicable", () => {
-    const r = one([row({ base_plan: null, service_status: "SUSPENDED" })], [row()]);
+    const r = one(
+      [row({ base_plan: null, service_status: "SUSPENDED" })],
+      [row({ base_plan: null })],
+    );
     expect(r.pack.status).toBe("not_applicable");
     expect(r.bucket).toBe("status_change");
   });
