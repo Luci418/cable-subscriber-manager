@@ -119,7 +119,10 @@ describe("detectEvents", () => {
     expect(r.counts.status_change).toBe(0);
   });
 
+  // Defensive only: Phase 2's parsers reject identifier-less rows before they
+  // ever become a ProviderReportRow, so this path is unreachable in practice.
   it("collects rows with no identifier instead of diffing them", () => {
+
     const r = detectEvents(null, [row({ row_number: 3, vc_id: null, stb_no: null })]);
     expect(r.events).toHaveLength(0);
     expect(r.unkeyed).toEqual([
