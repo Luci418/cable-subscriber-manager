@@ -206,17 +206,58 @@ phase before its predecessor is green.
   sample-verified** (annotated in the tests).
 
 
-### Phase 4 — Resolution layer
-- Pack resolution via `provider_pack_mappings` → `unmapped_pack`.
-- Subscriber resolution in the canonical order (§1.5-H): `vc_id` →
-  `serial_number` → `hathway_customer_nbr` vs. `account_number` → mobile
-  (suggested candidate, review-only) → `needs_review`.
-- **Conflict guard:** `vc_id` and `serial_number` resolving to two different
-  subscribers ⇒ `needs_review` conflict, never a silent pick.
-- Sync-policy filter (via `getSyncPolicy`) applied before anything is
-  proposed as a write; identity fields denied by default (INV-49).
-- **Done when:** Vitest covers matched (each key) / conflict / unmapped /
-  needs_review / policy-suppressed paths.
+### Phase 4 — Resolution layer ✅ SHIPPED (2026-08-03)
+- `src/lib/providers/resolution.ts` — `resolveEvents(events, ctx)`, pure, no DB.
+- Subscriber match in the canonical order (§1.5-H): `vc_id` → `serial_number` →
+  `hathway_customer_nbr` vs. `account_number` → mobile (**suggested** only,
+  review-required) → `unmatched`. Keys are normalised for comparison only.
+- **Conflict guard:** two deterministic keys resolving to different subscribers
+  ⇒ `conflict` → `needs_review`, never a silent pick. All candidates retained.
+- Pack resolution via `provider_pack_mappings` (case/whitespace-insensitive
+  key) → `mapped` / `unmapped` / `not_applicable` (plan-less dashboard rows).
+  Distinct unmapped keys are collected for the Phase 5 mapping drill-down.
+- Sync-policy filter via `getSyncPolicy` runs before any write is proposed.
+  A denied write is **recorded in `suppressed_by_policy`**, not dropped
+  silently, so the review screen can show "would have changed X, policy says
+  no". Identity fields are never proposed (INV-49).
+- **Buckets:** `needs_review` > `unmapped_pack` > event type, plus a new
+  **`anomaly`** bucket — see the decision below.
+- **Done:** `src/lib/providers/resolution.test.ts` — 21 Vitest tests covering
+  each match key, conflict, shared mobile, unmatched, mapped/unmapped/N-A
+  packs, every policy-suppressed path and all buckets.
+
+#### Decision — `no_change` with a non-empty `changed[]` (2026-08-03)
+`no_change` from the diff engine means "no business event", **not** "nothing
+differs": an end/start date that regresses, or a field that parsed to `null`
+against a real baseline, lands there with `changed` populated. Hiding those
+with genuinely identical rows would silently swallow either a real upstream
+correction or a Phase 2 parse failure — against the spirit of INV-46/47.
+
+**Resolved:** the resolution layer buckets them as **`anomaly`**. Phase 5 MUST
+render `anomaly` as its own visible section ("changed but not actionable —
+review anyway"), separate from `no_change`, which is the only bucket that may
+be collapsed/skipped entirely. `no_change` in Phase 4/5 vocabulary means
+byte-identical to the committed baseline.
+
+#### Two Phase 5 requirements carried forward
+- The renewal drill-down must list **every** field in `event.changed` per row,
+  not just the expiry pair — a suspension arriving in the same import as a
+  renewal is bucketed as `renewal` (documented precedence) and would otherwise
+  go unnoticed.
+- `needs_review` rows must show `match.candidates` and `match.reason`.
+
+#### Coverage note — INV-48
+INV-48 (a cancelled run never becomes a baseline) has **no test coverage yet**.
+The diff engine is a pure function with no concept of run status; the actual
+enforcement point is the Phase 6 baseline query
+(`WHERE status='committed' ORDER BY imported_at DESC LIMIT 1`) and it must be
+covered by pgTAP there. The Phase 3 test previously implying otherwise has been
+relabelled.
+
+#### Coverage note — `unkeyed`
+`detectEvents`'s `unkeyed` handling is defensive redundancy: Phase 2 rejects
+identifier-less rows as parse errors, so the path is unreachable today. Kept
+and tested deliberately, annotated as such.
 
 
 ### Phase 5 — Review screen
