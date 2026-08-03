@@ -186,19 +186,25 @@ phase before its predecessor is green.
   repeated-name sample, §1.4-5), malformed rows, CRLF/blank-line/quoting edge
   cases, and verbatim preservation of an unrecognised status.
 
-### Phase 3 — Diff engine (pure)
-- `detectEvents(previousSnapshot, currentRows)` →
-  `new_activation | renewal | plan_change | status_change | no_change`,
-  keyed on `vc_id`; no-previous-snapshot ⇒ all `new_activation`.
-- Baseline = latest **committed** run only; a cancelled run is never a
-  baseline (INV-48).
-- `service_status` handling: `is_active = (raw === 'ACTIVE')`; every other
-  value is "not active" generically. Raw string is preserved verbatim.
-- Stale-row detection (`last_seen_in_snapshot_at` ≥ 14 days).
-- **Done when:** Vitest covers every transition, the "absence ≠ termination"
-  rule, and re-diffing an identical committed snapshot ⇒ all `no_change`.
-  The non-`ACTIVE` path is **logic-verified but not sample-verified** — no
-  real non-`ACTIVE` row exists yet; annotate those tests as such.
+### Phase 3 — Diff engine (pure) ✅ SHIPPED (2026-08-03)
+- `src/lib/providers/diffEngine.ts` — `detectEvents(previousSnapshot, currentRows)`
+  → `new_activation | renewal | plan_change | status_change | no_change`, keyed
+  on `vc_id` with `stb_no` as the documented fallback; no baseline ⇒ every row
+  is `new_activation`. Every differing field is reported in `changed` even when
+  another type wins precedence (`plan_change` > `renewal` > `status_change`).
+- Baseline = latest **committed** run only; a cancelled run is never passed in
+  as a baseline, so its rows diff as new activations again (INV-48).
+- `service_status`: `is_active = isProviderActive(raw)`; comparison is
+  case/whitespace-insensitive, storage stays verbatim (§1.5-G).
+- **Absence is never termination** — a baseline key missing from the file emits
+  no event, only a `missing_keys` entry. `findStaleEntries(...)` surfaces the
+  informational 14-day (`STALE_AFTER_DAYS`) list.
+- Rows with neither identifier land in `unkeyed`, never in the event stream.
+- **Done:** `src/lib/providers/diffEngine.test.ts` — 17 Vitest tests covering
+  every transition, mixed-file counts, identical-snapshot ⇒ all `no_change`,
+  the absence rule and staleness. Non-`ACTIVE` paths are **logic-verified, not
+  sample-verified** (annotated in the tests).
+
 
 ### Phase 4 — Resolution layer
 - Pack resolution via `provider_pack_mappings` → `unmapped_pack`.
