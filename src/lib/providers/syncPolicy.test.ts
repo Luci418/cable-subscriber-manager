@@ -39,8 +39,8 @@ describe("getSyncPolicy (INV-50)", () => {
     const policy = getSyncPolicy({ sync_policy: {} });
     expect(policy.update_identity_name).toBe(false);
     expect(policy.update_identity_mobile).toBe(false);
-    expect(policy.update_identity_address).toBe(false);
     expect(policy.auto_pair_devices).toBe(false);
+    expect("update_identity_address" in policy).toBe(false);
   });
 
   it("accepts a bare jsonb value as well as a provider row", () => {

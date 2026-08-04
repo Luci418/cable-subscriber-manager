@@ -7,6 +7,12 @@
  * is forbidden anywhere in the codebase: a missing key must resolve to its
  * documented default, never to `false`/`undefined`, otherwise a future flag
  * would silently disable itself for every existing provider row.
+ *
+ * Removed 2026-08-04: `update_identity_address`. The Hathway parser never
+ * promoted an address into `ProviderReportRow`, so no layer could gate it and
+ * the flag was inert. A checkbox that does nothing when toggled is worse than
+ * no checkbox. Re-add it together with a canonical `address` field and the
+ * matching suppression check in `resolveEvent`, never before.
  */
 
 export type SyncPolicy = {
@@ -21,8 +27,12 @@ export type SyncPolicy = {
   /** Identity fields — denied by default (INV-49). */
   update_identity_name: boolean;
   update_identity_mobile: boolean;
-  update_identity_address: boolean;
-  /** Auto-pair devices found in a provider report. Denied by default. */
+  /**
+   * RESERVED — not live (decision 2026-08-04). Phase 6's commit path never
+   * auto-pairs a device regardless of this flag, and no other layer reads it.
+   * Kept in the map so the default exists the day pairing is implemented;
+   * Phase 8 MUST NOT render a checkbox for it until then.
+   */
   auto_pair_devices: boolean;
 };
 
@@ -39,7 +49,6 @@ export const SYNC_POLICY_DEFAULTS: SyncPolicy = {
   update_provider_status: true,
   update_identity_name: false,
   update_identity_mobile: false,
-  update_identity_address: false,
   auto_pair_devices: false,
 };
 
@@ -50,8 +59,7 @@ export const SYNC_POLICY_LABELS: Record<SyncPolicyKey, string> = {
   update_provider_status: "Update upstream service status",
   update_identity_name: "Allow sync to change customer name",
   update_identity_mobile: "Allow sync to change customer mobile",
-  update_identity_address: "Allow sync to change customer address",
-  auto_pair_devices: "Automatically pair devices found in the report",
+  auto_pair_devices: "Automatically pair devices found in the report (reserved — no effect yet)",
 };
 
 type PolicySource =

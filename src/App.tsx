@@ -12,6 +12,7 @@ import CustomerNew from "./pages/CustomerNew";
 import CustomerDetail from "./pages/CustomerDetail";
 import Equipment from "./pages/Equipment";
 import Catalog from "./pages/Catalog";
+import ProviderImport from "./pages/ProviderImport";
 import EquipmentDetail from "./pages/EquipmentDetail";
 import { Billing } from "./pages/Billing";
 import { Analytics } from "./pages/Analytics";
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="equipment/:serial" element={<EquipmentDetail />} />
               <Route path="analytics" element={<AnalyticsRoute />} />
               <Route path="complaints" element={<ComplaintsRoute />} />
+              <Route path="integrations/hathway" element={<ProviderImport />} />
               <Route path="settings" element={<Navigate to="/settings/company" replace />} />
               <Route path="settings/:section" element={<Settings />} />
             </Route>
