@@ -206,6 +206,12 @@ describe("bucketing", () => {
     expect(r.bucket).toBe("anomaly");
   });
 
+  it("zeroes every proposed write on an anomaly row even when matched and allowed", () => {
+    const r = one([row({ end_date: "2026-06-30" })], [row()]);
+    expect(r.match.status).toBe("matched");
+    expect(r.writes).toEqual({ charge: false, plan_state: false, provider_status: false });
+  });
+
   it("counts a mixed file by bucket", () => {
     const prev = [row({ vc_id: "A" }), row({ vc_id: "B" }), row({ vc_id: "C" })];
     const cur = [
