@@ -25,6 +25,11 @@
  * came through `null` because a parse failed, is exactly the kind of thing
  * INV-46/47 want a human to see. `no_change` in this layer means "byte-for-byte
  * the same as the committed baseline".
+ *
+ * Write circuit-breakers (2026-08-04): two conditions zero every proposed
+ * write unconditionally — an unmatched/suggested/conflicting row (no linked
+ * subscriber) and an `anomaly` row (data we do not trust). Policy cannot
+ * re-enable either.
  */
 
 import { SyncPolicy, SyncPolicyKey } from "./syncPolicy";
@@ -274,6 +279,18 @@ export function resolveEvent(
     bucket = "anomaly";
   } else {
     bucket = event.type;
+  }
+
+  // Anomaly circuit-breaker (2026-08-04). An anomaly is data we do not trust:
+  // a regressed date, or a field nulled by a parse failure. It gets the same
+  // treatment as an unmatched row — every proposed write is forced off,
+  // regardless of match status or policy. Phase 5 must require an explicit
+  // per-row operator acknowledgement; an anomaly is never eligible for a bulk
+  // "Approve all".
+  if (bucket === "anomaly") {
+    charge = false;
+    plan_state = false;
+    provider_status = false;
   }
 
   return { key: event.key, event, match, pack, bucket, writes: { charge, plan_state, provider_status }, suppressed_by_policy: suppressed };
