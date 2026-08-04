@@ -76,13 +76,51 @@ It generalises past the `subscribers.cable_provider_id` /
 be exactly two service types today. One row per subscriber × provider scales
 to any provider count with no further schema change.
 
-**B. `providers.sync_policy jsonb` — eight fixed booleans, one hard rule.**
+**B. `providers.sync_policy jsonb` — a fixed set of booleans, one hard rule.**
 No independent lifecycle, so no table. But `sync_policy` may only be read
 through a `getSyncPolicy(provider)` helper that merges the stored JSON over
 the **current defaults**. Direct `sync_policy.<key>` access is forbidden
 anywhere in the codebase. A missing key takes its documented default, never
 `false`/`undefined` — otherwise a future ninth flag silently disables itself
 for every existing provider row. (INV-50)
+
+**B1. Flag ownership — which layer enforces each flag (2026-08-04).**
+
+| Flag | Enforced in | Status |
+|---|---|---|
+| `create_charges` | Phase 4 `resolveEvent` (write proposal) + Phase 6 commit | Live |
+| `update_plan_state` | Phase 4 `resolveEvent` + Phase 6 commit | Live |
+| `update_provider_status` | Phase 4 `resolveEvent` + Phase 6 commit | Live |
+| `update_identity_name` | Phase 4 (recorded in `suppressed_by_policy`; never proposed) | Live |
+| `update_identity_mobile` | Phase 4 (recorded in `suppressed_by_policy`; never proposed) | Live |
+| `create_prospects` | **Phase 5 UI gate** | Live at Phase 5 |
+| `auto_pair_devices` | nowhere | **Reserved, not live** |
+
+- **`update_identity_address` was removed** from `SyncPolicy` on 2026-08-04.
+  The Hathway parser never promoted an address into `ProviderReportRow`
+  (it lands in `extra["Address"]`), so there was no structured value for a
+  policy check to gate and `resolveEvent` never referenced the flag. Rather
+  than ship a Settings checkbox with no effect, the flag is gone. Re-add it
+  only together with (a) a canonical `address` field on `ProviderReportRow`
+  and (b) a real suppression check in `resolveEvent`.
+
+- **`create_prospects` is a Phase 5 UI gate, not a Phase 6 RPC gate.**
+  Decision: the flag controls whether **"Create new customer" appears as an
+  option in the `needs_review` drill-down**. Phase 6's commit RPC executes the
+  per-row action the operator already chose in review and does not re-check
+  this flag. Rationale: the flag is an operator-workflow preference ("don't
+  clutter my review screen with prospect creation"), not a data-integrity
+  invariant — the integrity invariants are INV-46/47/49, all of which the
+  commit RPC does enforce. Corollary: a conflict row never offers "create new
+  customer" regardless of the flag, because creating a third customer does
+  not resolve two existing customers fighting over one identifier.
+
+- **`auto_pair_devices` is reserved, not live.** Phase 6 explicitly never
+  auto-pairs a device ("no auto-pairing"), so no layer reads this flag today.
+  It stays in `SYNC_POLICY_DEFAULTS` (default `false`) so the default exists
+  the day pairing is implemented, but **Phase 8 must not render a checkbox
+  for it** until it does something. Same rule as `update_identity_address`:
+  no inert checkboxes.
 
 **C. Idempotency is an explicit guarantee, not an emergent property.**
 - A charge is only ever created as part of **committing** a
@@ -239,6 +277,14 @@ review anyway"), separate from `no_change`, which is the only bucket that may
 be collapsed/skipped entirely. `no_change` in Phase 4/5 vocabulary means
 byte-identical to the committed baseline.
 
+#### Decision — anomaly write circuit-breaker (2026-08-04)
+`bucket === "anomaly"` now forces `writes.charge`, `writes.plan_state` and
+`writes.provider_status` to `false`, exactly as an unlinked row does — after
+the policy filter, so policy cannot re-enable them. An anomaly is untrusted
+data (a regressed date, a field nulled by a parse failure); it must never be
+swept up in a bulk "Approve all" and requires an explicit per-row operator
+acknowledgement in Phase 5.
+
 #### Two Phase 5 requirements carried forward
 - The renewal drill-down must list **every** field in `event.changed` per row,
   not just the expiry pair — a suspension arriving in the same import as a
@@ -260,14 +306,35 @@ identifier-less rows as parse errors, so the path is unreachable today. Kept
 and tested deliberately, annotated as such.
 
 
-### Phase 5 — Review screen
-- Upload → parse → diff → bucketed review UI with counts, drill-downs,
-  editable charge amounts, "Total charges to post", Approve / Cancel.
-- Drill-downs: renewal, `needs_review` (link / create prospect / ignore),
-  `unmapped_pack` (selling price + pre-filled unverified provider cost).
-- Nothing is written before Approve.
-- **Done when:** an operator can dry-run the sample file end-to-end and
-  cancel with zero DB writes.
+### Phase 5 — Review screen ✅ SHIPPED (2026-08-04)
+- Route `/integrations/hathway` (`src/pages/ProviderImport.tsx`), reachable
+  from Settings → Integrations. Gated on `isAdmin` (owner / admin_office)
+  until a dedicated `can_sync_provider` role lands.
+- Pipeline is entirely client-side and read-only: pick file → `parseCustomerMaster`
+  → load the latest **committed** run's `snapshot_data` as baseline →
+  `detectEvents` → `loadResolutionContext` (DB reads only) → `resolveEvents`.
+- **Row anatomy — three structurally separate sections, never collapsed
+  into one line** (`src/components/providers/ResolvedRowCard.tsx`):
+  1. **Event** — bucket badge + every field in `event.changed`, with the
+     baseline → current value pair for each.
+  2. **Identity** — match status *and* method, stated in words. A
+     `conflict` (two deterministic identifiers disagree) and an `unmatched`
+     row (nothing matched) render differently and carry different actions:
+     a conflict lists the competing candidates and never offers "create new
+     customer"; an unmatched row offers it when `create_prospects` allows.
+  3. **Proposed actions** — all three of `charge` / `plan_state` /
+     `provider_status` always listed with ✓ or ✗. A write denied by policy
+     is rendered **struck through with a "(policy)" label**, read from
+     `suppressed_by_policy` — never omitted.
+- Buckets render as their own sections with counts. `no_change` is the only
+  collapsible/skippable one; `anomaly` is always visible and each anomaly row
+  needs an explicit per-row acknowledgement — it is excluded from "Approve all".
+- Editable charge amount per charging row, pre-filled from the mapped pack's
+  price, with a running "Total charges to post".
+- **Nothing is written before Approve**; Approve itself lands in Phase 6, so
+  the button is present and disabled with the reason shown.
+- **Done:** an operator can dry-run a report end-to-end and leave with zero DB
+  writes.
 
 ### Phase 6 — Commit
 - `commit_provider_import(...)` RPC, per-row transactional:
