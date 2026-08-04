@@ -457,8 +457,10 @@ const IntegrationsSection = ({ readOnly }: { readOnly: boolean }) => {
                 {lastSynced ? new Date(lastSynced).toLocaleString() : 'Never — no reports imported yet.'}
               </p>
             </div>
-            <Button onClick={handleImport} disabled={!enabled || readOnly} variant="outline">
-              <FileUp className="mr-2 h-4 w-4" /> Import Report
+            <Button asChild disabled={!enabled} variant="outline">
+              <Link to="/integrations/hathway">
+                <FileUp className="mr-2 h-4 w-4" /> Import Report
+              </Link>
             </Button>
           </div>
 
