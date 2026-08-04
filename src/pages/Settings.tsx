@@ -406,32 +406,11 @@ const IntegrationsSection = ({ readOnly }: { readOnly: boolean }) => {
     toast.success(`Hathway integration ${v ? 'enabled' : 'disabled'}`);
   };
 
-  const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      // NB: parse + upsert intentionally deferred. Record the pick so
-      // the log surface has data during development.
-      const entry: SyncLogEntry = {
-        id: crypto.randomUUID(),
-        at: new Date().toISOString(),
-        filename: file.name,
-        processed: 0,
-        created: 0,
-        updated: 0,
-        errors: 0,
-        note: 'Import parser not yet implemented — file received but not processed.',
-      };
-      const next = [entry, ...log].slice(0, 10);
-      setLog(next);
-      localStorage.setItem(HATHWAY_LOG_KEY, JSON.stringify(next));
-      toast.info('Report received. Parser lands in a follow-up batch.');
-    };
-    input.click();
-  };
+  // Importing now lives on its own review screen (/integrations/hathway):
+  // parse → diff → resolve → operator review. Nothing is written until the
+  // operator approves, so the picker here is just a link.
+
+
 
   return (
     <div className="space-y-6">
