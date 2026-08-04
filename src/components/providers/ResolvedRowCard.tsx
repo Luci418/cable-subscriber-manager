@@ -161,7 +161,7 @@ export function ResolvedRowCard({
                 <li key={f} className="text-sm">
                   <span className="text-muted-foreground">{FIELD_LABELS[f] ?? f}: </span>
                   <span className="line-through text-muted-foreground">
-                    {String((event.previous as Record<string, unknown> | null)?.[f] ?? "—")}
+                    {String((event.previous as unknown as Record<string, unknown> | null)?.[f] ?? "—")}
                   </span>
                   <span className="mx-1">→</span>
                   <span className="font-medium">
