@@ -47,6 +47,8 @@ interface Permissions {
   canCollectPayment: boolean;
   canModifySettings: boolean;
   canViewCredentials: boolean;
+  /** Provider sync: upload, review and commit provider reports. */
+  canSyncProvider: boolean;
 }
 
 const EMPTY: Permissions = {
@@ -65,6 +67,7 @@ const EMPTY: Permissions = {
   canCollectPayment: false,
   canModifySettings: false,
   canViewCredentials: false,
+  canSyncProvider: false,
 };
 
 /**
@@ -97,6 +100,7 @@ const derive = (roles: AppRole[]): Permissions => {
     canCollectPayment:          isAdmin || isCollectionAgent,
     canModifySettings:          isOwner,
     canViewCredentials:         canViewCredentials(roles),
+    canSyncProvider:            isAdmin,
   };
 };
 
