@@ -111,6 +111,20 @@ interface Props {
   allowCreateProspect?: boolean;
   onLinkCustomer?: () => void;
   onCreateProspect?: () => void;
+  /**
+   * Display-only overrides for operator decisions taken in this review
+   * session. `resolveEvent` is deliberately NOT re-run for these — the real
+   * writes are computed server-side at commit.
+   */
+  linkedLabel?: string;
+  prospectQueued?: boolean;
+  /**
+   * True when the row matched on account number but the vc_id / stb_no it
+   * names is not among the devices currently paired to that subscriber.
+   */
+  deviceMismatch?: boolean;
+  /** Inline "Map this plan" action for `unmapped_pack` rows. */
+  onMapPack?: () => void;
 }
 
 export function ResolvedRowCard({
@@ -124,6 +138,10 @@ export function ResolvedRowCard({
   allowCreateProspect,
   onLinkCustomer,
   onCreateProspect,
+  linkedLabel,
+  prospectQueued,
+  deviceMismatch,
+  onMapPack,
 }: Props) {
   const { event, match, pack, writes, suppressed_by_policy: suppressed } = row;
   const suppressedFor = (key: SyncPolicyKey) =>
@@ -131,6 +149,8 @@ export function ResolvedRowCard({
 
   const isConflict = match.status === "conflict";
   const isAnomaly = row.bucket === "anomaly";
+  const resolvedByOperator = !!linkedLabel || !!prospectQueued;
+
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
