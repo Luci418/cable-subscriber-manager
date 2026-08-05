@@ -257,7 +257,7 @@ export default function ProviderImport() {
           // re-derived here — only rows the engine already proposed carry one.
           charge: r.writes.charge && !!sid,
           amount: r.writes.charge ? (Number.isFinite(amounts[r.key]) ? amounts[r.key] : 0) : 0,
-          plan_state: r.writes.plan_state || (linkedNow && r.ctxPlanState !== false),
+          plan_state: r.writes.plan_state || linkedNow || (!sid && !!prospects[r.key]),
           provider_status: r.writes.provider_status || linkedNow || (!sid && !!prospects[r.key]),
         };
       });
