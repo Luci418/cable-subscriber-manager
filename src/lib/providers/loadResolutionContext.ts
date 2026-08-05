@@ -21,11 +21,19 @@ export interface ReviewContext extends ResolutionContext {
   packById: Record<string, PackInfo>;
   /** Subscriber id → display label for the identity section. */
   subscriberLabelById: Record<string, string>;
+  /**
+   * Subscriber id → every normalised device key (vc_id and serial) currently
+   * paired to them locally. Used by the review screen to flag a report row
+   * that matched on account number but names hardware we have paired
+   * elsewhere (or not at all). Display-only — never a blocker.
+   */
+  deviceKeysBySubscriber: Record<string, string[]>;
   /** The committed baseline snapshot, or null when there is none. */
   baseline: ProviderReportRow[] | null;
   baselineRunId: string | null;
   baselineImportedAt: string | null;
 }
+
 
 export async function loadReviewContext(
   providerId: string,
@@ -63,12 +71,16 @@ export async function loadReviewContext(
 
   const subscriberByVcId: Record<string, string> = {};
   const subscriberBySerial: Record<string, string> = {};
+  const deviceKeysBySubscriber: Record<string, string[]> = {};
   for (const d of devicesRes.data ?? []) {
     if (!d.subscriber_id) continue;
     const vc = normKey(d.vc_id);
     if (vc) subscriberByVcId[vc] = d.subscriber_id;
     const sn = normKey(d.serial_number);
     if (sn) subscriberBySerial[sn] = d.subscriber_id;
+    const keys = (deviceKeysBySubscriber[d.subscriber_id] ??= []);
+    if (vc) keys.push(vc);
+    if (sn) keys.push(sn);
   }
 
   const subscriberByAccountNumber: Record<string, string> = {};
@@ -106,6 +118,7 @@ export async function loadReviewContext(
     policy: getSyncPolicy(providerRes.data),
     packById,
     subscriberLabelById,
+    deviceKeysBySubscriber,
     baseline: Array.isArray(baselineRow?.snapshot_data)
       ? (baselineRow!.snapshot_data as ProviderReportRow[])
       : null,

@@ -11,6 +11,7 @@
  * Purely presentational. All state lives in the parent screen.
  */
 
+import { memo } from "react";
 import { Check, X, AlertTriangle, Link2Off, GitBranch, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -111,9 +112,23 @@ interface Props {
   allowCreateProspect?: boolean;
   onLinkCustomer?: () => void;
   onCreateProspect?: () => void;
+  /**
+   * Display-only overrides for operator decisions taken in this review
+   * session. `resolveEvent` is deliberately NOT re-run for these — the real
+   * writes are computed server-side at commit.
+   */
+  linkedLabel?: string;
+  prospectQueued?: boolean;
+  /**
+   * True when the row matched on account number but the vc_id / stb_no it
+   * names is not among the devices currently paired to that subscriber.
+   */
+  deviceMismatch?: boolean;
+  /** Inline "Map this plan" action for `unmapped_pack` rows. */
+  onMapPack?: () => void;
 }
 
-export function ResolvedRowCard({
+function ResolvedRowCardImpl({
   row,
   subscriberLabelById,
   packLabel,
@@ -124,6 +139,10 @@ export function ResolvedRowCard({
   allowCreateProspect,
   onLinkCustomer,
   onCreateProspect,
+  linkedLabel,
+  prospectQueued,
+  deviceMismatch,
+  onMapPack,
 }: Props) {
   const { event, match, pack, writes, suppressed_by_policy: suppressed } = row;
   const suppressedFor = (key: SyncPolicyKey) =>
@@ -131,6 +150,8 @@ export function ResolvedRowCard({
 
   const isConflict = match.status === "conflict";
   const isAnomaly = row.bucket === "anomaly";
+  const resolvedByOperator = !!linkedLabel || !!prospectQueued;
+
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
@@ -182,7 +203,23 @@ export function ResolvedRowCard({
 
         {/* ── Identity ────────────────────────────────────────── */}
         <Section label="Identity">
-          {match.status === "matched" && (
+          {/* Operator decision taken in this session wins the display. The
+              underlying `match` is unchanged; the write happens at commit. */}
+          {resolvedByOperator && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">
+              <p className="font-medium text-primary flex items-start gap-1.5">
+                <Check className="h-4 w-4 mt-0.5 shrink-0" />
+                {linkedLabel
+                  ? `Linked to ${linkedLabel}`
+                  : "Queued as a new customer"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Will be applied when you approve this review.
+              </p>
+            </div>
+          )}
+
+          {!resolvedByOperator && match.status === "matched" && (
             <p className="text-sm">
               <Check className="inline h-4 w-4 text-primary mr-1" />
               Matched by <strong>{match.method === "vc_id" ? "VC id" : match.method === "serial_number" ? "STB serial" : "account number"}</strong>
@@ -193,7 +230,7 @@ export function ResolvedRowCard({
             </p>
           )}
 
-          {match.status === "suggested" && (
+          {!resolvedByOperator && match.status === "suggested" && (
             <div className="text-sm">
               <p className="text-muted-foreground">
                 <HelpCircle className="inline h-4 w-4 mr-1" />
@@ -231,7 +268,7 @@ export function ResolvedRowCard({
             </div>
           )}
 
-          {match.status === "unmatched" && (
+          {!resolvedByOperator && match.status === "unmatched" && (
             <p className="text-sm text-muted-foreground">
               <Link2Off className="inline h-4 w-4 mr-1" />
               <strong className="text-foreground">Unmatched</strong> — no VC id, serial,
@@ -239,21 +276,36 @@ export function ResolvedRowCard({
             </p>
           )}
 
+          {/* Tier-3 match hygiene: matched on account number, but the hardware
+              named in the report is not what is paired locally. Note, never a
+              blocker, never auto-pairing. */}
+          {deviceMismatch && (
+            <p className="mt-2 text-xs text-destructive flex items-start gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              Device on this report doesn't match what's currently paired locally.
+            </p>
+          )}
+
           {(match.status === "unmatched" || match.status === "suggested") && (
             <div className="flex flex-wrap gap-2 mt-2">
               {onLinkCustomer && (
                 <Button size="sm" variant="outline" onClick={onLinkCustomer}>
-                  Link customer
+                  {linkedLabel ? "Change link" : "Link customer"}
                 </Button>
               )}
-              {match.status === "unmatched" && allowCreateProspect && onCreateProspect && (
-                <Button size="sm" variant="outline" onClick={onCreateProspect}>
-                  Create new customer
+              {match.status === "unmatched" && allowCreateProspect && onCreateProspect && !linkedLabel && (
+                <Button
+                  size="sm"
+                  variant={prospectQueued ? "secondary" : "outline"}
+                  onClick={onCreateProspect}
+                >
+                  {prospectQueued ? "Queued — undo" : "Create new customer"}
                 </Button>
               )}
             </div>
           )}
         </Section>
+
 
         {/* ── Proposed actions ────────────────────────────────── */}
         <Section label="Proposed actions">
@@ -291,12 +343,32 @@ export function ResolvedRowCard({
               <Input
                 type="number"
                 inputMode="decimal"
+                min={0}
+                step="0.01"
                 className="h-8 mt-1"
-                value={amount ?? 0}
-                onChange={(e) => onAmountChange?.(Number(e.target.value))}
+                value={Number.isFinite(amount as number) ? amount : 0}
+                onChange={(e) => {
+                  // Never let a cleared or non-numeric field poison the total
+                  // with NaN: parse, floor at 0, fall back to 0.
+                  const parsed = Number.parseFloat(e.target.value);
+                  onAmountChange?.(Number.isFinite(parsed) ? Math.max(0, parsed) : 0);
+                }}
               />
             </div>
           )}
+
+          {row.bucket === "unmapped_pack" && onMapPack && (
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
+              <p className="text-xs text-destructive">
+                “{event.current.base_plan ?? "—"}” has no local pack. No charge can
+                be posted until it is mapped.
+              </p>
+              <Button size="sm" variant="outline" className="mt-2" onClick={onMapPack}>
+                Map this plan
+              </Button>
+            </div>
+          )}
+
 
           {isAnomaly && (
             <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
@@ -325,3 +397,6 @@ export function ResolvedRowCard({
     </div>
   );
 }
+
+/** Memoised: a 400-row report mounts 400 of these with live inputs. */
+export const ResolvedRowCard = memo(ResolvedRowCardImpl);

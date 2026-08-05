@@ -292,7 +292,7 @@ export const Settings = () => {
 
           {section === 'roles' && <RolesManagement />}
 
-          {section === 'integrations' && <IntegrationsSection readOnly={readOnly} />}
+          {section === 'integrations' && <IntegrationsSection />}
 
 
           {section === 'backup' && (
@@ -365,111 +365,113 @@ const ReconcileAllButton = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────
-// Integrations — stub UI for upstream operator report imports.
+// Integrations — provider report sync.
 //
-// The first connector is Hathway. This batch establishes the UI pattern:
-// an "enabled" toggle, a last-synced timestamp, an "Import Report" file
-// picker (CSV / Excel) and a rolling sync log. The actual parse + upsert
-// pipeline is deliberately deferred until Hathway's report structure is
-// confirmed; a locally-stored log records manual picks in the meantime
-// so operators can see the shell responding.
+// Rewritten 2026-08-05. The previous version was a 6.5-M stub: an "enabled"
+// toggle backed by localStorage, an Import link gated behind that fake toggle,
+// and a "Recent imports" list read from a second localStorage key that the
+// real pipeline never wrote to.
 //
-// Future providers drop in as additional cards using the same pattern.
+// Decisions:
+//  - There is no on/off switch. Sync is simply available to anyone with
+//    `can_sync_provider`; per-provider behaviour is governed by
+//    `providers.sync_policy` (Phase 8 renders those checkboxes).
+//  - "Recent imports" is a real query against `provider_import_runs`
+//    (committed runs, newest first). Full history UI stays with Phase 8.
 // ─────────────────────────────────────────────────────────────────────
-type SyncLogEntry = {
+type ImportRun = {
   id: string;
-  at: string;
-  filename: string;
-  processed: number;
-  created: number;
-  updated: number;
-  errors: number;
-  note: string;
+  file_name: string | null;
+  row_count: number;
+  committed_at: string | null;
+  imported_at: string;
+  results: Record<string, unknown> | null;
 };
 
-const HATHWAY_LOG_KEY = 'lovable.integrations.hathway.log';
-const HATHWAY_ENABLED_KEY = 'lovable.integrations.hathway.enabled';
+const IntegrationsSection = () => {
+  const perms = usePermissions();
+  const [runs, setRuns] = useState<ImportRun[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(true);
 
-const readLog = (key: string): SyncLogEntry[] => {
-  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
-};
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('provider_import_runs')
+        .select('id, file_name, row_count, committed_at, imported_at, results')
+        .eq('status', 'committed')
+        .order('committed_at', { ascending: false })
+        .limit(10);
+      if (!cancelled) {
+        setRuns((data as ImportRun[]) ?? []);
+        setLoadingRuns(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-const IntegrationsSection = ({ readOnly }: { readOnly: boolean }) => {
-  const [enabled, setEnabled] = useState<boolean>(() => localStorage.getItem(HATHWAY_ENABLED_KEY) === '1');
-  const [log, setLog] = useState<SyncLogEntry[]>(() => readLog(HATHWAY_LOG_KEY));
-
-  const lastSynced = log[0]?.at;
-
-  const toggleEnabled = (v: boolean) => {
-    setEnabled(v);
-    localStorage.setItem(HATHWAY_ENABLED_KEY, v ? '1' : '0');
-    toast.success(`Hathway integration ${v ? 'enabled' : 'disabled'}`);
-  };
-
-  // Importing now lives on its own review screen (/integrations/hathway):
-  // parse → diff → resolve → operator review. Nothing is written until the
-  // operator approves, so the picker here is just a link.
-
-
+  const lastSynced = runs[0]?.committed_at ?? runs[0]?.imported_at;
 
   return (
     <div className="space-y-6">
       <SectionCard
         title="Hathway"
-        description="Import subscriber and billing reports from Hathway to reconcile balances against the upstream ledger."
+        description="Import the Customer Master report to reconcile your ledger against the upstream provider. Every import is reviewed before anything is posted."
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
             <div className="min-w-0">
-              <p className="font-medium">Enable Hathway sync</p>
-              <p className="text-sm text-muted-foreground">
-                Turn on to allow importing Hathway reports. Store your Hathway customer numbers on subscriber profiles for matching.
-              </p>
-            </div>
-            <Switch checked={enabled} onCheckedChange={toggleEnabled} disabled={readOnly} />
-          </div>
-
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Last synced</p>
+              <p className="text-sm font-medium">Last committed import</p>
               <p className="text-xs text-muted-foreground">
-                {lastSynced ? new Date(lastSynced).toLocaleString() : 'Never — no reports imported yet.'}
+                {lastSynced ? new Date(lastSynced).toLocaleString() : 'Never — no reports committed yet.'}
               </p>
             </div>
-            <Button asChild disabled={!enabled} variant="outline">
+            <Button asChild variant="outline" disabled={!perms.canSyncProvider}>
               <Link to="/integrations/hathway">
-                <FileUp className="mr-2 h-4 w-4" /> Import Report
+                <FileUp className="mr-2 h-4 w-4" /> Import report
               </Link>
             </Button>
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            Matching uses the VC id, STB serial and the Hathway customer number stored
+            on each customer profile. What a sync is allowed to change is governed per
+            provider by its sync policy.
+          </p>
+
           <div>
             <p className="text-sm font-medium mb-2">Recent imports</p>
-            {log.length === 0 ? (
+            {loadingRuns ? (
+              <p className="text-xs text-muted-foreground rounded-md border border-dashed p-3">Loading…</p>
+            ) : runs.length === 0 ? (
               <p className="text-xs text-muted-foreground rounded-md border border-dashed p-3">
-                No imports yet.
+                No committed imports yet.
               </p>
             ) : (
               <div className="rounded-md border divide-y text-sm">
-                {log.map(e => (
-                  <div key={e.id} className="p-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{e.filename}</div>
+                {runs.map((r) => {
+                  const res = (r.results ?? {}) as Record<string, number>;
+                  return (
+                    <div key={r.id} className="p-3">
+                      <div className="font-medium truncate">{r.file_name ?? 'Customer Master'}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(e.at).toLocaleString()} · {e.processed} processed · {e.created} created · {e.updated} updated
-                        {e.errors > 0 && <span className="text-destructive"> · {e.errors} errors</span>}
+                        {new Date(r.committed_at ?? r.imported_at).toLocaleString()} · {r.row_count} rows
+                        {' · '}{res.charges_created ?? 0} charges
+                        {' · '}{res.prospects_created ?? 0} new customers
+                        {Number(res.errors ?? 0) > 0 && (
+                          <span className="text-destructive"> · {res.errors} errors</span>
+                        )}
                       </div>
-                      {e.note && <div className="text-xs text-muted-foreground mt-1 italic">{e.note}</div>}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </SectionCard>
-
     </div>
   );
 };
+
 

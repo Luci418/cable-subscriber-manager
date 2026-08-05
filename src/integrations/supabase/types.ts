@@ -1444,6 +1444,7 @@ export type Database = {
       can_sync_provider: { Args: { _uid: string }; Returns: boolean }
       can_view_credentials: { Args: { _uid?: string }; Returns: boolean }
       can_void_transaction: { Args: { _uid?: string }; Returns: boolean }
+      cancel_provider_import: { Args: { p_run_id: string }; Returns: undefined }
       cancel_subscription: {
         Args: {
           p_reason?: string
@@ -1457,6 +1458,10 @@ export type Database = {
       check_device_deletable: { Args: { p_device_id: string }; Returns: Json }
       check_subscriber_deletable: {
         Args: { p_subscriber_id: string }
+        Returns: Json
+      }
+      commit_provider_import: {
+        Args: { p_decisions: Json; p_run_id: string }
         Returns: Json
       }
       create_subscription: {
