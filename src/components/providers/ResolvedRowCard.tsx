@@ -11,6 +11,7 @@
  * Purely presentational. All state lives in the parent screen.
  */
 
+import { memo } from "react";
 import { Check, X, AlertTriangle, Link2Off, GitBranch, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,7 +128,7 @@ interface Props {
   onMapPack?: () => void;
 }
 
-export function ResolvedRowCard({
+function ResolvedRowCardImpl({
   row,
   subscriberLabelById,
   packLabel,
@@ -396,3 +397,6 @@ export function ResolvedRowCard({
     </div>
   );
 }
+
+/** Memoised: a 400-row report mounts 400 of these with live inputs. */
+export const ResolvedRowCard = memo(ResolvedRowCardImpl);
