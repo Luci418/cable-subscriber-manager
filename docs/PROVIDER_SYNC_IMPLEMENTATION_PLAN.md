@@ -336,21 +336,66 @@ and tested deliberately, annotated as such.
 - **Done:** an operator can dry-run a report end-to-end and leave with zero DB
   writes.
 
-### Phase 6 — Commit
-- `commit_provider_import(...)` RPC, per-row transactional:
-  upsert `subscriber_provider_state` (raw `provider_status` verbatim);
-  insert charge (`source='provider_sync'`, `provider_id`,
-  `service_type='cable'`); create pack rows for newly mapped plans;
-  status-only rows write no transaction; `needs_review → create new`
-  creates a `prospect` (no auto-pairing).
-- **Insert-only.** No existing transaction is ever updated or deleted
-  (INV-46, INV-47).
-- Writes `provider_import_runs` with per-row results and becomes the new
-  baseline.
-- **Done when:** pgTAP proves role gating, per-row partial success,
-  insert-only behaviour, that a re-run of the same file produces
-  `no_change` with zero transactions, and that a cancelled run leaves no
-  baseline behind.
+#### Phase 5 review fixes (2026-08-05)
+- **Operator decisions are reflected on the row.** A row with a link or a
+  queued prospect renders "Linked to <name> — applied on approve" in place of
+  the unmatched/suggested messaging. Display-only: `resolveEvent` is **not**
+  re-run; the real write is computed at commit.
+- **Device mismatch note.** A row matched on `account_number` (tier 3) whose
+  `vc_id`/`stb_no` is not among the devices currently paired to that
+  subscriber shows "Device on this report doesn't match what's currently
+  paired locally." Informational — never a blocker, never auto-pairing.
+  Backed by `deviceKeysBySubscriber` on `ReviewContext` (no extra query).
+- **Filter bar** over `customer_name` / `vc_id` / `stb_no` / `account_number`
+  / `mobile`, client-side across `review.rows`.
+- **Charge input is NaN-proof**: `parseFloat`, floored at 0, non-numeric → 0.
+  The running total skips non-finite values defensively.
+- **Inline "Map this plan"** on `unmapped_pack` rows — upserts
+  `provider_pack_mappings` and re-runs the pure diff/resolve against the
+  updated map, without leaving the screen. (Phase 8 still owns full CRUD.)
+- **Performance:** the 400-row pipeline measures ~37 ms end-to-end
+  (parse 31 / diff 1.4 / resolve 4.4). Rendering is bounded rather than
+  virtualised: cards are `memo`-ised and each bucket renders 40 rows with a
+  "show the remaining N" control, so live inputs stay cheap.
+
+#### Decision — draft runs are persisted at parse time (2026-08-05)
+- Parsing a file inserts one `provider_import_runs` row with
+  `status='draft'`. This is the **only** write in the review flow.
+- Amounts / acknowledgements / links / queued prospects stay in local state
+  and are flushed to the draft row's `results` on an **explicit "Save draft"**
+  action, not on every change (a 400-row report with live inputs would
+  otherwise write per keystroke).
+- Cancelling calls `cancel_provider_import(run_id)` → `status='cancelled'`.
+- The baseline query reads `status='committed'` only, so neither a draft nor a
+  cancelled run can ever become a baseline. (INV-48)
+
+### Phase 6 — Commit ✅ SHIPPED (2026-08-05)
+- `commit_provider_import(p_run_id uuid, p_decisions jsonb)` — SECURITY
+  DEFINER, gated on `can_sync_provider(auth.uid())`. Operates on an **existing
+  draft run** (`FOR UPDATE`, rejects any non-draft status), never on a fresh
+  insert.
+- Per decision, inside a per-row exception block (**partial success**):
+  1. optional `prospect` subscriber creation for an unmatched row the operator
+     chose (`generate_subscriber_id`, `customer_status='prospect'`,
+     `services={cable}`, no device pairing — `auto_pair_devices` stays inert);
+  2. upsert `subscriber_provider_state` on `(subscriber_id, provider_id)` with
+     the raw `provider_status` verbatim (§1.5-G), plus
+     `last_seen_in_snapshot_at` and `last_import_run_id`;
+  3. insert one `transactions` row (`type='charge'`, `source='provider_sync'`,
+     `service_type='cable'`, `status='posted'`, provider tagged). Amount must
+     be > 0. **Insert-only** — no existing transaction is ever updated or
+     deleted (INV-46, INV-47).
+- The run is then flipped to `status='committed'` with `committed_at`,
+  `committed_by` (the approver, not the importer) and a `results` summary
+  (`charges_created`, `states_updated`, `prospects_created`, `errors`,
+  `total_charged`, per-row outcomes). It becomes the next baseline.
+- `cancel_provider_import(p_run_id uuid)` marks an abandoned draft
+  `cancelled`.
+- Anomaly rows are excluded from the decision payload unless individually
+  acknowledged; conflict rows are never included.
+- **Outstanding:** pgTAP coverage for role gating, insert-only behaviour,
+  re-run ⇒ `no_change` with zero transactions, and cancelled-run-is-not-a-
+  baseline is scheduled with Phase 9.
 
 ### Phase 7 — Dashboard Status import
 - Separate picker, no review screen. Match by `vc_id`, update
@@ -358,6 +403,11 @@ and tested deliberately, annotated as such.
   updated/not-found/skipped summary, logged as its own run.
 
 ### Phase 8 — Settings → Integrations
+- **Done early (2026-08-05):** the 6.5-M localStorage stub is retired. There is
+  no "enable Hathway" toggle any more (sync is available to `can_sync_provider`;
+  behaviour is governed by `providers.sync_policy`), the Import link is no
+  longer gated behind it, and "Recent imports" queries committed
+  `provider_import_runs` instead of a localStorage log.
 - Per-provider: Pack Mappings CRUD (auto-populated from review screen),
   Sync Policy checkboxes (rendered from the default map, so a new flag
   appears automatically), run history. Gated on `can_sync_provider`.
