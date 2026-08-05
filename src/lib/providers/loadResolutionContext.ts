@@ -21,11 +21,19 @@ export interface ReviewContext extends ResolutionContext {
   packById: Record<string, PackInfo>;
   /** Subscriber id → display label for the identity section. */
   subscriberLabelById: Record<string, string>;
+  /**
+   * Subscriber id → every normalised device key (vc_id and serial) currently
+   * paired to them locally. Used by the review screen to flag a report row
+   * that matched on account number but names hardware we have paired
+   * elsewhere (or not at all). Display-only — never a blocker.
+   */
+  deviceKeysBySubscriber: Record<string, string[]>;
   /** The committed baseline snapshot, or null when there is none. */
   baseline: ProviderReportRow[] | null;
   baselineRunId: string | null;
   baselineImportedAt: string | null;
 }
+
 
 export async function loadReviewContext(
   providerId: string,
