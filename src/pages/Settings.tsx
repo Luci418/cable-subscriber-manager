@@ -292,7 +292,7 @@ export const Settings = () => {
 
           {section === 'roles' && <RolesManagement />}
 
-          {section === 'integrations' && <IntegrationsSection readOnly={readOnly} />}
+          {section === 'integrations' && <IntegrationsSection />}
 
 
           {section === 'backup' && (
@@ -388,7 +388,7 @@ type ImportRun = {
   results: Record<string, unknown> | null;
 };
 
-const IntegrationsSection = ({ readOnly }: { readOnly: boolean }) => {
+const IntegrationsSection = () => {
   const perms = usePermissions();
   const [runs, setRuns] = useState<ImportRun[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
