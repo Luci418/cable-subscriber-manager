@@ -71,12 +71,16 @@ export async function loadReviewContext(
 
   const subscriberByVcId: Record<string, string> = {};
   const subscriberBySerial: Record<string, string> = {};
+  const deviceKeysBySubscriber: Record<string, string[]> = {};
   for (const d of devicesRes.data ?? []) {
     if (!d.subscriber_id) continue;
     const vc = normKey(d.vc_id);
     if (vc) subscriberByVcId[vc] = d.subscriber_id;
     const sn = normKey(d.serial_number);
     if (sn) subscriberBySerial[sn] = d.subscriber_id;
+    const keys = (deviceKeysBySubscriber[d.subscriber_id] ??= []);
+    if (vc) keys.push(vc);
+    if (sn) keys.push(sn);
   }
 
   const subscriberByAccountNumber: Record<string, string> = {};
@@ -114,6 +118,7 @@ export async function loadReviewContext(
     policy: getSyncPolicy(providerRes.data),
     packById,
     subscriberLabelById,
+    deviceKeysBySubscriber,
     baseline: Array.isArray(baselineRow?.snapshot_data)
       ? (baselineRow!.snapshot_data as ProviderReportRow[])
       : null,
