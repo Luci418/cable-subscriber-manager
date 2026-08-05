@@ -202,7 +202,23 @@ export function ResolvedRowCard({
 
         {/* ── Identity ────────────────────────────────────────── */}
         <Section label="Identity">
-          {match.status === "matched" && (
+          {/* Operator decision taken in this session wins the display. The
+              underlying `match` is unchanged; the write happens at commit. */}
+          {resolvedByOperator && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">
+              <p className="font-medium text-primary flex items-start gap-1.5">
+                <Check className="h-4 w-4 mt-0.5 shrink-0" />
+                {linkedLabel
+                  ? `Linked to ${linkedLabel}`
+                  : "Queued as a new customer"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Will be applied when you approve this review.
+              </p>
+            </div>
+          )}
+
+          {!resolvedByOperator && match.status === "matched" && (
             <p className="text-sm">
               <Check className="inline h-4 w-4 text-primary mr-1" />
               Matched by <strong>{match.method === "vc_id" ? "VC id" : match.method === "serial_number" ? "STB serial" : "account number"}</strong>
@@ -213,7 +229,7 @@ export function ResolvedRowCard({
             </p>
           )}
 
-          {match.status === "suggested" && (
+          {!resolvedByOperator && match.status === "suggested" && (
             <div className="text-sm">
               <p className="text-muted-foreground">
                 <HelpCircle className="inline h-4 w-4 mr-1" />
@@ -251,7 +267,7 @@ export function ResolvedRowCard({
             </div>
           )}
 
-          {match.status === "unmatched" && (
+          {!resolvedByOperator && match.status === "unmatched" && (
             <p className="text-sm text-muted-foreground">
               <Link2Off className="inline h-4 w-4 mr-1" />
               <strong className="text-foreground">Unmatched</strong> — no VC id, serial,
@@ -259,21 +275,36 @@ export function ResolvedRowCard({
             </p>
           )}
 
+          {/* Tier-3 match hygiene: matched on account number, but the hardware
+              named in the report is not what is paired locally. Note, never a
+              blocker, never auto-pairing. */}
+          {deviceMismatch && (
+            <p className="mt-2 text-xs text-destructive flex items-start gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              Device on this report doesn't match what's currently paired locally.
+            </p>
+          )}
+
           {(match.status === "unmatched" || match.status === "suggested") && (
             <div className="flex flex-wrap gap-2 mt-2">
               {onLinkCustomer && (
                 <Button size="sm" variant="outline" onClick={onLinkCustomer}>
-                  Link customer
+                  {linkedLabel ? "Change link" : "Link customer"}
                 </Button>
               )}
-              {match.status === "unmatched" && allowCreateProspect && onCreateProspect && (
-                <Button size="sm" variant="outline" onClick={onCreateProspect}>
-                  Create new customer
+              {match.status === "unmatched" && allowCreateProspect && onCreateProspect && !linkedLabel && (
+                <Button
+                  size="sm"
+                  variant={prospectQueued ? "secondary" : "outline"}
+                  onClick={onCreateProspect}
+                >
+                  {prospectQueued ? "Queued — undo" : "Create new customer"}
                 </Button>
               )}
             </div>
           )}
         </Section>
+
 
         {/* ── Proposed actions ────────────────────────────────── */}
         <Section label="Proposed actions">
