@@ -342,12 +342,32 @@ export function ResolvedRowCard({
               <Input
                 type="number"
                 inputMode="decimal"
+                min={0}
+                step="0.01"
                 className="h-8 mt-1"
-                value={amount ?? 0}
-                onChange={(e) => onAmountChange?.(Number(e.target.value))}
+                value={Number.isFinite(amount as number) ? amount : 0}
+                onChange={(e) => {
+                  // Never let a cleared or non-numeric field poison the total
+                  // with NaN: parse, floor at 0, fall back to 0.
+                  const parsed = Number.parseFloat(e.target.value);
+                  onAmountChange?.(Number.isFinite(parsed) ? Math.max(0, parsed) : 0);
+                }}
               />
             </div>
           )}
+
+          {row.bucket === "unmapped_pack" && onMapPack && (
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
+              <p className="text-xs text-destructive">
+                “{event.current.base_plan ?? "—"}” has no local pack. No charge can
+                be posted until it is mapped.
+              </p>
+              <Button size="sm" variant="outline" className="mt-2" onClick={onMapPack}>
+                Map this plan
+              </Button>
+            </div>
+          )}
+
 
           {isAnomaly && (
             <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
