@@ -15,7 +15,6 @@ import { memo } from "react";
 import { Check, X, AlertTriangle, Link2Off, GitBranch, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { ResolvedRow, ResolutionBucket } from "@/lib/providers/resolution";
@@ -102,9 +101,15 @@ interface Props {
   row: ResolvedRow;
   subscriberLabelById: Record<string, string>;
   packLabel?: string;
-  /** Editable charge amount, only meaningful when `row.writes.charge`. */
-  amount?: number;
-  onAmountChange?: (v: number) => void;
+  /**
+   * What the commit will post for this row: pack price × periods. Read-only —
+   * the charge is a side effect of `create_subscription`, not a typed number.
+   */
+  chargeAmount?: number;
+  chargeDuration?: number;
+  packValidityDays?: number;
+  /** Item 13 — renewal gap that isn't a clean multiple of the pack validity. */
+  renewalMismatch?: { gapDays: number; validityDays: number } | null;
   /** Anomaly rows require an explicit per-row acknowledgement. */
   acknowledged?: boolean;
   onAcknowledge?: (v: boolean) => void;
@@ -112,16 +117,17 @@ interface Props {
   allowCreateProspect?: boolean;
   onLinkCustomer?: () => void;
   onCreateProspect?: () => void;
+  onUnlink?: () => void;
   /**
-   * Display-only overrides for operator decisions taken in this review
-   * session. `resolveEvent` is deliberately NOT re-run for these — the real
-   * writes are computed server-side at commit.
+   * Operator decisions taken in this review session. The row itself has
+   * already been re-resolved against them by `deriveReview`; these only drive
+   * the wording of the identity section.
    */
   linkedLabel?: string;
   prospectQueued?: boolean;
   /**
-   * True when the row matched on account number but the vc_id / stb_no it
-   * names is not among the devices currently paired to that subscriber.
+   * True when the vc_id / stb_no the report names is not among the devices
+   * currently paired to the matched subscriber.
    */
   deviceMismatch?: boolean;
   /** Inline "Map this plan" action for `unmapped_pack` rows. */
@@ -132,13 +138,16 @@ function ResolvedRowCardImpl({
   row,
   subscriberLabelById,
   packLabel,
-  amount,
-  onAmountChange,
+  chargeAmount,
+  chargeDuration,
+  packValidityDays,
+  renewalMismatch,
   acknowledged,
   onAcknowledge,
   allowCreateProspect,
   onLinkCustomer,
   onCreateProspect,
+  onUnlink,
   linkedLabel,
   prospectQueued,
   deviceMismatch,
@@ -203,21 +212,36 @@ function ResolvedRowCardImpl({
 
         {/* ── Identity ────────────────────────────────────────── */}
         <Section label="Identity">
-          {/* Operator decision taken in this session wins the display. The
-              underlying `match` is unchanged; the write happens at commit. */}
+          {/* Operator decision taken in this session. The row has already been
+              re-resolved against it — this states it in words. */}
           {resolvedByOperator && (
             <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">
               <p className="font-medium text-primary flex items-start gap-1.5">
                 <Check className="h-4 w-4 mt-0.5 shrink-0" />
                 {linkedLabel
-                  ? `Linked to ${linkedLabel}`
-                  : "Queued as a new customer"}
+                  ? `Linked to ${linkedLabel} — will apply on approve`
+                  : "Queued as a new customer — will be created on approve"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Will be applied when you approve this review.
-              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {linkedLabel && onLinkCustomer && (
+                  <Button size="sm" variant="outline" onClick={onLinkCustomer}>
+                    Change link
+                  </Button>
+                )}
+                {linkedLabel && onUnlink && (
+                  <Button size="sm" variant="ghost" onClick={onUnlink}>
+                    Unlink
+                  </Button>
+                )}
+                {prospectQueued && onCreateProspect && (
+                  <Button size="sm" variant="ghost" onClick={onCreateProspect}>
+                    Undo
+                  </Button>
+                )}
+              </div>
             </div>
           )}
+
 
           {!resolvedByOperator && match.status === "matched" && (
             <p className="text-sm">
@@ -337,25 +361,29 @@ function ResolvedRowCardImpl({
               ))}
           </ul>
 
-          {writes.charge && (
-            <div className="mt-3">
-              <label className="text-xs text-muted-foreground">Charge amount (₹)</label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                className="h-8 mt-1"
-                value={Number.isFinite(amount as number) ? amount : 0}
-                onChange={(e) => {
-                  // Never let a cleared or non-numeric field poison the total
-                  // with NaN: parse, floor at 0, fall back to 0.
-                  const parsed = Number.parseFloat(e.target.value);
-                  onAmountChange?.(Number.isFinite(parsed) ? Math.max(0, parsed) : 0);
-                }}
-              />
+          {writes.charge && Number.isFinite(chargeAmount as number) && (
+            <div className="mt-3 rounded-md border border-border bg-muted/40 p-2">
+              <p className="text-sm">
+                Charge <strong>₹{(chargeAmount as number).toFixed(2)}</strong>
+                {chargeDuration && chargeDuration > 1 ? ` · ${chargeDuration} periods` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {packLabel ?? "Mapped pack"}
+                {packValidityDays ? ` · ${packValidityDays}-day validity` : ""} — posted by
+                creating the subscription, not typed in.
+              </p>
             </div>
           )}
+
+          {renewalMismatch && (
+            <p className="mt-2 text-xs text-destructive flex items-start gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              Renewal extends {renewalMismatch.gapDays} days, which isn't a multiple of
+              the mapped pack's {renewalMismatch.validityDays}-day validity. Check the
+              mapping before approving.
+            </p>
+          )}
+
 
           {row.bucket === "unmapped_pack" && onMapPack && (
             <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
