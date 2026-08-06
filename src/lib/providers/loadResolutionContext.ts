@@ -30,6 +30,9 @@ export interface ReviewContext extends ResolutionContext {
    * elsewhere (or not at all). Display-only — never a blocker.
    */
   deviceKeysBySubscriber: Record<string, string[]>;
+  /** Account numbers claimed by more than one customer — never auto-matched. */
+  ambiguousAccountNumbers: string[];
+
   /** The committed baseline snapshot, or null when there is none. */
   baseline: ProviderReportRow[] | null;
   baselineRunId: string | null;
@@ -153,6 +156,8 @@ export async function loadReviewContext(
     packById,
     subscriberLabelById,
     deviceKeysBySubscriber,
+    ambiguousAccountNumbers,
+
     baseline: Array.isArray(baselineRow?.snapshot_data)
       ? (baselineRow!.snapshot_data as ProviderReportRow[])
       : null,
