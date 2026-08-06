@@ -41,16 +41,24 @@ export async function loadReviewContext(
   providerId: string,
   reportType: ProviderReportType,
 ): Promise<ReviewContext> {
-  const [providerRes, devicesRes, subsRes, mappingsRes, packsRes, baselineRes] =
+  const [providerRes, devicesRes, subsRes, stateRes, mappingsRes, packsRes, baselineRes] =
     await Promise.all([
       supabase.from("providers").select("id, name, sync_policy").eq("id", providerId).maybeSingle(),
       supabase.from("stb_inventory").select("vc_id, serial_number, subscriber_id"),
       supabase.from("subscribers").select("id, name, subscriber_id, mobile, hathway_customer_nbr"),
+      // Tier-3 identity is NOT the legacy column alone: every link an operator
+      // confirmed and every prospect sync created is recorded only here
+      // (`provider_customer_number`). Reading it back is what stops the next
+      // import re-creating a customer sync itself created last time.
+      supabase
+        .from("subscriber_provider_state")
+        .select("subscriber_id, provider_customer_number")
+        .eq("provider_id", providerId),
       supabase
         .from("provider_pack_mappings")
         .select("provider_plan_key, pack_id")
         .eq("provider_id", providerId),
-      supabase.from("packs").select("id, name, price"),
+      supabase.from("packs").select("id, name, price, validity_days"),
       supabase
         .from("provider_import_runs")
         .select("id, snapshot_data, imported_at")
@@ -66,6 +74,7 @@ export async function loadReviewContext(
     providerRes.error ||
     devicesRes.error ||
     subsRes.error ||
+    stateRes.error ||
     mappingsRes.error ||
     packsRes.error ||
     baselineRes.error;
@@ -85,15 +94,32 @@ export async function loadReviewContext(
     if (sn) keys.push(sn);
   }
 
-  const subscriberByAccountNumber: Record<string, string> = {};
+  // Account number → subscriber, from the UNION of the legacy column and the
+  // provider-state link table. A key claimed by two different subscribers is
+  // dropped entirely rather than resolved arbitrarily: an ambiguous account
+  // number must fall through to "needs review", never pick a winner.
+  const accountClaims: Record<string, Set<string>> = {};
+  const claim = (key: string | null, sid: string) => {
+    if (!key) return;
+    (accountClaims[key] ??= new Set()).add(sid);
+  };
   const subscribersByMobile: Record<string, string[]> = {};
   const subscriberLabelById: Record<string, string> = {};
   for (const s of subsRes.data ?? []) {
     subscriberLabelById[s.id] = `${s.name} · ${s.subscriber_id}`;
-    const acc = normKey(s.hathway_customer_nbr);
-    if (acc) subscriberByAccountNumber[acc] = s.id;
+    claim(normKey(s.hathway_customer_nbr), s.id);
     const mob = normMobile(s.mobile);
     if (mob) (subscribersByMobile[mob] ??= []).push(s.id);
+  }
+  for (const st of stateRes.data ?? []) {
+    claim(normKey(st.provider_customer_number), st.subscriber_id);
+  }
+
+  const subscriberByAccountNumber: Record<string, string> = {};
+  const ambiguousAccountNumbers: string[] = [];
+  for (const [key, owners] of Object.entries(accountClaims)) {
+    if (owners.size === 1) subscriberByAccountNumber[key] = [...owners][0];
+    else ambiguousAccountNumbers.push(key);
   }
 
   const packIdByProviderKey: Record<string, string> = {};
@@ -104,8 +130,14 @@ export async function loadReviewContext(
 
   const packById: Record<string, PackInfo> = {};
   for (const p of packsRes.data ?? []) {
-    packById[p.id] = { id: p.id, name: p.name, price: Number(p.price) };
+    packById[p.id] = {
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+      validity_days: p.validity_days ?? null,
+    };
   }
+
 
   const baselineRow = baselineRes.data as
     | { id: string; snapshot_data: unknown; imported_at: string }
