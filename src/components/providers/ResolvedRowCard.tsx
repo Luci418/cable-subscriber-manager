@@ -15,7 +15,6 @@ import { memo } from "react";
 import { Check, X, AlertTriangle, Link2Off, GitBranch, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { ResolvedRow, ResolutionBucket } from "@/lib/providers/resolution";
