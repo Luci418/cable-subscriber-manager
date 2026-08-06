@@ -347,25 +347,29 @@ function ResolvedRowCardImpl({
               ))}
           </ul>
 
-          {writes.charge && (
-            <div className="mt-3">
-              <label className="text-xs text-muted-foreground">Charge amount (₹)</label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                className="h-8 mt-1"
-                value={Number.isFinite(amount as number) ? amount : 0}
-                onChange={(e) => {
-                  // Never let a cleared or non-numeric field poison the total
-                  // with NaN: parse, floor at 0, fall back to 0.
-                  const parsed = Number.parseFloat(e.target.value);
-                  onAmountChange?.(Number.isFinite(parsed) ? Math.max(0, parsed) : 0);
-                }}
-              />
+          {writes.charge && Number.isFinite(chargeAmount as number) && (
+            <div className="mt-3 rounded-md border border-border bg-muted/40 p-2">
+              <p className="text-sm">
+                Charge <strong>₹{(chargeAmount as number).toFixed(2)}</strong>
+                {chargeDuration && chargeDuration > 1 ? ` · ${chargeDuration} periods` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {packLabel ?? "Mapped pack"}
+                {packValidityDays ? ` · ${packValidityDays}-day validity` : ""} — posted by
+                creating the subscription, not typed in.
+              </p>
             </div>
           )}
+
+          {renewalMismatch && (
+            <p className="mt-2 text-xs text-destructive flex items-start gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              Renewal extends {renewalMismatch.gapDays} days, which isn't a multiple of
+              the mapped pack's {renewalMismatch.validityDays}-day validity. Check the
+              mapping before approving.
+            </p>
+          )}
+
 
           {row.bucket === "unmapped_pack" && onMapPack && (
             <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
