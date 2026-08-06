@@ -213,21 +213,36 @@ function ResolvedRowCardImpl({
 
         {/* ── Identity ────────────────────────────────────────── */}
         <Section label="Identity">
-          {/* Operator decision taken in this session wins the display. The
-              underlying `match` is unchanged; the write happens at commit. */}
+          {/* Operator decision taken in this session. The row has already been
+              re-resolved against it — this states it in words. */}
           {resolvedByOperator && (
             <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">
               <p className="font-medium text-primary flex items-start gap-1.5">
                 <Check className="h-4 w-4 mt-0.5 shrink-0" />
                 {linkedLabel
-                  ? `Linked to ${linkedLabel}`
-                  : "Queued as a new customer"}
+                  ? `Linked to ${linkedLabel} — will apply on approve`
+                  : "Queued as a new customer — will be created on approve"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Will be applied when you approve this review.
-              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {linkedLabel && onLinkCustomer && (
+                  <Button size="sm" variant="outline" onClick={onLinkCustomer}>
+                    Change link
+                  </Button>
+                )}
+                {linkedLabel && onUnlink && (
+                  <Button size="sm" variant="ghost" onClick={onUnlink}>
+                    Unlink
+                  </Button>
+                )}
+                {prospectQueued && onCreateProspect && (
+                  <Button size="sm" variant="ghost" onClick={onCreateProspect}>
+                    Undo
+                  </Button>
+                )}
+              </div>
             </div>
           )}
+
 
           {!resolvedByOperator && match.status === "matched" && (
             <p className="text-sm">
