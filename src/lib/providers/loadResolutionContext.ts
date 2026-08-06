@@ -14,7 +14,9 @@ export interface PackInfo {
   id: string;
   name: string;
   price: number;
+  validity_days: number | null;
 }
+
 
 export interface ReviewContext extends ResolutionContext {
   /** `packs.id` → display info, for the editable charge amount prefill. */
