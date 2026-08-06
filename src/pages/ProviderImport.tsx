@@ -4,21 +4,26 @@
  * Pipeline: pick file → parse → load committed baseline + lookup tables →
  * diff (Phase 3) → resolve (Phase 4) → render → **commit (Phase 6)**.
  *
- * Write model (decision 2026-08-05):
+ * Re-derivation model (2026-08-06): every operator decision — link a
+ * customer, queue a prospect, map a plan — changes the *context* and the
+ * whole report is resolved again through `deriveReview`. Nothing patches a
+ * resolved row by hand any more. That is what makes a just-linked row
+ * eligible for a charge, which it never was while the flags were frozen at
+ * parse time.
+ *
+ * Money model: the amount is not free-typed. A provider charge is a side
+ * effect of `create_subscription` (BUSINESS_RULES §4.3), so the review shows
+ * exactly what the server will post — the mapped pack's price × the number of
+ * validity periods the reported window covers.
+ *
+ * Write model:
  *  - Parsing a file inserts ONE `provider_import_runs` row with
  *    `status='draft'`. This is the single intentional exception to "review is
  *    dry-run"; it exists so an abandoned review is visible and so Phase 6
  *    commits an *existing* run rather than inventing one.
- *  - Everything else the operator does in review (amounts, acknowledgements,
- *    links, queued prospects, pack mappings) stays in local state and is
- *    written to the draft row only on an **explicit "Save draft"** action —
- *    not on every keystroke. Chosen over autosave because a 400-row report
- *    with live inputs would otherwise fire a write per character.
+ *  - Everything else stays in local state until an explicit "Save draft".
  *  - Cancelling marks the run `status='cancelled'`. The Phase 3 baseline query
- *    only ever reads `status='committed'`, so neither a draft nor a cancelled
- *    run can become a baseline (INV-48).
- *  - Approve calls `commit_provider_import(run_id, decisions)`, which flips the
- *    same draft row to `committed`. Insert-only for the ledger (INV-46/47).
+ *    only ever reads `status='committed'` (INV-48).
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -42,12 +47,13 @@ import { useProviders } from '@/hooks/useProviders';
 import { usePacks } from '@/hooks/usePacks';
 import { parseCustomerMaster } from '@/lib/providers/hathway/parseCustomerMaster';
 import { detectEvents } from '@/lib/providers/diffEngine';
+import { normKey, type ResolutionBucket, type ResolvedRow } from '@/lib/providers/resolution';
 import {
-  resolveEvents,
-  normKey,
-  type ResolutionBucket,
-  type ResolvedRow,
-} from '@/lib/providers/resolution';
+  deriveReview,
+  chargePlan,
+  renewalValidityMismatch,
+  isProspectPlaceholder,
+} from '@/lib/providers/reviewModel';
 import { loadReviewContext, type ReviewContext } from '@/lib/providers/loadResolutionContext';
 import type { ParseError, ProviderReportRow } from '@/lib/providers/hathway/types';
 
@@ -70,11 +76,9 @@ interface ReviewState {
   runId: string;
   fileName: string;
   parsedRows: ProviderReportRow[];
-  rows: ResolvedRow[];
-  counts: Record<ResolutionBucket, number>;
-  unmappedKeys: string[];
   parseErrors: ParseError[];
-  ctx: ReviewContext;
+  /** The context as loaded from the DB. Operator decisions are layered on top. */
+  baseCtx: ReviewContext;
 }
 
 export default function ProviderImport() {
@@ -98,10 +102,10 @@ export default function ProviderImport() {
   const [committing, setCommitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [review, setReview] = useState<ReviewState | null>(null);
-  const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [acked, setAcked] = useState<Record<string, boolean>>({});
   const [prospects, setProspects] = useState<Record<string, boolean>>({});
   const [links, setLinks] = useState<Record<string, SubscriberComboboxValue>>({});
+  const [packOverrides, setPackOverrides] = useState<Record<string, string>>({});
   const [linkTarget, setLinkTarget] = useState<string | null>(null);
   const [linkPick, setLinkPick] = useState<SubscriberComboboxValue | null>(null);
   const [mapTarget, setMapTarget] = useState<{ key: string; label: string } | null>(null);
@@ -109,12 +113,24 @@ export default function ProviderImport() {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  /** The single source of truth for the screen. Recomputed on every decision. */
+  const derived = useMemo(() => {
+    if (!review) return null;
+    const linkIds: Record<string, string> = {};
+    for (const [k, v] of Object.entries(links)) linkIds[k] = v.id;
+    return deriveReview(review.baseCtx, review.parsedRows, {
+      links: linkIds,
+      prospects,
+      packOverrides,
+    });
+  }, [review, links, prospects, packOverrides]);
+
   const clearLocal = () => {
     setReview(null);
-    setAmounts({});
     setAcked({});
     setProspects({});
     setLinks({});
+    setPackOverrides({});
     setQuery('');
     setExpanded({});
   };
@@ -148,9 +164,8 @@ export default function ProviderImport() {
           toast.error('No usable rows found in this file');
           return;
         }
-        const ctx = await loadReviewContext(providerId, 'customer_master');
-        const { events } = detectEvents(ctx.baseline, parsed.rows);
-        const resolved = resolveEvents(events, ctx);
+        const baseCtx = await loadReviewContext(providerId, 'customer_master');
+        const { events } = detectEvents(baseCtx.baseline, parsed.rows);
 
         // The one intentional write in the review flow: persist the draft run.
         const { data: run, error: runErr } = await (supabase as any)
@@ -171,27 +186,18 @@ export default function ProviderImport() {
           .single();
         if (runErr) throw runErr;
 
-        const nextAmounts: Record<string, number> = {};
-        for (const r of resolved.rows) {
-          if (r.writes.charge && r.pack.pack_id) {
-            nextAmounts[r.key] = ctx.packById[r.pack.pack_id]?.price ?? 0;
-          }
-        }
-        setAmounts(nextAmounts);
         setAcked({});
         setProspects({});
         setLinks({});
+        setPackOverrides({});
         setQuery('');
         setExpanded({});
         setReview({
           runId: run.id as string,
           fileName: file.name,
           parsedRows: parsed.rows,
-          rows: resolved.rows,
-          counts: resolved.counts,
-          unmappedKeys: resolved.unmapped_pack_keys,
           parseErrors: parsed.errors,
-          ctx,
+          baseCtx,
         });
         toast.success(`Parsed ${parsed.rows.length} rows — draft saved, nothing posted yet`);
       } catch (err) {
@@ -204,63 +210,75 @@ export default function ProviderImport() {
     input.click();
   };
 
-  /** Effective subscriber for a row: operator link wins over the auto-match. */
-  const effectiveSubscriberId = useCallback(
-    (r: ResolvedRow) => links[r.key]?.id ?? (r.match.status === 'matched' ? r.match.subscriber_id : null),
-    [links],
+  const packFor = useCallback(
+    (r: ResolvedRow) => (r.pack.pack_id ? derived?.ctx.packById[r.pack.pack_id] : undefined),
+    [derived],
+  );
+
+  const planFor = useCallback(
+    (r: ResolvedRow) =>
+      r.writes.charge
+        ? chargePlan(packFor(r), r.event.current.start_date, r.event.current.end_date)
+        : null,
+    [packFor],
   );
 
   /**
-   * Tier-3 hygiene check (display-only): matched by account number, but the
-   * hardware named on this report isn't paired to that customer locally.
+   * Hardware hygiene (display-only). Fires for a tier-3 (account number)
+   * automatic match AND for a manual link — the real-world risk is identical:
+   * the box Hathway reports isn't the box we have paired locally.
    */
   const deviceMismatch = useCallback(
     (r: ResolvedRow) => {
-      if (r.match.status !== 'matched' || r.match.method !== 'account_number') return false;
+      const sid = r.match.status === 'matched' ? r.match.subscriber_id : null;
+      if (!sid || isProspectPlaceholder(sid)) return false;
+      const manual = !!links[r.key];
+      if (!manual && r.match.method !== 'account_number') return false;
       const reported = [normKey(r.event.current.vc_id), normKey(r.event.current.stb_no)].filter(
         Boolean,
       ) as string[];
       if (reported.length === 0) return false;
-      const local = review?.ctx.deviceKeysBySubscriber[r.match.subscriber_id!] ?? [];
+      const local = review?.baseCtx.deviceKeysBySubscriber[sid] ?? [];
       return !reported.some((k) => local.includes(k));
     },
-    [review],
+    [links, review],
   );
 
-  const buildDecisions = () =>
-    (review?.rows ?? [])
+  const buildDecisions = useCallback(() => {
+    if (!derived) return [];
+    return derived.rows
       .filter((r) => {
         if (r.bucket === 'anomaly' && !acked[r.key]) return false;
-        const sid = effectiveSubscriberId(r);
-        const willCreate = !sid && prospects[r.key];
-        if (!sid && !willCreate) return false;
-        return r.writes.charge || r.writes.plan_state || r.writes.provider_status || willCreate || !!links[r.key];
+        if (r.match.status !== 'matched') return false;
+        return r.writes.charge || r.writes.plan_state || r.writes.provider_status;
       })
       .map((r) => {
-        const sid = effectiveSubscriberId(r);
+        const sid = r.match.subscriber_id!;
+        const isNew = isProspectPlaceholder(sid);
         const c = r.event.current;
-        const linkedNow = !!links[r.key];
+        const plan = planFor(r);
         return {
           key: r.key,
-          subscriber_id: sid,
-          create_prospect: !sid && !!prospects[r.key],
+          subscriber_id: isNew ? null : sid,
+          create_prospect: isNew,
           customer_name: c.customer_name,
           mobile: c.mobile,
           account_number: c.account_number,
+          vc_id: c.vc_id,
+          stb_no: c.stb_no,
           base_plan: c.base_plan,
           start_date: c.start_date,
           end_date: c.end_date,
           service_status: c.service_status,
-          // A row the operator just linked/created had every write zeroed by
-          // the Phase 4 circuit-breaker (it was unlinked at resolve time).
-          // The mirror write is safe and expected; the charge is not
-          // re-derived here — only rows the engine already proposed carry one.
-          charge: r.writes.charge && !!sid,
-          amount: r.writes.charge ? (Number.isFinite(amounts[r.key]) ? amounts[r.key] : 0) : 0,
-          plan_state: r.writes.plan_state || linkedNow || (!sid && !!prospects[r.key]),
-          provider_status: r.writes.provider_status || linkedNow || (!sid && !!prospects[r.key]),
+          charge: r.writes.charge,
+          pack_id: r.pack.pack_id,
+          duration: plan?.duration ?? 1,
+          amount: plan?.amount ?? 0,
+          plan_state: r.writes.plan_state,
+          provider_status: r.writes.provider_status,
         };
       });
+  }, [derived, acked, planFor]);
 
   const saveDraft = async () => {
     if (!review) return;
@@ -293,7 +311,7 @@ export default function ProviderImport() {
       return;
     }
     toast.success(
-      `Committed — ${data?.charges_created ?? 0} charges (₹${Number(data?.total_charged ?? 0).toFixed(2)}), ` +
+      `Committed — ${data?.charges_created ?? 0} subscriptions charged (₹${Number(data?.total_charged ?? 0).toFixed(2)}), ` +
         `${data?.states_updated ?? 0} upstream records, ${data?.prospects_created ?? 0} new customers` +
         (data?.errors ? `, ${data.errors} rows failed` : ''),
     );
@@ -316,29 +334,7 @@ export default function ProviderImport() {
       toast.error('Could not save the mapping');
       return;
     }
-    // Re-resolve locally against the updated mapping table — pure, no refetch.
-    const ctx: ReviewContext = {
-      ...review.ctx,
-      packIdByProviderKey: { ...review.ctx.packIdByProviderKey, [mapTarget.key]: mapPick },
-    };
-    const { events } = detectEvents(ctx.baseline, review.parsedRows);
-    const resolved = resolveEvents(events, ctx);
-    setAmounts((prev) => {
-      const next = { ...prev };
-      for (const r of resolved.rows) {
-        if (r.writes.charge && r.pack.pack_id && next[r.key] === undefined) {
-          next[r.key] = ctx.packById[r.pack.pack_id]?.price ?? 0;
-        }
-      }
-      return next;
-    });
-    setReview({
-      ...review,
-      ctx,
-      rows: resolved.rows,
-      counts: resolved.counts,
-      unmappedKeys: resolved.unmapped_pack_keys,
-    });
+    setPackOverrides((o) => ({ ...o, [mapTarget.key]: mapPick }));
     setMapTarget(null);
     setMapPick('');
     toast.success('Plan mapped — rows re-evaluated');
@@ -356,17 +352,14 @@ export default function ProviderImport() {
     [query],
   );
 
-  const visibleRows = useMemo(() => (review?.rows ?? []).filter(matches), [review, matches]);
+  const visibleRows = useMemo(() => (derived?.rows ?? []).filter(matches), [derived, matches]);
 
-  const chargingRows = (review?.rows ?? []).filter(
+  const chargingRows = (derived?.rows ?? []).filter(
     (r) => r.writes.charge && (r.bucket !== 'anomaly' || acked[r.key]),
   );
-  const totalCharges = chargingRows.reduce((sum, r) => {
-    const v = amounts[r.key];
-    return sum + (Number.isFinite(v) ? v : 0);
-  }, 0);
-  const unackedAnomalies = (review?.counts.anomaly ?? 0)
-    - (review?.rows.filter((r) => r.bucket === 'anomaly' && acked[r.key]).length ?? 0);
+  const totalCharges = chargingRows.reduce((sum, r) => sum + (planFor(r)?.amount ?? 0), 0);
+  const unackedAnomalies = (derived?.counts.anomaly ?? 0)
+    - (derived?.rows.filter((r) => r.bucket === 'anomaly' && acked[r.key]).length ?? 0);
 
   if (!permsLoading && !canSyncProvider) {
     return (
@@ -422,34 +415,56 @@ export default function ProviderImport() {
           </Button>
         </div>
 
-        {review && (
+        {review && derived && (
           <div className="mt-4 text-sm text-muted-foreground space-y-1">
-            <p><span className="text-foreground font-medium">{review.fileName}</span> · {review.rows.length} rows</p>
+            <p><span className="text-foreground font-medium">{review.fileName}</span> · {derived.rows.length} rows</p>
             <p>
               Baseline:{' '}
-              {review.ctx.baselineImportedAt
-                ? `last committed run of ${new Date(review.ctx.baselineImportedAt).toLocaleString()}`
+              {review.baseCtx.baselineImportedAt
+                ? `last committed run of ${new Date(review.baseCtx.baselineImportedAt).toLocaleString()}`
                 : 'none — every row reads as a new activation'}
             </p>
             {review.parseErrors.length > 0 && (
               <p className="text-destructive">{review.parseErrors.length} rows skipped as unreadable</p>
             )}
-            {review.unmappedKeys.length > 0 && (
+            {review.baseCtx.ambiguousAccountNumbers.length > 0 && (
               <p className="text-destructive">
-                Unmapped plans: {review.unmappedKeys.join(', ')} — use “Map this plan” on any affected row.
+                Account numbers claimed by more than one customer (never auto-matched):{' '}
+                {review.baseCtx.ambiguousAccountNumbers.join(', ')}
+              </p>
+            )}
+            {derived.unmapped_pack_keys.length > 0 && (
+              <p className="text-destructive">
+                Unmapped plans:{' '}
+                {derived.unmapped_pack_keys.map((k, i) => (
+                  <span key={k}>
+                    {i > 0 && ', '}
+                    {/* Clickable regardless of which bucket its rows landed in —
+                        an unmapped plan on an unmatched row has no row-level
+                        action, so the summary itself has to be the action. */}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 font-medium"
+                      onClick={() => { setMapPick(''); setMapTarget({ key: k, label: k }); }}
+                    >
+                      {k}
+                    </button>
+                  </span>
+                ))}{' '}
+                — click a plan to map it.
               </p>
             )}
           </div>
         )}
       </SectionCard>
 
-      {review && (
+      {review && derived && (
         <>
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {BUCKET_ORDER.filter((b) => review.counts[b] > 0).map((b) => (
+            {BUCKET_ORDER.filter((b) => derived.counts[b] > 0).map((b) => (
               <div key={b} className="rounded-lg border border-border bg-card p-3">
                 <p className="text-xs text-muted-foreground">{BUCKET_LABELS[b]}</p>
-                <p className="text-2xl font-semibold">{review.counts[b]}</p>
+                <p className="text-2xl font-semibold">{derived.counts[b]}</p>
               </div>
             ))}
           </div>
@@ -465,51 +480,70 @@ export default function ProviderImport() {
           </div>
           {query.trim() && (
             <p className="mt-2 text-xs text-muted-foreground">
-              {visibleRows.length} of {review.rows.length} rows match.
+              {visibleRows.length} of {derived.rows.length} rows match.
             </p>
           )}
 
           <div className="mt-6 space-y-6">
-            {BUCKET_ORDER.filter((b) => review.counts[b] > 0).map((bucket) => {
+            {BUCKET_ORDER.filter((b) => derived.counts[b] > 0).map((bucket) => {
               const all = visibleRows.filter((r) => r.bucket === bucket);
               if (all.length === 0) return null;
               const showAll = expanded[bucket] || all.length <= PAGE;
               const rows = showAll ? all : all.slice(0, PAGE);
               const body = (
                 <div className="space-y-3">
-                  {rows.map((r) => (
-                    <ResolvedRowCard
-                      key={r.key}
-                      row={r}
-                      subscriberLabelById={review.ctx.subscriberLabelById}
-                      packLabel={r.pack.pack_id ? review.ctx.packById[r.pack.pack_id]?.name : undefined}
-                      amount={amounts[r.key]}
-                      onAmountChange={(v) => setAmounts((a) => ({ ...a, [r.key]: v }))}
-                      acknowledged={acked[r.key]}
-                      onAcknowledge={(v) => setAcked((a) => ({ ...a, [r.key]: v }))}
-                      allowCreateProspect={review.ctx.policy.create_prospects}
-                      linkedLabel={
-                        links[r.key] ? `${links[r.key].name} · ${links[r.key].subscriber_id}` : undefined
-                      }
-                      prospectQueued={!!prospects[r.key]}
-                      deviceMismatch={deviceMismatch(r)}
-                      onLinkCustomer={() => { setLinkPick(links[r.key] ?? null); setLinkTarget(r.key); }}
-                      onCreateProspect={() =>
-                        setProspects((p) => ({ ...p, [r.key]: !p[r.key] }))
-                      }
-                      onMapPack={
-                        r.pack.provider_pack_key
-                          ? () => {
-                              setMapPick('');
-                              setMapTarget({
-                                key: r.pack.provider_pack_key!,
-                                label: r.event.current.base_plan ?? r.pack.provider_pack_key!,
-                              });
-                            }
-                          : undefined
-                      }
-                    />
-                  ))}
+                  {rows.map((r) => {
+                    const pack = packFor(r);
+                    const plan = planFor(r);
+                    return (
+                      <ResolvedRowCard
+                        key={r.key}
+                        row={r}
+                        subscriberLabelById={derived.ctx.subscriberLabelById}
+                        packLabel={pack?.name}
+                        chargeAmount={plan?.amount}
+                        chargeDuration={plan?.duration}
+                        packValidityDays={pack?.validity_days ?? undefined}
+                        renewalMismatch={
+                          r.bucket === 'renewal'
+                            ? renewalValidityMismatch(
+                                pack,
+                                r.event.previous?.end_date,
+                                r.event.current.end_date,
+                              )
+                            : null
+                        }
+                        acknowledged={acked[r.key]}
+                        onAcknowledge={(v) => setAcked((a) => ({ ...a, [r.key]: v }))}
+                        allowCreateProspect={derived.ctx.policy.create_prospects}
+                        linkedLabel={
+                          links[r.key] ? `${links[r.key].name} · ${links[r.key].subscriber_id}` : undefined
+                        }
+                        prospectQueued={!!prospects[r.key]}
+                        deviceMismatch={deviceMismatch(r)}
+                        onLinkCustomer={() => { setLinkPick(links[r.key] ?? null); setLinkTarget(r.key); }}
+                        onUnlink={
+                          links[r.key]
+                            ? () => setLinks((l) => { const n = { ...l }; delete n[r.key]; return n; })
+                            : undefined
+                        }
+                        onCreateProspect={() =>
+                          setProspects((p) => ({ ...p, [r.key]: !p[r.key] }))
+                        }
+                        onMapPack={
+                          r.pack.status === 'unmapped' && r.pack.provider_pack_key
+                            ? () => {
+                                setMapPick('');
+                                setMapTarget({
+                                  key: r.pack.provider_pack_key!,
+                                  label: r.event.current.base_plan ?? r.pack.provider_pack_key!,
+                                });
+                              }
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
                   {!showAll && (
                     <Button
                       variant="outline"
@@ -561,7 +595,7 @@ export default function ProviderImport() {
               <p className="text-sm text-muted-foreground">Total charges to post</p>
               <p className="text-2xl font-semibold">₹{totalCharges.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">
-                {chargingRows.length} rows · {unackedAnomalies} anomalies awaiting acknowledgement
+                {chargingRows.length} subscriptions · {unackedAnomalies} anomalies awaiting acknowledgement
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -586,7 +620,7 @@ export default function ProviderImport() {
                 if (linkTarget && linkPick) {
                   setLinks((l) => ({ ...l, [linkTarget]: linkPick }));
                   setProspects((p) => ({ ...p, [linkTarget]: false }));
-                  toast.success('Linked for this review — applied on approve');
+                  toast.success('Linked — the row has been re-evaluated');
                 }
                 setLinkTarget(null);
               }}
