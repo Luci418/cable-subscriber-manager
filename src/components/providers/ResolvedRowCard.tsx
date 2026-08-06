@@ -102,9 +102,15 @@ interface Props {
   row: ResolvedRow;
   subscriberLabelById: Record<string, string>;
   packLabel?: string;
-  /** Editable charge amount, only meaningful when `row.writes.charge`. */
-  amount?: number;
-  onAmountChange?: (v: number) => void;
+  /**
+   * What the commit will post for this row: pack price × periods. Read-only —
+   * the charge is a side effect of `create_subscription`, not a typed number.
+   */
+  chargeAmount?: number;
+  chargeDuration?: number;
+  packValidityDays?: number;
+  /** Item 13 — renewal gap that isn't a clean multiple of the pack validity. */
+  renewalMismatch?: { gapDays: number; validityDays: number } | null;
   /** Anomaly rows require an explicit per-row acknowledgement. */
   acknowledged?: boolean;
   onAcknowledge?: (v: boolean) => void;
@@ -112,16 +118,17 @@ interface Props {
   allowCreateProspect?: boolean;
   onLinkCustomer?: () => void;
   onCreateProspect?: () => void;
+  onUnlink?: () => void;
   /**
-   * Display-only overrides for operator decisions taken in this review
-   * session. `resolveEvent` is deliberately NOT re-run for these — the real
-   * writes are computed server-side at commit.
+   * Operator decisions taken in this review session. The row itself has
+   * already been re-resolved against them by `deriveReview`; these only drive
+   * the wording of the identity section.
    */
   linkedLabel?: string;
   prospectQueued?: boolean;
   /**
-   * True when the row matched on account number but the vc_id / stb_no it
-   * names is not among the devices currently paired to that subscriber.
+   * True when the vc_id / stb_no the report names is not among the devices
+   * currently paired to the matched subscriber.
    */
   deviceMismatch?: boolean;
   /** Inline "Map this plan" action for `unmapped_pack` rows. */
@@ -132,13 +139,16 @@ function ResolvedRowCardImpl({
   row,
   subscriberLabelById,
   packLabel,
-  amount,
-  onAmountChange,
+  chargeAmount,
+  chargeDuration,
+  packValidityDays,
+  renewalMismatch,
   acknowledged,
   onAcknowledge,
   allowCreateProspect,
   onLinkCustomer,
   onCreateProspect,
+  onUnlink,
   linkedLabel,
   prospectQueued,
   deviceMismatch,
