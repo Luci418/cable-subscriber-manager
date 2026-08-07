@@ -462,7 +462,9 @@ function ResolvedRowCardImpl({
           )}
         </Section>
       </div>
+      )}
     </div>
+
   );
 }
 
