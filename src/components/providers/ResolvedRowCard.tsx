@@ -11,8 +11,20 @@
  * Purely presentational. All state lives in the parent screen.
  */
 
-import { memo } from "react";
-import { Check, X, AlertTriangle, Link2Off, GitBranch, HelpCircle } from "lucide-react";
+import { memo, useState } from "react";
+import {
+  Check,
+  X,
+  AlertTriangle,
+  Link2Off,
+  GitBranch,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+
+/** Same normalisation the resolution layer uses for device keys. */
+const normalise = (v: string | null | undefined) => (v ?? "").trim().toUpperCase();
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
