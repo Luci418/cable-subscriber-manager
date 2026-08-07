@@ -8,6 +8,9 @@
 import type { ParseError, ParseResult, ProviderReportRow } from "./types";
 import { cleanCell, pick, rowShapeError, splitTsv, toIsoDate, toNumber } from "./parseUtils";
 
+/** Bumped whenever parsing semantics change — frozen onto every run (INV-51). */
+export const CUSTOMER_MASTER_PARSER_VERSION = "customer_master.v1";
+
 const KNOWN_HEADERS = [
   "Account Number",
   "Customer Name",

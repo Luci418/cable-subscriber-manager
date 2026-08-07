@@ -45,7 +45,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/lib/permissions';
 import { useProviders } from '@/hooks/useProviders';
 import { usePacks } from '@/hooks/usePacks';
-import { parseCustomerMaster } from '@/lib/providers/hathway/parseCustomerMaster';
+import { parseCustomerMaster, CUSTOMER_MASTER_PARSER_VERSION } from '@/lib/providers/hathway/parseCustomerMaster';
 import { detectEvents } from '@/lib/providers/diffEngine';
 import { normKey, type ResolutionBucket, type ResolvedRow } from '@/lib/providers/resolution';
 import {
@@ -179,6 +179,7 @@ export default function ProviderImport() {
             row_count: parsed.rows.length,
             snapshot_data: parsed.rows,
             events_detected: events,
+            parser_version: CUSTOMER_MASTER_PARSER_VERSION,
             results: {},
             imported_by: user!.id,
           })
@@ -259,6 +260,8 @@ export default function ProviderImport() {
         const plan = planFor(r);
         return {
           key: r.key,
+          bucket: r.bucket,
+          provider_plan_key: r.pack.provider_pack_key,
           subscriber_id: isNew ? null : sid,
           create_prospect: isNew,
           customer_name: c.customer_name,
@@ -310,10 +313,16 @@ export default function ProviderImport() {
       toast.error(error.message || 'Commit failed');
       return;
     }
+    const byEvent = (data?.by_event ?? {}) as Record<string, number>;
+    const breakdown = Object.entries(byEvent)
+      .filter(([, n]) => Number(n) > 0)
+      .map(([k, n]) => `${n} ${k.replace(/_/g, ' ')}`)
+      .join(', ');
     toast.success(
-      `Committed — ${data?.charges_created ?? 0} subscriptions charged (₹${Number(data?.total_charged ?? 0).toFixed(2)}), ` +
-        `${data?.states_updated ?? 0} upstream records, ${data?.prospects_created ?? 0} new customers` +
-        (data?.errors ? `, ${data.errors} rows failed` : ''),
+      `Committed — ₹${Number(data?.total_charged ?? 0).toFixed(2)} charged` +
+        (breakdown ? ` · ${breakdown}` : '') +
+        ` · ${data?.states_updated ?? 0} upstream records, ${data?.prospects_created ?? 0} new customers` +
+        (data?.errors ? ` · ${data.errors} rows failed and will return for review` : ''),
     );
     clearLocal();
   };

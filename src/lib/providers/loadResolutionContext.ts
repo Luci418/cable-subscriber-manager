@@ -7,7 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { getSyncPolicy } from "./syncPolicy";
-import { normKey, normMobile, normPackKey, type ResolutionContext } from "./resolution";
+import { normKey, normPackKey, type ResolutionContext } from "./resolution";
 import type { ProviderReportRow, ProviderReportType } from "./hathway/types";
 
 export interface PackInfo {
@@ -64,7 +64,7 @@ export async function loadReviewContext(
       supabase.from("packs").select("id, name, price, validity_days"),
       supabase
         .from("provider_import_runs")
-        .select("id, snapshot_data, imported_at")
+        .select("id, snapshot_data, imported_at, results")
         .eq("provider_id", providerId)
         .eq("report_type", reportType)
         .eq("status", "committed")
@@ -106,13 +106,10 @@ export async function loadReviewContext(
     if (!key) return;
     (accountClaims[key] ??= new Set()).add(sid);
   };
-  const subscribersByMobile: Record<string, string[]> = {};
   const subscriberLabelById: Record<string, string> = {};
   for (const s of subsRes.data ?? []) {
     subscriberLabelById[s.id] = `${s.name} · ${s.subscriber_id}`;
     claim(normKey(s.hathway_customer_nbr), s.id);
-    const mob = normMobile(s.mobile);
-    if (mob) (subscribersByMobile[mob] ??= []).push(s.id);
   }
   for (const st of stateRes.data ?? []) {
     claim(normKey(st.provider_customer_number), st.subscriber_id);
@@ -143,20 +140,34 @@ export async function loadReviewContext(
 
 
   const baselineRow = baselineRes.data as
-    | { id: string; snapshot_data: unknown; imported_at: string }
+    | {
+        id: string;
+        snapshot_data: unknown;
+        imported_at: string;
+        results: { failed_keys?: unknown } | null;
+      }
     | null;
+
+  // Rows that errored in the last committed run. `commit_provider_import`
+  // carries an unresolved key forward, so this single read is the full open
+  // set — a key leaves it only by committing cleanly.
+  const rawFailed = baselineRow?.results?.failed_keys;
+  const forcedReviewKeys = Array.isArray(rawFailed)
+    ? rawFailed.filter((k): k is string => typeof k === "string")
+    : [];
 
   return {
     subscriberByVcId,
     subscriberBySerial,
     subscriberByAccountNumber,
-    subscribersByMobile,
     packIdByProviderKey,
+    forcedReviewKeys,
     policy: getSyncPolicy(providerRes.data),
     packById,
     subscriberLabelById,
     deviceKeysBySubscriber,
     ambiguousAccountNumbers,
+
 
     baseline: Array.isArray(baselineRow?.snapshot_data)
       ? (baselineRow!.snapshot_data as ProviderReportRow[])

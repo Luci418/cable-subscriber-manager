@@ -39,12 +39,10 @@ export type MatchMethod =
   | "vc_id"
   | "serial_number"
   | "account_number"
-  | "mobile"
   | null;
 
 export type MatchStatus =
   | "matched" // one subscriber, deterministic key
-  | "suggested" // mobile-only candidate(s) — operator must confirm
   | "conflict" // two deterministic keys disagree
   | "unmatched";
 
@@ -52,8 +50,10 @@ export interface SubscriberMatch {
   status: MatchStatus;
   method: MatchMethod;
   subscriber_id: string | null;
-  /** Every distinct subscriber any key pointed at (conflict/suggestion detail). */
-  candidates: { subscriber_id: string; method: Exclude<MatchMethod, null> }[];
+  /** The raw provider value that actually matched — shown on the review card. */
+  matched_value: string | null;
+  /** Every distinct subscriber any key pointed at (conflict detail). */
+  candidates: { subscriber_id: string; method: Exclude<MatchMethod, null>; value: string | null }[];
   reason?: string;
 }
 
@@ -113,10 +113,15 @@ export interface ResolutionContext {
   subscriberByVcId?: Record<string, string>;
   subscriberBySerial?: Record<string, string>;
   subscriberByAccountNumber?: Record<string, string>;
-  /** Mobile may legitimately be shared (family) → list of candidates. */
-  subscribersByMobile?: Record<string, string[]>;
   /** `provider_pack_mappings.provider_pack_key` → local `packs.id`. */
   packIdByProviderKey?: Record<string, string>;
+  /**
+   * Row keys that errored during a previous commit. A failed row never wrote
+   * anything, but the baseline snapshot recorded it as if it had — so a plain
+   * diff would call it `no_change` and hide it forever. These keys are forced
+   * into `needs_review` until they commit cleanly once.
+   */
+  forcedReviewKeys?: string[];
   policy: SyncPolicy;
 }
 
@@ -133,13 +138,6 @@ export function normPackKey(v: string | null | undefined): string | null {
   return s === "" ? null : s;
 }
 
-/** Last 10 digits — tolerates +91 / spaces / dashes. */
-export function normMobile(v: string | null | undefined): string | null {
-  const digits = (v ?? "").replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  return digits.slice(-10);
-}
-
 function lookup(
   table: Record<string, string> | undefined,
   key: string | null,
@@ -148,6 +146,12 @@ function lookup(
   return table[key] ?? null;
 }
 
+/**
+ * Deterministic identifiers only (2026-08-07 decision): vc_id → serial →
+ * account number. Mobile-based matching is **gone** — a shared or stale
+ * mobile is not evidence of identity, and a "suggested" state only ever
+ * invited an operator to confirm a guess.
+ */
 export function resolveSubscriber(
   event: ProviderEvent,
   ctx: ResolutionContext,
@@ -161,9 +165,15 @@ export function resolveSubscriber(
   );
 
   const candidates: SubscriberMatch["candidates"] = [];
-  if (byVc) candidates.push({ subscriber_id: byVc, method: "vc_id" });
-  if (bySerial) candidates.push({ subscriber_id: bySerial, method: "serial_number" });
-  if (byAccount) candidates.push({ subscriber_id: byAccount, method: "account_number" });
+  if (byVc) candidates.push({ subscriber_id: byVc, method: "vc_id", value: row.vc_id ?? null });
+  if (bySerial)
+    candidates.push({ subscriber_id: bySerial, method: "serial_number", value: row.stb_no ?? null });
+  if (byAccount)
+    candidates.push({
+      subscriber_id: byAccount,
+      method: "account_number",
+      value: row.account_number ?? null,
+    });
 
   const deterministic = [byVc, bySerial, byAccount].filter(Boolean) as string[];
   const distinct = [...new Set(deterministic)];
@@ -173,39 +183,45 @@ export function resolveSubscriber(
       status: "conflict",
       method: null,
       subscriber_id: null,
+      matched_value: null,
       candidates,
       reason:
         "Provider identifiers on this row resolve to different customers — resolve manually",
     };
   }
 
-  if (byVc) return { status: "matched", method: "vc_id", subscriber_id: byVc, candidates };
-  if (bySerial)
-    return { status: "matched", method: "serial_number", subscriber_id: bySerial, candidates };
-  if (byAccount)
-    return { status: "matched", method: "account_number", subscriber_id: byAccount, candidates };
-
-  const mobileKey = normMobile(row.mobile);
-  const byMobile = (mobileKey && ctx.subscribersByMobile?.[mobileKey]) || [];
-  if (byMobile.length > 0) {
+  if (byVc)
     return {
-      status: "suggested",
-      method: "mobile",
-      subscriber_id: byMobile.length === 1 ? byMobile[0] : null,
-      candidates: byMobile.map((subscriber_id) => ({ subscriber_id, method: "mobile" as const })),
-      reason:
-        byMobile.length === 1
-          ? "Matched on mobile only — confirm before linking"
-          : "Several customers share this mobile — pick one",
+      status: "matched",
+      method: "vc_id",
+      subscriber_id: byVc,
+      matched_value: row.vc_id ?? null,
+      candidates,
     };
-  }
+  if (bySerial)
+    return {
+      status: "matched",
+      method: "serial_number",
+      subscriber_id: bySerial,
+      matched_value: row.stb_no ?? null,
+      candidates,
+    };
+  if (byAccount)
+    return {
+      status: "matched",
+      method: "account_number",
+      subscriber_id: byAccount,
+      matched_value: row.account_number ?? null,
+      candidates,
+    };
 
   return {
     status: "unmatched",
     method: null,
     subscriber_id: null,
+    matched_value: null,
     candidates: [],
-    reason: "No customer matches this row — link an existing customer or create one",
+    reason: "Unmatched — search to link a customer",
   };
 }
 
@@ -270,6 +286,11 @@ export function resolveEvent(
     suppressed.push({ policy_key: "update_identity_mobile", what: "Mobile from provider" });
   }
 
+  // A key that errored during a previous commit wrote nothing, but the
+  // baseline snapshot recorded it as if it had. Never let it diff away as
+  // `no_change` — it is forced in front of a human until it commits cleanly.
+  const previouslyFailed = !!ctx.forcedReviewKeys?.includes(event.key);
+
   let bucket: ResolutionBucket;
   if (match.status !== "matched") {
     bucket = "needs_review";
@@ -277,6 +298,8 @@ export function resolveEvent(
     bucket = "unmapped_pack";
   } else if (event.type === "no_change" && event.changed.length > 0) {
     bucket = "anomaly";
+  } else if (previouslyFailed && event.type === "no_change") {
+    bucket = "needs_review";
   } else {
     bucket = event.type;
   }

@@ -11,8 +11,20 @@
  * Purely presentational. All state lives in the parent screen.
  */
 
-import { memo } from "react";
-import { Check, X, AlertTriangle, Link2Off, GitBranch, HelpCircle } from "lucide-react";
+import { memo, useState } from "react";
+import {
+  Check,
+  X,
+  AlertTriangle,
+  Link2Off,
+  GitBranch,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+
+/** Same normalisation the resolution layer uses for device keys. */
+const normalise = (v: string | null | undefined) => (v ?? "").trim().toUpperCase();
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -161,23 +173,67 @@ function ResolvedRowCardImpl({
   const isAnomaly = row.bucket === "anomaly";
   const resolvedByOperator = !!linkedLabel || !!prospectQueued;
 
+  // Rows that need a human stay open; everything else collapses to one line
+  // so a 400-row report reads as a list, not a wall of cards.
+  const mustExpand =
+    isConflict ||
+    isAnomaly ||
+    row.bucket === "needs_review" ||
+    row.bucket === "unmapped_pack";
+  const [open, setOpen] = useState(mustExpand);
+
+  // Item 10 — say which identifier the report key is, never leave it implied.
+  const keyKind = normalise(event.current.vc_id) === normalise(row.key) ? "VC" : "STB";
+
+  const identityLine = resolvedByOperator
+    ? linkedLabel
+      ? `Linked to ${linkedLabel}`
+      : "Queued as a new customer"
+    : match.status === "matched"
+      ? (subscriberLabelById[match.subscriber_id!] ?? match.subscriber_id ?? "")
+      : isConflict
+        ? "Conflict — identifiers disagree"
+        : "Unmatched";
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 text-left"
+      >
         <div className="min-w-0 flex items-center gap-2">
+          {open ? (
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0">
+            {keyKind}
+          </span>
           <span className="font-mono text-sm font-medium truncate">{row.key}</span>
           <span className="text-xs text-muted-foreground truncate">
             {event.current.customer_name ?? "—"}
           </span>
         </div>
-        <Badge variant="outline" className={cn("shrink-0", BUCKET_TONE[row.bucket])}>
-          {BUCKET_LABELS[row.bucket]}
-        </Badge>
-      </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!open && writes.charge && Number.isFinite(chargeAmount as number) && (
+            <span className="text-xs font-medium">₹{(chargeAmount as number).toFixed(2)}</span>
+          )}
+          <Badge variant="outline" className={cn("shrink-0", BUCKET_TONE[row.bucket])}>
+            {BUCKET_LABELS[row.bucket]}
+          </Badge>
+        </div>
+      </button>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* ── Event ───────────────────────────────────────────── */}
+      {!open && (
+        <p className="mt-1.5 pl-6 text-xs text-muted-foreground truncate">{identityLine}</p>
+      )}
+
+      {open && (
+      <div className="grid gap-4 md:grid-cols-3 mt-3">
+
         <Section label="Event">
           {event.changed.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -246,7 +302,17 @@ function ResolvedRowCardImpl({
           {!resolvedByOperator && match.status === "matched" && (
             <p className="text-sm">
               <Check className="inline h-4 w-4 text-primary mr-1" />
-              Matched by <strong>{match.method === "vc_id" ? "VC id" : match.method === "serial_number" ? "STB serial" : "account number"}</strong>
+              Matched by{" "}
+              <strong>
+                {match.method === "vc_id"
+                  ? "VC id"
+                  : match.method === "serial_number"
+                    ? "STB serial"
+                    : "account number"}
+              </strong>
+              {match.matched_value && (
+                <span className="font-mono text-xs text-muted-foreground"> {match.matched_value}</span>
+              )}
               <br />
               <span className="text-muted-foreground">
                 {subscriberLabelById[match.subscriber_id!] ?? match.subscriber_id}
@@ -254,21 +320,6 @@ function ResolvedRowCardImpl({
             </p>
           )}
 
-          {!resolvedByOperator && match.status === "suggested" && (
-            <div className="text-sm">
-              <p className="text-muted-foreground">
-                <HelpCircle className="inline h-4 w-4 mr-1" />
-                <strong className="text-foreground">Suggested by mobile</strong> — not confirmed
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                {match.candidates.map((c) => (
-                  <li key={c.subscriber_id} className="text-muted-foreground">
-                    {subscriberLabelById[c.subscriber_id] ?? c.subscriber_id}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {isConflict && (
             <div className="text-sm">
@@ -295,8 +346,8 @@ function ResolvedRowCardImpl({
           {!resolvedByOperator && match.status === "unmatched" && (
             <p className="text-sm text-muted-foreground">
               <Link2Off className="inline h-4 w-4 mr-1" />
-              <strong className="text-foreground">Unmatched</strong> — no VC id, serial,
-              account number or mobile matched any customer.
+              <strong className="text-foreground">Unmatched</strong> — no VC id, STB serial
+              or account number on this row matched any customer.
             </p>
           )}
 
@@ -310,14 +361,15 @@ function ResolvedRowCardImpl({
             </p>
           )}
 
-          {(match.status === "unmatched" || match.status === "suggested") && (
+          {match.status === "unmatched" && (
             <div className="flex flex-wrap gap-2 mt-2">
               {onLinkCustomer && (
                 <Button size="sm" variant="outline" onClick={onLinkCustomer}>
                   {linkedLabel ? "Change link" : "Link customer"}
                 </Button>
               )}
-              {match.status === "unmatched" && allowCreateProspect && onCreateProspect && !linkedLabel && (
+              {allowCreateProspect && onCreateProspect && !linkedLabel && (
+
                 <Button
                   size="sm"
                   variant={prospectQueued ? "secondary" : "outline"}
@@ -422,7 +474,9 @@ function ResolvedRowCardImpl({
           )}
         </Section>
       </div>
+      )}
     </div>
+
   );
 }
 
