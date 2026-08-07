@@ -402,6 +402,7 @@ export type Database = {
           id: string
           imported_at: string
           imported_by: string | null
+          parser_version: string | null
           provider_id: string
           report_type: string
           results: Json
@@ -420,6 +421,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          parser_version?: string | null
           provider_id: string
           report_type: string
           results?: Json
@@ -438,6 +440,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          parser_version?: string | null
           provider_id?: string
           report_type?: string
           results?: Json
@@ -997,7 +1000,10 @@ export type Database = {
           device_serial_snapshot: string | null
           duration: number
           end_date: string
+          extended_from_subscription_id: string | null
+          extension_count: number
           id: string
+          last_extended_at: string | null
           pack_id: string | null
           pack_name_snapshot: string
           pack_price_snapshot: number
@@ -1030,7 +1036,10 @@ export type Database = {
           device_serial_snapshot?: string | null
           duration: number
           end_date: string
+          extended_from_subscription_id?: string | null
+          extension_count?: number
           id?: string
+          last_extended_at?: string | null
           pack_id?: string | null
           pack_name_snapshot: string
           pack_price_snapshot: number
@@ -1063,7 +1072,10 @@ export type Database = {
           device_serial_snapshot?: string | null
           duration?: number
           end_date?: string
+          extended_from_subscription_id?: string | null
+          extension_count?: number
           id?: string
+          last_extended_at?: string | null
           pack_id?: string | null
           pack_name_snapshot?: string
           pack_price_snapshot?: number
@@ -1089,6 +1101,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "stb_inventory"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_extended_from_subscription_id_fkey"
+            columns: ["extended_from_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_extended_from_subscription_id_fkey"
+            columns: ["extended_from_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_active_subscription"
+            referencedColumns: ["subscription_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_extended_from_subscription_id_fkey"
+            columns: ["extended_from_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "v_subscriber_subscription_timeline"
+            referencedColumns: ["subscription_id"]
           },
           {
             foreignKeyName: "subscriptions_pack_id_fkey"
@@ -1448,6 +1481,7 @@ export type Database = {
       cancel_subscription: {
         Args: {
           p_reason?: string
+          p_reason_code?: string
           p_refund_amount?: number
           p_service_type: string
           p_subscriber_id: string
@@ -1501,6 +1535,16 @@ export type Database = {
         }
       }
       expire_lapsed_subscriptions: { Args: never; Returns: number }
+      extend_subscription: {
+        Args: {
+          p_end_date_override?: string
+          p_pack_id: string
+          p_periods?: number
+          p_service_type: string
+          p_subscriber_id: string
+        }
+        Returns: Json
+      }
       generate_subscriber_id: {
         Args: { p_region_name: string }
         Returns: string

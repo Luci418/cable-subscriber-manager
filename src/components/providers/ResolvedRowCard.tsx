@@ -246,7 +246,17 @@ function ResolvedRowCardImpl({
           {!resolvedByOperator && match.status === "matched" && (
             <p className="text-sm">
               <Check className="inline h-4 w-4 text-primary mr-1" />
-              Matched by <strong>{match.method === "vc_id" ? "VC id" : match.method === "serial_number" ? "STB serial" : "account number"}</strong>
+              Matched by{" "}
+              <strong>
+                {match.method === "vc_id"
+                  ? "VC id"
+                  : match.method === "serial_number"
+                    ? "STB serial"
+                    : "account number"}
+              </strong>
+              {match.matched_value && (
+                <span className="font-mono text-xs text-muted-foreground"> {match.matched_value}</span>
+              )}
               <br />
               <span className="text-muted-foreground">
                 {subscriberLabelById[match.subscriber_id!] ?? match.subscriber_id}
@@ -254,21 +264,6 @@ function ResolvedRowCardImpl({
             </p>
           )}
 
-          {!resolvedByOperator && match.status === "suggested" && (
-            <div className="text-sm">
-              <p className="text-muted-foreground">
-                <HelpCircle className="inline h-4 w-4 mr-1" />
-                <strong className="text-foreground">Suggested by mobile</strong> — not confirmed
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                {match.candidates.map((c) => (
-                  <li key={c.subscriber_id} className="text-muted-foreground">
-                    {subscriberLabelById[c.subscriber_id] ?? c.subscriber_id}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {isConflict && (
             <div className="text-sm">
@@ -295,8 +290,8 @@ function ResolvedRowCardImpl({
           {!resolvedByOperator && match.status === "unmatched" && (
             <p className="text-sm text-muted-foreground">
               <Link2Off className="inline h-4 w-4 mr-1" />
-              <strong className="text-foreground">Unmatched</strong> — no VC id, serial,
-              account number or mobile matched any customer.
+              <strong className="text-foreground">Unmatched</strong> — no VC id, STB serial
+              or account number on this row matched any customer.
             </p>
           )}
 
@@ -310,14 +305,15 @@ function ResolvedRowCardImpl({
             </p>
           )}
 
-          {(match.status === "unmatched" || match.status === "suggested") && (
+          {match.status === "unmatched" && (
             <div className="flex flex-wrap gap-2 mt-2">
               {onLinkCustomer && (
                 <Button size="sm" variant="outline" onClick={onLinkCustomer}>
                   {linkedLabel ? "Change link" : "Link customer"}
                 </Button>
               )}
-              {match.status === "unmatched" && allowCreateProspect && onCreateProspect && !linkedLabel && (
+              {allowCreateProspect && onCreateProspect && !linkedLabel && (
+
                 <Button
                   size="sm"
                   variant={prospectQueued ? "secondary" : "outline"}

@@ -3,7 +3,6 @@ import { detectEvents } from "./diffEngine";
 import {
   resolveEvents,
   resolveEvent,
-  normMobile,
   normPackKey,
   type ResolutionContext,
 } from "./resolution";
@@ -34,7 +33,6 @@ function ctx(over: Partial<ResolutionContext> = {}): ResolutionContext {
     subscriberByVcId: { VC001: "sub-1" },
     subscriberBySerial: { STB001: "sub-1" },
     subscriberByAccountNumber: { ACC1: "sub-1" },
-    subscribersByMobile: { "9999999999": ["sub-1"] },
     packIdByProviderKey: { "basic pack": "pack-1" },
     policy: SYNC_POLICY_DEFAULTS,
     ...over,
@@ -47,11 +45,6 @@ function one(rows: ProviderReportRow[], previous: ProviderReportRow[] | null, c 
 }
 
 describe("key normalisation", () => {
-  it("normalises mobiles to the last 10 digits", () => {
-    expect(normMobile("+91 99999-99999")).toBe("9999999999");
-    expect(normMobile("12345")).toBeNull();
-  });
-
   it("normalises pack keys case- and whitespace-insensitively", () => {
     expect(normPackKey("  Basic   Pack ")).toBe("basic pack");
     expect(normPackKey("")).toBeNull();
@@ -76,24 +69,16 @@ describe("subscriber resolution order (§1.5-H)", () => {
     expect(r.match.method).toBe("account_number");
   });
 
-  it("treats a mobile-only hit as a suggestion, never a match", () => {
+  it("never matches on mobile — a known mobile alone leaves the row unmatched", () => {
     const r = one([row({ vc_id: "X", stb_no: "Y", account_number: "Z" })], null);
-    expect(r.match.status).toBe("suggested");
-    expect(r.match.method).toBe("mobile");
+    expect(r.match.status).toBe("unmatched");
+    expect(r.match.method).toBeNull();
     expect(r.bucket).toBe("needs_review");
   });
 
-  it("offers all candidates when a mobile is shared", () => {
-    const c = ctx({
-      subscriberByVcId: {},
-      subscriberBySerial: {},
-      subscriberByAccountNumber: {},
-      subscribersByMobile: { "9999999999": ["sub-1", "sub-2"] },
-    });
-    const r = one([row()], null, c);
-    expect(r.match.status).toBe("suggested");
-    expect(r.match.subscriber_id).toBeNull();
-    expect(r.match.candidates).toHaveLength(2);
+  it("reports the raw identifier that matched", () => {
+    const r = one([row()], null);
+    expect(r.match.matched_value).toBe("VC001");
   });
 
   it("flags a vc_id / serial_number disagreement as a conflict, never a silent pick", () => {
@@ -112,7 +97,6 @@ describe("subscriber resolution order (§1.5-H)", () => {
       subscriberByVcId: {},
       subscriberBySerial: {},
       subscriberByAccountNumber: {},
-      subscribersByMobile: {},
     });
     const r = one([row()], null, c);
     expect(r.match.status).toBe("unmatched");
@@ -233,5 +217,19 @@ describe("bucketing", () => {
       new_activation: 1,
       needs_review: 0,
     });
+  });
+});
+
+describe("failed rows never diff away (baseline-corruption guard)", () => {
+  it("forces a previously failed key into needs_review even when nothing changed", () => {
+    const rows = [row()];
+    const r = one(rows, rows, ctx({ forcedReviewKeys: ["VC001"] }));
+    expect(r.bucket).toBe("needs_review");
+  });
+
+  it("leaves untouched keys as no_change", () => {
+    const rows = [row()];
+    const r = one(rows, rows, ctx({ forcedReviewKeys: ["OTHER"] }));
+    expect(r.bucket).toBe("no_change");
   });
 });
