@@ -8,8 +8,8 @@ consciously retires it. Silent violations are the most expensive class of
 bug in this system.
 
 Source of truth for the *why* is `BUSINESS_MODEL.md`, which holds the **single
-canonical invariant set: INV-01 … INV-50** (Part Twelve = INV-01…INV-38,
-"Additional Invariants" = INV-39…INV-50). This document is the *engineering*
+canonical invariant set: INV-01 … INV-51** (Part Twelve = INV-01…INV-38,
+"Additional Invariants" = INV-39…INV-51). This document is the *engineering*
 view: what code enforces each rule today. It never mints new IDs — if a rule
 here has no INV number, it is an implementation guard, not an invariant.
 
@@ -95,7 +95,8 @@ shipped yet — every row below is 🔴 until the corresponding phase lands.
 | INV-49 — Sync never changes subscriber identity fields (name, address, mobile, GST, notes, billing prefs) unless explicitly enabled in `sync_policy` | The SMS owns customer identity; provider data is operational | Sync-policy filter before any proposed write; defaults deny (Phase 4) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
 | INV-50 — `sync_policy` is read only via `getSyncPolicy(provider)`, merging stored JSON over current defaults; a missing key takes its documented default | A future ninth flag must not silently disable itself for every existing provider row | Code constraint — no direct `sync_policy.<key>` access (Phase 1/4) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
 | Absence is never termination — only an explicit non-`ACTIVE` `service_status` is evidence | A row missing from an export usually means an export quirk, not a disconnection | Diff engine (Phase 3); missing rows only age `last_seen_in_snapshot_at` | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md §1.4 |
-| Mobile is never an auto-match — only a suggested candidate inside `needs_review` | Households share numbers | Resolution layer (Phase 4) | 🔴 | BUSINESS_RULES §1.1 |
+| INV-51 — A committed provider import is a historical record: its interpretation must never depend on mutable reference tables. `provider_plan_key`, `pack_id`, `pack_name`, `pack_price`, `provider_cost` and `parser_version` are frozen onto the run at commit | Renaming or repricing a pack a year later must not rewrite what an old import meant | `commit_provider_import` snapshots pack fields into `results`; `provider_import_runs.parser_version` frozen at parse (Phase 6) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
+| Mobile is never a match at all — matching is VC Id → STB serial → account number, and nothing else | Households share numbers; a suggested mobile match was still a footgun during review | Resolution layer (`resolution.ts`) — no mobile lookup exists | 🟢 | BUSINESS_RULES §1.1 |
 | Charge amount is always the local catalog price, never `dpo_total_price` | The provider's DPO figure is informational, not a sell price | Review screen + commit RPC (Phase 5/6) | 🔴 | PROVIDER_SYNC_IMPLEMENTATION_PLAN.md |
 
 ---
