@@ -13,6 +13,7 @@ import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
+import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 type Pack = Database["public"]["Tables"]["packs"]["Row"] & {
@@ -39,6 +40,7 @@ const emptyForm = {
   validity_days: 30,
   provider_id: '' as string,
   provider_cost: '' as string,
+  provider_plan_key: '' as string,
 };
 
 
@@ -86,17 +88,36 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       provider_cost: formData.provider_cost.trim() === '' ? null : parseFloat(formData.provider_cost),
     };
 
-    const success = editingId
+    const saved = editingId
       ? await updatePack(editingId, payload)
       : await addPack(payload);
 
-    if (success) {
+    if (saved) {
+      // Provider plan key → pack mapping. This is what lets a provider import
+      // resolve the plan on the report to a local pack without an operator
+      // mapping it by hand during review (INV-51 freezes it at commit time).
+      const key = formData.provider_plan_key.trim();
+      if (key) {
+        const { error } = await supabase
+          .from('provider_pack_mappings')
+          .upsert(
+            {
+              user_id: user!.id,
+              provider_id: formData.provider_id,
+              provider_plan_key: key,
+              provider_plan_label: key,
+              pack_id: saved.id,
+            },
+            { onConflict: 'user_id,provider_id,provider_plan_key' },
+          );
+        if (error) toast.error('Pack saved, but the provider plan name could not be mapped');
+      }
       toast.success(editingId ? 'Pack updated' : 'Pack added');
       resetForm();
     }
   };
 
-  const handleEdit = (pack: Pack) => {
+  const handleEdit = async (pack: Pack) => {
     setActiveService((pack.service_type as ServiceType) || 'cable');
     setEditingId(pack.id);
     setFormData({
@@ -107,7 +128,17 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       validity_days: pack.validity_days ?? 30,
       provider_id: pack.provider_id || '',
       provider_cost: pack.provider_cost != null ? String(pack.provider_cost) : '',
+      provider_plan_key: '',
     });
+    const { data } = await supabase
+      .from('provider_pack_mappings')
+      .select('provider_plan_key')
+      .eq('pack_id', pack.id)
+      .limit(1)
+      .maybeSingle();
+    if (data?.provider_plan_key) {
+      setFormData(prev => ({ ...prev, provider_plan_key: data.provider_plan_key }));
+    }
   };
 
 
@@ -319,6 +350,24 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label>
+                      Provider plan name on their report{' '}
+                      <span className="text-muted-foreground font-normal">— optional</span>
+                    </Label>
+                    <Input
+                      value={formData.provider_plan_key}
+                      onChange={(e) => setFormData({ ...formData, provider_plan_key: e.target.value })}
+                      placeholder="e.g. HATHWAY BROADBAND 100MBPS"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Exact plan text as it appears in the provider's report. Setting it here lets imports
+                      match this pack automatically instead of asking you to map it during review.
+                    </p>
+                  </div>
+
+
 
 
                   {service === 'cable' && (
