@@ -16,6 +16,8 @@ export interface StbInventoryItem {
   notes: string | null;
   device_type: DeviceType;
   service_type: DeviceServiceType;
+  vc_id: string | null;
+  mac_address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -27,6 +29,8 @@ export interface StbInsert {
   notes?: string | null;
   device_type?: DeviceType;
   service_type?: DeviceServiceType;
+  vc_id?: string | null;
+  mac_address?: string | null;
 }
 
 export interface StbUpdate {
@@ -36,6 +40,8 @@ export interface StbUpdate {
   notes?: string | null;
   device_type?: DeviceType;
   service_type?: DeviceServiceType;
+  vc_id?: string | null;
+  mac_address?: string | null;
 }
 
 export const useStbInventory = (userId: string | undefined) => {
