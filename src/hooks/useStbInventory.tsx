@@ -99,6 +99,53 @@ export const useStbInventory = (userId: string | undefined) => {
     return true;
   };
 
+  /**
+   * Bulk add. Both `serial_number` and `vc_id` are written when supplied —
+   * provider imports match on VC Id first and serial second, so a device
+   * loaded without its VC Id will not auto-match on a Hathway report.
+   * Duplicates (by serial or VC Id, local or remote) are skipped, not failed.
+   */
+  const addStbsBulk = async (rows: StbInsert[]) => {
+    if (!userId) return { added: 0, skipped: 0, error: null as string | null };
+
+    const seenSerial = new Set(stbs.map(s => s.serial_number.trim().toUpperCase()));
+    const seenVc = new Set(
+      stbs.map(s => (s.vc_id || '').trim().toUpperCase()).filter(Boolean),
+    );
+
+    const toInsert: StbInsert[] = [];
+    let skipped = 0;
+    for (const r of rows) {
+      const serial = r.serial_number.trim();
+      const vc = (r.vc_id || '').trim();
+      if (!serial) { skipped++; continue; }
+      if (seenSerial.has(serial.toUpperCase()) || (vc && seenVc.has(vc.toUpperCase()))) {
+        skipped++;
+        continue;
+      }
+      seenSerial.add(serial.toUpperCase());
+      if (vc) seenVc.add(vc.toUpperCase());
+      toInsert.push({ ...r, serial_number: serial, vc_id: vc || null });
+    }
+
+    if (toInsert.length === 0) return { added: 0, skipped, error: null };
+
+    const { data, error } = await supabase
+      .from("stb_inventory")
+      .insert(toInsert.map(r => ({ ...r, user_id: userId })))
+      .select();
+
+    if (error) {
+      console.error(error);
+      return { added: 0, skipped, error: friendlyDbError(error, "Bulk import failed") };
+    }
+
+    setStbs(prev => [...((data as StbInventoryItem[]) || []), ...prev]);
+    return { added: data?.length ?? 0, skipped, error: null };
+  };
+
+
+
   const updateStb = async (id: string, updates: StbUpdate) => {
     const { data, error } = await supabase
       .from("stb_inventory")
