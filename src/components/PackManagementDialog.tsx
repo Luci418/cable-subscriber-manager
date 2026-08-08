@@ -39,6 +39,7 @@ const emptyForm = {
   validity_days: 30,
   provider_id: '' as string,
   provider_cost: '' as string,
+  provider_plan_key: '' as string,
 };
 
 
