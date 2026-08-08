@@ -50,13 +50,13 @@ export const usePacks = (userId: string | undefined) => {
     if (error) {
       toast.error(friendlyDbError(error, "Failed to add pack"));
       console.error(error);
-      return false;
+      return null;
     }
 
     if (data) {
       setPacks(prev => [data, ...prev]);
     }
-    return true;
+    return data;
   };
 
   const updatePack = async (id: string, updates: PackUpdate) => {
