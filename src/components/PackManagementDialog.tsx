@@ -13,6 +13,7 @@ import { usePacks } from '@/hooks/usePacks';
 import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
+import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 type Pack = Database["public"]["Tables"]["packs"]["Row"] & {
