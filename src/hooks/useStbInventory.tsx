@@ -299,6 +299,7 @@ export const useStbInventory = (userId: string | undefined) => {
     stbs,
     loading,
     addStb,
+    addStbsBulk,
     updateStb,
     deleteStb,
     assignStb,
