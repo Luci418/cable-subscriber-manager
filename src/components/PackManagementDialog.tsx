@@ -351,6 +351,24 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
                     </div>
                   </div>
 
+                  <div className="space-y-1.5">
+                    <Label>
+                      Provider plan name on their report{' '}
+                      <span className="text-muted-foreground font-normal">— optional</span>
+                    </Label>
+                    <Input
+                      value={formData.provider_plan_key}
+                      onChange={(e) => setFormData({ ...formData, provider_plan_key: e.target.value })}
+                      placeholder="e.g. HATHWAY BROADBAND 100MBPS"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Exact plan text as it appears in the provider's report. Setting it here lets imports
+                      match this pack automatically instead of asking you to map it during review.
+                    </p>
+                  </div>
+
+
+
 
                   {service === 'cable' && (
                     <div className="space-y-1.5">
