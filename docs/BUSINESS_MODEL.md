@@ -8,7 +8,7 @@
 > - For *what is built*, `docs/PROJECT_STATUS.md` wins. Phases 3 through 6.5
 >   (A–M) are complete; **Part Fourteen — Build Priority Order is historical**
 >   and describes work that has already shipped.
-> - The canonical invariant range is **INV-01 … INV-50** (Part Twelve plus the
+> - The canonical invariant range is **INV-01 … INV-52** (Part Twelve plus the
 >   "Additional Invariants" section). `docs/SYSTEM_INVARIANTS.md` is the
 >   engineering view of the same set — it never introduces new IDs.
 > - The `services[]` question raised on 2026-06-20 is **closed** (see that
@@ -1550,9 +1550,9 @@ migration.
 
 # PART TWELVE — COMPLETE INVARIANT MATRIX (INV-01 … INV-38)
 
-> The matrix continues in **"Additional Invariants — INV-39 through INV-50"**
+> The matrix continues in **"Additional Invariants — INV-39 through INV-52"**
 > later in this document. Together those two tables are the **single canonical
-> invariant set: INV-01 … INV-50**. No other document may mint new IDs;
+> invariant set: INV-01 … INV-52**. No other document may mint new IDs;
 > `docs/SYSTEM_INVARIANTS.md` only records how each one is enforced today.
 
 
@@ -2111,7 +2111,7 @@ Phase 4b (follow-up migration, after Phase 4a is stable in production):
 
 ---
 
-## Additional Invariants — INV-39 through INV-50
+## Additional Invariants — INV-39 through INV-52
 
 Added to the invariant matrix in Part 12.
 
@@ -2129,6 +2129,8 @@ Added to the invariant matrix in Part 12.
 | INV-48 | Provider sync | Sync is **idempotent**: a run is diffed only against the most recent *committed* run for the same `(provider_id, report_type)`. Re-uploading an already-committed file yields 100% `no_change` and zero transactions. A cancelled review writes no baseline, so cancelling and re-uploading never causes an event to be treated as already-synced | Diff engine baseline query `WHERE status='committed' ORDER BY imported_at DESC LIMIT 1` |
 | INV-49 | Provider sync | Provider synchronization never changes subscriber identity fields (name, address, mobile, GST, notes, billing preferences) unless the operator has explicitly enabled that field in `sync_policy`. Provider reports are operational data; the SMS owns customer identity by default | Sync-policy filter applied before any proposed write; defaults deny |
 | INV-50 | Provider sync | `sync_policy` is read only through `getSyncPolicy(provider)`, which merges stored JSON over the current defaults. A **missing key takes its documented default**, never `false`/`undefined` | Code constraint: no direct `sync_policy.<key>` access anywhere else |
+| INV-51 | Provider sync | A committed provider import is a **historical record**: its interpretation must never depend on mutable reference tables. `provider_plan_key`, `pack_id`, `pack_name`, `pack_price`, `provider_cost` and `parser_version` are frozen onto the run at commit time. Renaming, remapping or repricing a pack later must not change what an old import meant | `commit_provider_import` snapshots the pack mapping into `results`; `provider_import_runs.parser_version` frozen at parse |
+| INV-52 | Provider sync | A manually entered provider identifier (`subscriber_provider_state.provider_customer_number`, recorded from the customer profile) is a **first-class deterministic identity key**, ranked equally with sync-written links — matching reads the union of both. A number claimed by two customers is ambiguous: it matches nobody and must be corrected by an operator | `save_provider_account` RPC refuses a colliding number; `loadReviewContext` drops ambiguous keys instead of picking a winner |
 
 ---
 
@@ -2179,7 +2181,9 @@ Phase 4b (separate deployment after Phase 4a is confirmed stable):
 *subscription_id added to transactions as nullable display reference;*
 *INV-39 reworded to reflect multi-device model; INV-45 added.*
 *Changes from v3.3: provider-synchronization invariants INV-46 … INV-50 added*
-*(2026-07-31); canonical range is now INV-01 … INV-50.*
+*(2026-07-31); INV-51 (frozen commit interpretation) and INV-52 (manual provider*
+*identifiers are deterministic identity keys) added (2026-08-09); canonical*
+*range is now INV-01 … INV-52.*
 *Any change to a business rule, invariant, or workflow decision must be*
 *reflected here before implementation begins.*
 
