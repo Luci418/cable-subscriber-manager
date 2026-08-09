@@ -505,12 +505,14 @@ export const SubscriberDetail = ({
 
         <TabsContent value="subscriptions" className="space-y-4 mt-4">
           <SubscriptionsTab
+            subscriberId={subscriber.id}
             showCableTab={showCableTab}
             showInternetTab={showInternetTab}
             cableActives={cableActives}
             internetActives={internetActives}
             cableHistory={cableHistory}
             internetHistory={internetHistory}
+            onReload={onReload}
           />
         </TabsContent>
 
