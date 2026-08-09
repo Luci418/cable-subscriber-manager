@@ -1,15 +1,24 @@
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tv, Wifi } from 'lucide-react';
+import { CalendarPlus, Loader2, Tv, Wifi } from 'lucide-react';
 import { daysUntil, type SubscriptionBlob } from '@/lib/activeSubs';
+import { supabase } from '@/integrations/supabase/client';
+import { friendlyDbError } from '@/lib/dbErrors';
+import { confirm } from '@/lib/confirm';
+import { usePermissions } from '@/lib/permissions';
 
 interface SubscriptionsTabProps {
+  subscriberId?: string;
   showCableTab: boolean;
   showInternetTab: boolean;
   cableActives: SubscriptionBlob[];
   internetActives: SubscriptionBlob[];
   cableHistory: SubscriptionBlob[];
   internetHistory: SubscriptionBlob[];
+  onReload?: () => void;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   positionToneClasses,
 } from '@/lib/financialPosition';
 import { buildGrossComponents, type LedgerSubscription } from '@/lib/ledgerRendering';
+import { ProviderAccountsCard } from './ProviderAccountsCard';
 import { SubscriberComplaintsCard } from './SubscriberComplaintsCard';
 
 
