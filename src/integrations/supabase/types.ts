@@ -540,6 +540,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          identifier_label: string | null
           is_active: boolean
           name: string
           notes: string | null
@@ -551,6 +552,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          identifier_label?: string | null
           is_active?: boolean
           name: string
           notes?: string | null
@@ -562,6 +564,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          identifier_label?: string | null
           is_active?: boolean
           name?: string
           notes?: string | null
@@ -1471,6 +1474,7 @@ export type Database = {
       can_archive_customer: { Args: { _uid?: string }; Returns: boolean }
       can_cancel_subscription: { Args: { _uid?: string }; Returns: boolean }
       can_collect_payment: { Args: { _uid?: string }; Returns: boolean }
+      can_edit_customer_identity: { Args: { _uid: string }; Returns: boolean }
       can_modify_settings: { Args: { _uid?: string }; Returns: boolean }
       can_pair_device: { Args: { _uid?: string }; Returns: boolean }
       can_replace_device: { Args: { _uid?: string }; Returns: boolean }
@@ -1630,6 +1634,14 @@ export type Database = {
           p_vlan_id: string
         }
         Returns: undefined
+      }
+      save_provider_account: {
+        Args: {
+          p_account_number: string
+          p_provider_id: string
+          p_subscriber_id: string
+        }
+        Returns: Json
       }
       save_wifi_credentials: {
         Args: {
