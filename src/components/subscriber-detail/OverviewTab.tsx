@@ -12,6 +12,7 @@ import {
   positionToneClasses,
 } from '@/lib/financialPosition';
 import { buildGrossComponents, type LedgerSubscription } from '@/lib/ledgerRendering';
+import { ProviderAccountsCard } from './ProviderAccountsCard';
 import { SubscriberComplaintsCard } from './SubscriberComplaintsCard';
 
 
@@ -262,6 +263,13 @@ export function OverviewTab({
           </CardContent>
         </Card>
       )}
+      <ProviderAccountsCard
+        subscriberId={subscriber.id}
+        providerIds={[
+          (subscriber as any).cable_provider_id,
+          (subscriber as any).internet_provider_id,
+        ]}
+      />
       <SubscriberComplaintsCard
         subscriberId={subscriber.id}
         subscriberIdText={(subscriber as any).subscriber_id}

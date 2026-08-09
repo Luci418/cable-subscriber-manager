@@ -438,8 +438,11 @@ export default function ProviderImport() {
             )}
             {review.baseCtx.ambiguousAccountNumbers.length > 0 && (
               <p className="text-destructive">
-                Account numbers claimed by more than one customer (never auto-matched):{' '}
-                {review.baseCtx.ambiguousAccountNumbers.join(', ')}
+                Needs a fix in customer records: account number{review.baseCtx.ambiguousAccountNumbers.length > 1 ? 's' : ''}{' '}
+                {review.baseCtx.ambiguousAccountNumbers.join(', ')}{' '}
+                {review.baseCtx.ambiguousAccountNumbers.length > 1 ? 'are each recorded on' : 'is recorded on'} more than one
+                customer, so rows carrying {review.baseCtx.ambiguousAccountNumbers.length > 1 ? 'them' : 'it'} will not match
+                automatically. Clear the number from the wrong customer's profile (Overview → Provider accounts) and re-upload.
               </p>
             )}
             {derived.unmapped_pack_keys.length > 0 && (

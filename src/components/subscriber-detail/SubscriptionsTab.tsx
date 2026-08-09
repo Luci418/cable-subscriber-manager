@@ -1,15 +1,24 @@
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tv, Wifi } from 'lucide-react';
+import { CalendarPlus, Loader2, Tv, Wifi } from 'lucide-react';
 import { daysUntil, type SubscriptionBlob } from '@/lib/activeSubs';
+import { supabase } from '@/integrations/supabase/client';
+import { friendlyDbError } from '@/lib/dbErrors';
+import { confirm } from '@/lib/confirm';
+import { usePermissions } from '@/lib/permissions';
 
 interface SubscriptionsTabProps {
+  subscriberId?: string;
   showCableTab: boolean;
   showInternetTab: boolean;
   cableActives: SubscriptionBlob[];
   internetActives: SubscriptionBlob[];
   cableHistory: SubscriptionBlob[];
   internetHistory: SubscriptionBlob[];
+  onReload?: () => void;
 }
 
 /**
@@ -67,17 +76,54 @@ function renderHistoryItem(sub: SubscriptionBlob) {
  * on device cards in the Devices tab (they're per-device).
  */
 export function SubscriptionsTab({
+  subscriberId,
   showCableTab,
   showInternetTab,
   cableActives,
   internetActives,
   cableHistory,
   internetHistory,
+  onReload,
 }: SubscriptionsTabProps) {
+  const perms = usePermissions();
+  const [extending, setExtending] = useState<string | null>(null);
+
   const groups = [
     { key: 'cable' as const, show: showCableTab, actives: cableActives, history: cableHistory, label: 'Cable', Icon: Tv },
     { key: 'internet' as const, show: showInternetTab, actives: internetActives, history: internetHistory, label: 'Internet', Icon: Wifi },
   ].filter((g) => g.show);
+
+  /**
+   * "Extend" is the manual twin of the renewal path `commit_provider_import`
+   * takes: same `extend_subscription` RPC, so the charge, the end-date maths
+   * and the extension counters stay in one place.
+   */
+  const extend = async (service: 'cable' | 'internet', sub: SubscriptionBlob) => {
+    if (!subscriberId || !sub.packId) {
+      toast.error('This subscription has no pack on record and cannot be extended.');
+      return;
+    }
+    const ok = await confirm({
+      title: `Extend ${sub.packName}?`,
+      description: `Adds one more period to the current subscription and posts a charge of ₹${Number(sub.packPrice || 0).toFixed(0)}.`,
+      confirmText: 'Extend',
+    });
+    if (!ok) return;
+    setExtending(sub.subscriptionId);
+    const { error } = await (supabase as any).rpc('extend_subscription', {
+      p_subscriber_id: subscriberId,
+      p_service_type: service,
+      p_pack_id: sub.packId,
+      p_periods: 1,
+    });
+    setExtending(null);
+    if (error) {
+      toast.error(friendlyDbError(error, 'Could not extend the subscription'));
+      return;
+    }
+    toast.success('Subscription extended');
+    onReload?.();
+  };
 
   return (
     <>
@@ -115,6 +161,23 @@ export function SubscriptionsTab({
                             {new Date(sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             {sub.stbNumber && <> · <span className="font-mono">{sub.stbNumber}</span></>}
                           </p>
+                          {perms.canCancelSubscription && subscriberId && (
+                            <div className="mt-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={extending === sub.subscriptionId}
+                                onClick={() => extend(g.key, sub)}
+                              >
+                                {extending === sub.subscriptionId ? (
+                                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                ) : (
+                                  <CalendarPlus className="h-3.5 w-3.5 mr-1" />
+                                )}
+                                Extend
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

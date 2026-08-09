@@ -70,7 +70,10 @@ export const SubscriberList = ({
 
   const setParam = (key: string, value: string | null, resetPage = true) => {
     const next = new URLSearchParams(params);
-    if (value == null || value === '' || (key !== 'q' && (value === 'all' || value === 'any'))) next.delete(key);
+    // `status` defaults to 'active', not 'all' — dropping the param on 'all'
+    // silently snapped the list back to active-only. It must stay in the URL.
+    const dropsOnAll = key !== 'q' && key !== 'status';
+    if (value == null || value === '' || (dropsOnAll && (value === 'all' || value === 'any'))) next.delete(key);
     else next.set(key, value);
     if (resetPage) next.delete('page');
     setParams(next, { replace: true });
