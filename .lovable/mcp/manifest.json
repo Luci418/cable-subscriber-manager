@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://zjlpmnlfbhhypfuzipvv.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "cable-subscriber-manager",
+      "version": "0.1.0",
+      "title": "Cable Subscriber Manager"
+    },
+    "tools": [
+      {
+        "name": "search_subscribers",
+        "title": "Search subscribers",
+        "description": "Search cable/internet subscribers by name, subscriber ID or mobile number. Returns id, subscriber ID, name, mobile, region, status and balances.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Name, subscriber ID or mobile number fragment. Empty for a general list."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "inactive",
+                "prospect",
+                "archived"
+              ],
+              "default": "all",
+              "description": "Filter by customer status."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "description": "Maximum rows to return."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_subscriber",
+        "title": "Get subscriber profile",
+        "description": "Full profile for one subscriber: contact details, balances, subscriptions, paired devices and open complaints. Accepts the human subscriber ID (e.g. MAHARAJ-003) or the internal UUID.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "subscriber_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human subscriber ID or internal UUID."
+            }
+          },
+          "required": [
+            "subscriber_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_expiring_subscriptions",
+        "title": "List expiring subscriptions",
+        "description": "Active subscriptions ending within the next N days, oldest expiry first. Use for renewal follow-up lists.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 90,
+              "default": 7,
+              "description": "Look-ahead window in days."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "Maximum rows to return."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_transactions",
+        "title": "List transactions",
+        "description": "Recent ledger transactions (payments, charges, refunds) across the business or for one subscriber, newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "from_date": {
+              "type": "string",
+              "default": "",
+              "description": "Start date YYYY-MM-DD. Empty for no lower bound."
+            },
+            "to_date": {
+              "type": "string",
+              "default": "",
+              "description": "End date YYYY-MM-DD. Empty for no upper bound."
+            },
+            "subscriber_uuid": {
+              "type": "string",
+              "default": "",
+              "description": "Internal subscriber UUID to filter by. Empty for all."
+            },
+            "type": {
+              "type": "string",
+              "default": "",
+              "description": "Transaction type filter, e.g. payment or charge. Empty for all."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "Maximum rows to return."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_packs",
+        "title": "List packs",
+        "description": "Available cable/internet packs with price, validity and provider cost.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "service_type": {
+              "type": "string",
+              "enum": [
+                "all",
+                "cable",
+                "internet"
+              ],
+              "default": "all",
+              "description": "Filter packs by service type."
+            },
+            "active_only": {
+              "type": "boolean",
+              "default": true,
+              "description": "Only return packs currently on sale."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_devices",
+        "title": "List devices",
+        "description": "Set-top boxes, ONUs and routers in inventory with status, serial number, VC id and current assignment.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "default": "",
+              "description": "Inventory status filter, e.g. available, assigned, faulty. Empty for all."
+            },
+            "query": {
+              "type": "string",
+              "default": "",
+              "description": "Serial number or VC id fragment. Empty for all."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "Maximum rows to return."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "business_summary",
+        "title": "Business summary",
+        "description": "Snapshot of the operation: subscriber counts by status, active subscriptions, outstanding balances, collections over a recent window and open complaints.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30,
+              "description": "Collection window in days."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
