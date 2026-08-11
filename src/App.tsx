@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import Auth from "./pages/Auth";
+import OAuthConsent from "./pages/OAuthConsent";
 import NotFound from "./pages/NotFound";
 import Home from "./pages/Home";
 import Customers from "./pages/Customers";
@@ -61,6 +62,7 @@ const App = () => (
         <SettingsProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route element={<AppLayout />}>
               <Route index element={<Home />} />
               <Route path="customers" element={<Customers />} />
