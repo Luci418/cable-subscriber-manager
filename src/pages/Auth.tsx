@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,15 @@ import { Loader2 } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Preserve the post-login destination (e.g. the OAuth consent page) so a
+  // client connection flow returns where it started instead of the dashboard.
+  const rawNext = searchParams.get("next") ?? "";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const goNext = () => {
+    if (next === "/") navigate("/");
+    else window.location.href = next;
+  };
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,10 +29,11 @@ const Auth = () => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        goNext();
       }
     });
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, next]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +54,7 @@ const Auth = () => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}${next}`,
         data: {
           full_name: fullName,
         },
@@ -57,7 +67,7 @@ const Auth = () => {
       toast.error(error.message);
     } else {
       toast.success("Account created successfully!");
-      navigate("/");
+      goNext();
     }
   };
 
@@ -82,7 +92,7 @@ const Auth = () => {
       toast.error(error.message);
     } else {
       toast.success("Logged in successfully!");
-      navigate("/");
+      goNext();
     }
   };
 
