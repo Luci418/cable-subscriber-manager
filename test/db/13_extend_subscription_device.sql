@@ -8,7 +8,7 @@
 --      instead of extending an arbitrary subscription.
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(4);
+SELECT plan(5);
 
 DO $$
 DECLARE
@@ -81,6 +81,16 @@ SELECT throws_ok(
        current_setting('lovable.test_dev_3')::uuid) $$,
   NULL,
   'multi-connection extend with an unmatched device raises instead of guessing'
+);
+
+-- Matching device extends the right connection.
+SELECT is(
+  (SELECT (public.extend_subscription(
+     current_setting('lovable.test_sub')::uuid, 'cable',
+     current_setting('lovable.test_pack')::uuid, 1, NULL,
+     current_setting('lovable.test_dev_2')::uuid)->>'device_id')::uuid),
+  current_setting('lovable.test_dev_2')::uuid,
+  'multi-connection extend targets the subscription on the reported device'
 );
 
 SELECT * FROM finish();
