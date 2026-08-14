@@ -180,7 +180,7 @@ export function SubscriptionsTab({
                                 size="sm"
                                 variant="outline"
                                 disabled={extending === sub.subscriptionId}
-                                onClick={() => extend(g.key, sub)}
+                                onClick={() => extend(g.key, sub, g.actives)}
                               >
                                 {extending === sub.subscriptionId ? (
                                   <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
