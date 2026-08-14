@@ -98,14 +98,25 @@ export function SubscriptionsTab({
    * takes: same `extend_subscription` RPC, so the charge, the end-date maths
    * and the extension counters stay in one place.
    */
-  const extend = async (service: 'cable' | 'internet', sub: SubscriptionBlob) => {
+  const extend = async (service: 'cable' | 'internet', sub: SubscriptionBlob, activesForService: SubscriptionBlob[]) => {
     if (!subscriberId || !sub.packId) {
       toast.error('This subscription has no pack on record and cannot be extended.');
       return;
     }
+    // Multi-connection subscribers: the device is the only thing that says
+    // WHICH box is being renewed. Never let the RPC guess.
+    const multi = activesForService.length > 1;
+    if (multi && !sub.deviceId) {
+      toast.error(
+        'This customer has more than one active connection for this service. Pair this subscription to a device before extending it.',
+      );
+      return;
+    }
     const ok = await confirm({
       title: `Extend ${sub.packName}?`,
-      description: `Adds one more period to the current subscription and posts a charge of ₹${Number(sub.packPrice || 0).toFixed(0)}.`,
+      description:
+        `Adds one more period to ${multi ? `the connection on ${sub.stbNumber || 'this device'}` : 'the current subscription'}` +
+        ` and posts a charge of ₹${Number(sub.packPrice || 0).toFixed(0)}.`,
       confirmText: 'Extend',
     });
     if (!ok) return;
@@ -115,6 +126,7 @@ export function SubscriptionsTab({
       p_service_type: service,
       p_pack_id: sub.packId,
       p_periods: 1,
+      p_device_id: sub.deviceId ?? null,
     });
     setExtending(null);
     if (error) {
@@ -124,6 +136,7 @@ export function SubscriptionsTab({
     toast.success('Subscription extended');
     onReload?.();
   };
+
 
   return (
     <>
