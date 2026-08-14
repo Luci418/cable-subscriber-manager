@@ -1541,6 +1541,7 @@ export type Database = {
       expire_lapsed_subscriptions: { Args: never; Returns: number }
       extend_subscription: {
         Args: {
+          p_device_id?: string
           p_end_date_override?: string
           p_pack_id: string
           p_periods?: number
