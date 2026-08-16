@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { expireLapsedInBackground } from "@/lib/expireLapsed";
 import { toast } from "sonner";
 import { friendlyDbError } from "@/lib/dbErrors";
 import type { Database } from "@/integrations/supabase/types";
@@ -12,7 +13,7 @@ type SubscriberUpdate = Database["public"]["Tables"]["subscribers"]["Update"];
 // What components see: the DB row + the four normalised subscription arrays.
 export type Subscriber = SubscriberRow & EnrichedSubscriber;
 
-export const useSubscribers = (userId: string | undefined) => {
+export const useSubscribers = (userId: string | undefined, enabled: boolean = true) => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,13 +21,10 @@ export const useSubscribers = (userId: string | undefined) => {
     if (!userId) return;
 
     setLoading(true);
-    // Eagerly expire any lapsed subscriptions server-side BEFORE fetching,
-    // so the UI always reflects authoritative server state (no client-side lazy cleanup).
-    try {
-      await supabase.rpc("expire_lapsed_subscriptions");
-    } catch (e) {
-      console.warn("expire_lapsed_subscriptions RPC failed (non-fatal):", e);
-    }
+    // The lapsed-subscription sweep runs in the background: the views filter
+    // on end_date already, so blocking the read on it only added latency.
+    expireLapsedInBackground();
+
 
     // Three reads in parallel:
     //   1. subscribers — base row
