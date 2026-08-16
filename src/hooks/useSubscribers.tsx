@@ -92,8 +92,9 @@ export const useSubscribers = (userId: string | undefined, enabled: boolean = tr
   };
 
   useEffect(() => {
+    if (!enabled) return;
     loadSubscribers();
-  }, [userId]);
+  }, [userId, enabled]);
 
   const addSubscriber = async (subscriber: Omit<SubscriberInsert, "user_id">) => {
     if (!userId) return;
