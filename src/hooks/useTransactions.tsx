@@ -41,8 +41,9 @@ export const useTransactions = (
   };
 
   useEffect(() => {
+    if (!enabled) return;
     loadTransactions();
-  }, [userId, subscriberId]);
+  }, [userId, subscriberId, enabled]);
 
   const addTransaction = async (transaction: Omit<TransactionInsert, "user_id">) => {
     if (!userId) return;
