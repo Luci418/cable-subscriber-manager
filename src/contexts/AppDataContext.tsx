@@ -1,40 +1,70 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
 
 /**
  * AppDataContext — shared subscribers/transactions state for the routed
- * shell. Previously the single Index page owned this state; with real
- * routes the pages that need it (Home, Customers, CustomerDetail,
- * BillingRoute) subscribe here so we don't refetch per route.
+ * shell.
+ *
+ * Loading is DEMAND-DRIVEN: the provider fetches nothing until a consumer
+ * calls `useAppData()`. Routes that render their own server-paginated data
+ * (e.g. Customers) use `useAppDataLazy()` so they don't pay for a full
+ * subscribers + transactions load they never display.
  *
  * Kept intentionally thin: no fetching orchestration, no dialog state.
- * Each page owns its own dialog/UI state; reloads happen through the
- * exposed reload functions.
  */
 type Ctx = ReturnType<typeof useSubscribers> & {
   transactions: ReturnType<typeof useTransactions>['transactions'];
   addTransaction: ReturnType<typeof useTransactions>['addTransaction'];
   reloadTransactions: ReturnType<typeof useTransactions>['reloadTransactions'];
+  requestFullData: () => void;
 };
 
 const AppDataCtx = createContext<Ctx | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const subs = useSubscribers(user?.id);
-  const { transactions, addTransaction, reloadTransactions } = useTransactions(user?.id);
+  const [demand, setDemand] = useState(false);
+  const subs = useSubscribers(user?.id, demand);
+  const { transactions, addTransaction, reloadTransactions } = useTransactions(
+    user?.id,
+    undefined,
+    demand,
+  );
 
   return (
-    <AppDataCtx.Provider value={{ ...subs, transactions, addTransaction, reloadTransactions }}>
+    <AppDataCtx.Provider
+      value={{
+        ...subs,
+        transactions,
+        addTransaction,
+        reloadTransactions,
+        requestFullData: () => setDemand(true),
+      }}
+    >
       {children}
     </AppDataCtx.Provider>
   );
 }
 
-export function useAppData() {
+function useCtx() {
   const ctx = useContext(AppDataCtx);
   if (!ctx) throw new Error('useAppData must be used inside AppDataProvider');
   return ctx;
+}
+
+/** Reads shared data and triggers the full load on mount. */
+export function useAppData() {
+  const ctx = useCtx();
+  const { requestFullData } = ctx;
+  useEffect(() => {
+    requestFullData();
+  }, [requestFullData]);
+  return ctx;
+}
+
+/** Access the context WITHOUT triggering the full subscribers/transactions load. */
+export function useAppDataLazy() {
+  return useCtx();
 }
