@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { expireLapsedInBackground } from '@/lib/expireLapsed';
 import type { Subscriber } from '@/hooks/useSubscribers';
 import type { SubscriptionBlob } from '@/lib/activeSubs';
 
@@ -76,12 +77,9 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
       setLoading(true);
       setError(null);
 
-      // Server-side expire lapsed so the paged view is authoritative.
-      try {
-        await supabase.rpc('expire_lapsed_subscriptions');
-      } catch {
-        /* non-fatal */
-      }
+      // Housekeeping sweep runs in the background — never on the read path.
+      expireLapsedInBackground();
+
 
       let q = supabase
         .from('subscribers')
