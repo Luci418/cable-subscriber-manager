@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -26,6 +26,7 @@ const AppDataCtx = createContext<Ctx | null>(null);
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [demand, setDemand] = useState(false);
+  const requestFullData = useCallback(() => setDemand(true), []);
   const subs = useSubscribers(user?.id, demand);
   const { transactions, addTransaction, reloadTransactions } = useTransactions(
     user?.id,
@@ -40,7 +41,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         transactions,
         addTransaction,
         reloadTransactions,
-        requestFullData: () => setDemand(true),
+        requestFullData,
       }}
     >
       {children}
