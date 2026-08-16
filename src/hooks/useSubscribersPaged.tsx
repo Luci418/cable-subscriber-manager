@@ -134,8 +134,19 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
       const to = from + pageSize - 1;
       q = q.order('created_at', { ascending: false }).range(from, to);
 
-      const { data, count, error: qErr } = await q;
+      // Run the page query and the active-subscription enrichment in
+      // parallel instead of chaining them: the view is already scoped to the
+      // user and is tiny, so filtering to the visible ids client-side costs
+      // nothing and removes a serial round-trip from the critical path.
+      const [pageRes, viewRes] = await Promise.all([
+        q,
+        (supabase as any)
+          .from('v_subscriber_active_subscription')
+          .select('subscriber_id, service_type, blob')
+          .eq('user_id', userId),
+      ]);
       if (cancelled) return;
+      const { data, count, error: qErr } = pageRes as any;
       if (qErr) {
         setError(qErr.message);
         setRows([]);
@@ -144,20 +155,15 @@ export function useSubscribersPaged(opts: UseSubscribersPagedOptions): UseSubscr
         return;
       }
 
-      const ids = (data ?? []).map((r: any) => r.id);
-      let actives: Record<string, { cable: SubscriptionBlob[]; internet: SubscriptionBlob[] }> = {};
-      if (ids.length) {
-        const { data: viewRows } = await (supabase as any)
-          .from('v_subscriber_active_subscription')
-          .select('subscriber_id, service_type, blob')
-          .eq('user_id', userId)
-          .in('subscriber_id', ids);
-        (viewRows ?? []).forEach((r: any) => {
-          const bucket = (actives[r.subscriber_id] ??= { cable: [], internet: [] });
-          if (r.service_type === 'internet') bucket.internet.push(r.blob);
-          else bucket.cable.push(r.blob);
-        });
-      }
+      const pageIds = new Set((data ?? []).map((r: any) => r.id));
+      const actives: Record<string, { cable: SubscriptionBlob[]; internet: SubscriptionBlob[] }> = {};
+      ((viewRes as any)?.data ?? []).forEach((r: any) => {
+        if (!pageIds.has(r.subscriber_id)) return;
+        const bucket = (actives[r.subscriber_id] ??= { cable: [], internet: [] });
+        if (r.service_type === 'internet') bucket.internet.push(r.blob);
+        else bucket.cable.push(r.blob);
+      });
+
 
       const enriched: Subscriber[] = (data ?? []).map((r: any) => {
         const a = actives[r.id] ?? { cable: [], internet: [] };
