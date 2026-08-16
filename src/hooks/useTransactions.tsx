@@ -8,7 +8,11 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
 type TransactionUpdate = Database["public"]["Tables"]["transactions"]["Update"];
 
-export const useTransactions = (userId: string | undefined, subscriberId?: string) => {
+export const useTransactions = (
+  userId: string | undefined,
+  subscriberId?: string,
+  enabled: boolean = true,
+) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,8 +41,9 @@ export const useTransactions = (userId: string | undefined, subscriberId?: strin
   };
 
   useEffect(() => {
+    if (!enabled) return;
     loadTransactions();
-  }, [userId, subscriberId]);
+  }, [userId, subscriberId, enabled]);
 
   const addTransaction = async (transaction: Omit<TransactionInsert, "user_id">) => {
     if (!userId) return;
