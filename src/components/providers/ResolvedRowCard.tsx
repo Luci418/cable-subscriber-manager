@@ -388,47 +388,92 @@ function ResolvedRowCardImpl({
 
         {/* ── Proposed actions ────────────────────────────────── */}
         <Section label="Proposed actions">
-          <ul className="space-y-1">
-            <WriteLine
-              label="Post ledger charge"
-              allowed={writes.charge}
-              suppressedBy={suppressedFor("create_charges")}
-            />
-            <WriteLine
-              label="Update upstream plan & validity"
-              allowed={writes.plan_state}
-              suppressedBy={suppressedFor("update_plan_state")}
-            />
-            <WriteLine
-              label="Update upstream status"
-              allowed={writes.provider_status}
-              suppressedBy={suppressedFor("update_provider_status")}
-            />
+          <ul className="space-y-1.5">
+            {/* Charge */}
+            {writes.charge ? (
+              <OutcomeLine kind="will">
+                Will charge{" "}
+                <strong>
+                  ₹{Number.isFinite(chargeAmount as number) ? (chargeAmount as number).toFixed(2) : "—"}
+                </strong>{" "}
+                for {packLabel ?? "the mapped pack"}
+                {packValidityDays ? ` (${packValidityDays} days` : ""}
+                {packValidityDays && chargeDuration && chargeDuration > 1
+                  ? ` × ${chargeDuration})`
+                  : packValidityDays
+                    ? ")"
+                    : ""}
+              </OutcomeLine>
+            ) : suppressedFor("create_charges") ? (
+              <OutcomeLine kind="blocked">
+                <Blocked>Won't post a charge</Blocked> — your sync settings don't allow
+                provider imports to post charges (change this in Settings → Integrations).
+              </OutcomeLine>
+            ) : (
+              <OutcomeLine kind="nothing">{noChargeReason}</OutcomeLine>
+            )}
+
+            {/* Plan / validity from the provider */}
+            {writes.plan_state ? (
+              <OutcomeLine kind="will">
+                Will update this customer's plan details from the provider (plan name and
+                the dates it runs between)
+              </OutcomeLine>
+            ) : suppressedFor("update_plan_state") ? (
+              <OutcomeLine kind="blocked">
+                <Blocked>Won't update the plan details we store from the provider</Blocked>{" "}
+                — your sync settings don't allow it (change this in Settings → Integrations).
+              </OutcomeLine>
+            ) : (
+              <OutcomeLine kind="nothing">
+                {linked
+                  ? "Plan details stay as they are — the report shows the same plan and dates we already have."
+                  : "Plan details stay as they are — this row isn't linked to a customer yet."}
+              </OutcomeLine>
+            )}
+
+            {/* Provider status */}
+            {writes.provider_status ? (
+              <OutcomeLine kind="will">
+                Will record the provider's current status for this connection (
+                {event.current.service_status ?? "unknown"})
+              </OutcomeLine>
+            ) : suppressedFor("update_provider_status") ? (
+              <OutcomeLine kind="blocked">
+                <Blocked>Won't record the provider's status</Blocked> — your sync settings
+                don't allow it (change this in Settings → Integrations).
+              </OutcomeLine>
+            ) : (
+              <OutcomeLine kind="nothing">
+                {linked
+                  ? "Provider status stays as it is — it hasn't changed since the last import."
+                  : "Provider status stays as it is — this row isn't linked to a customer yet."}
+              </OutcomeLine>
+            )}
+
+            {/* Identity — always policy-blocked when listed */}
             {suppressed
               .filter((s) => s.policy_key.startsWith("update_identity"))
               .map((s) => (
-                <WriteLine
-                  key={s.policy_key}
-                  label={s.what}
-                  allowed={false}
-                  suppressedBy={s.policy_key}
-                />
+                <OutcomeLine key={s.policy_key} kind="blocked">
+                  <Blocked>
+                    Won't change this customer's{" "}
+                    {s.policy_key === "update_identity_name" ? "name" : "mobile number"} to
+                    what the provider has
+                  </Blocked>{" "}
+                  — your sync settings don't allow provider imports to change customer
+                  details (change this in Settings → Integrations).
+                </OutcomeLine>
               ))}
           </ul>
 
-          {writes.charge && Number.isFinite(chargeAmount as number) && (
-            <div className="mt-3 rounded-md border border-border bg-muted/40 p-2">
-              <p className="text-sm">
-                Charge <strong>₹{(chargeAmount as number).toFixed(2)}</strong>
-                {chargeDuration && chargeDuration > 1 ? ` · ${chargeDuration} periods` : ""}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {packLabel ?? "Mapped pack"}
-                {packValidityDays ? ` · ${packValidityDays}-day validity` : ""} — posted by
-                creating the subscription, not typed in.
-              </p>
-            </div>
+          {writes.charge && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              The charge is posted by creating the subscription — the amount comes from the
+              pack's own price, it is never typed in here.
+            </p>
           )}
+
 
           {renewalMismatch && (
             <p className="mt-2 text-xs text-destructive flex items-start gap-1.5">
