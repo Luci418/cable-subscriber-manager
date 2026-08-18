@@ -71,6 +71,38 @@ export default function Catalog() {
   const [showPackDialog, setShowPackDialog] = useState(false);
   const [showProviderDialog, setShowProviderDialog] = useState(false);
 
+  /**
+   * Provider plan → pack mappings, so an operator can audit what a plan name
+   * on an import report resolves to without reopening import review.
+   */
+  const [mappings, setMappings] = useState<
+    { pack_id: string | null; provider_id: string; provider_plan_key: string }[]
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('provider_pack_mappings')
+      .select('pack_id, provider_id, provider_plan_key')
+      .then(({ data }) => {
+        if (!cancelled) setMappings(data ?? []);
+      });
+    return () => { cancelled = true; };
+  }, [packs.length]);
+
+  const mappingsByPack = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const row of mappings) {
+      if (!row.pack_id) continue;
+      const prov = providers.find(p => p.id === row.provider_id);
+      const label = `${row.provider_plan_key}${prov ? ` (${prov.name})` : ''}`;
+      const list = m.get(row.pack_id) ?? [];
+      if (!list.includes(label)) list.push(label);
+      m.set(row.pack_id, list);
+    }
+    return m;
+  }, [mappings, providers]);
+
+
   // ── Filters (packs) ────────────────────────────────────────────────
   const providerFilter = params.get('provider') || 'all';
   const serviceFilter = (params.get('service') as 'cable' | 'internet' | 'all') || 'all';
