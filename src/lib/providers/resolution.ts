@@ -264,8 +264,23 @@ export function resolveEvent(
   const pack = resolvePack(event, ctx);
   const policy = ctx.policy;
 
-  const wantsCharge = CHARGE_EVENTS.has(event.type);
   const linked = match.status === "matched";
+
+  /**
+   * Newly identified this session (2026-08-12). Learning who a row belongs to
+   * is itself a business event: the subscriber has no active subscription on
+   * file, the upstream plan is active, so a charge belongs on the ledger even
+   * though the report bytes are identical to the last committed snapshot.
+   * Deliberately scoped to rows the operator linked/created in THIS session —
+   * `no_change` handling for already-matched rows is unchanged.
+   */
+  const newlyIdentified =
+    linked &&
+    event.is_active &&
+    !!ctx.newlyIdentifiedKeys?.includes(event.key) &&
+    !(ctx.subscribersWithActiveSubscription ?? []).includes(match.subscriber_id as string);
+
+  const wantsCharge = CHARGE_EVENTS.has(event.type) || newlyIdentified;
 
   const suppressed: SuppressedWrite[] = [];
 
@@ -276,6 +291,7 @@ export function resolveEvent(
   }
 
   const planChanged =
+    newlyIdentified ||
     event.previous === null ||
     event.changed.includes("base_plan") ||
     event.changed.includes("start_date") ||
@@ -286,7 +302,8 @@ export function resolveEvent(
     suppressed.push({ policy_key: "update_plan_state", what: "Upstream plan and validity window" });
   }
 
-  const statusChanged = event.previous === null || event.changed.includes("service_status");
+  const statusChanged =
+    newlyIdentified || event.previous === null || event.changed.includes("service_status");
   let provider_status = linked && statusChanged;
   if (provider_status && !policy.update_provider_status) {
     provider_status = false;
@@ -316,6 +333,10 @@ export function resolveEvent(
     bucket = "anomaly";
   } else if (previouslyFailed && event.type === "no_change") {
     bucket = "needs_review";
+  } else if (newlyIdentified && !CHARGE_EVENTS.has(event.type)) {
+    // Treat it exactly as the activation it effectively is, so the review
+    // screen and the commit RPC agree on what this row does.
+    bucket = "new_activation";
   } else {
     bucket = event.type;
   }
@@ -332,8 +353,18 @@ export function resolveEvent(
     provider_status = false;
   }
 
-  return { key: event.key, event, match, pack, bucket, writes: { charge, plan_state, provider_status }, suppressed_by_policy: suppressed };
+  return {
+    key: event.key,
+    event,
+    match,
+    pack,
+    bucket,
+    writes: { charge, plan_state, provider_status },
+    newly_identified: newlyIdentified,
+    suppressed_by_policy: suppressed,
+  };
 }
+
 
 export function resolveEvents(
   events: ProviderEvent[],
