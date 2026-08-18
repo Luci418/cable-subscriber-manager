@@ -76,28 +76,31 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SettingsProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-            <Route element={<AppLayout />}>
-              <Route index element={<Home />} />
-              <Route path="customers" element={<Customers />} />
-              <Route path="customers/new" element={<CustomerNew />} />
-              {/* Redirect bare /customers/:id → overview tab so the URL is always canonical. */}
-              <Route path="customers/:id" element={<Navigate to="overview" replace />} />
-              <Route path="customers/:id/:tab" element={<CustomerDetail />} />
-              <Route path="billing" element={<Billing />} />
-              <Route path="catalog" element={<Catalog />} />
-              <Route path="equipment" element={<Equipment />} />
-              <Route path="equipment/:serial" element={<EquipmentDetail />} />
-              <Route path="analytics" element={<AnalyticsRoute />} />
-              <Route path="complaints" element={<ComplaintsRoute />} />
-              <Route path="integrations/hathway" element={<ProviderImport />} />
-              <Route path="settings" element={<Navigate to="/settings/company" replace />} />
-              <Route path="settings/:section" element={<Settings />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+              <Route element={<AppLayout />}>
+                <Route index element={<Home />} />
+                <Route path="customers" element={<Customers />} />
+                <Route path="customers/new" element={<CustomerNew />} />
+                {/* Redirect bare /customers/:id → overview tab so the URL is always canonical. */}
+                <Route path="customers/:id" element={<Navigate to="overview" replace />} />
+                <Route path="customers/:id/:tab" element={<CustomerDetail />} />
+                <Route path="billing" element={<Billing />} />
+                <Route path="catalog" element={<Catalog />} />
+                <Route path="equipment" element={<Equipment />} />
+                <Route path="equipment/:serial" element={<EquipmentDetail />} />
+                <Route path="analytics" element={<AnalyticsRoute />} />
+                <Route path="complaints" element={<ComplaintsRoute />} />
+                <Route path="integrations/hathway" element={<ProviderImport />} />
+                <Route path="settings" element={<Navigate to="/settings/company" replace />} />
+                <Route path="settings/:section" element={<Settings />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+
         </SettingsProvider>
       </BrowserRouter>
     </TooltipProvider>
