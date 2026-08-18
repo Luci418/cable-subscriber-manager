@@ -14,13 +14,15 @@
 import { memo, useState } from "react";
 import {
   Check,
-  X,
+  Minus,
+  Lock as LockIcon,
   AlertTriangle,
   Link2Off,
   GitBranch,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+
 
 /** Same normalisation the resolution layer uses for device keys. */
 const normalise = (v: string | null | undefined) => (v ?? "").trim().toUpperCase();
