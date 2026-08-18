@@ -95,7 +95,7 @@ function OutcomeLine({
       {kind === "will" ? (
         <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
       ) : kind === "blocked" ? (
-        <Lock className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+        <LockIcon className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
       ) : (
         <Minus className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
       )}
