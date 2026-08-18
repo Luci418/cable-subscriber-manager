@@ -211,8 +211,14 @@ export default function Catalog() {
           {p.service_type === 'cable' && p.channels && p.channels !== '-' && (
             <div className="text-xs text-muted-foreground truncate">{p.channels}</div>
           )}
+          {(mappingsByPack.get(p.id) ?? []).length > 0 && (
+            <div className="text-xs text-muted-foreground truncate mt-0.5">
+              Mapped from: {(mappingsByPack.get(p.id) ?? []).join(', ')}
+            </div>
+          )}
         </div>
       ),
+
     },
     {
       id: 'provider',
