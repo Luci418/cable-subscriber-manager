@@ -72,42 +72,43 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function WriteLine({
-  label,
-  allowed,
-  suppressedBy,
+/**
+ * One plain-language outcome sentence (redesign 2026-08-12).
+ *
+ * Three genuinely different situations, three consistent visual cues:
+ *   will    — a tick, stated as a fact with the concrete detail
+ *   nothing — a dash, "won't happen because there's nothing to do"
+ *   blocked — strikethrough + a spelled-out reason. Strikethrough ALWAYS
+ *             means "blocked by your sync settings", never "just off".
+ */
+function OutcomeLine({
+  kind,
+  children,
 }: {
-  label: string;
-  allowed: boolean;
-  suppressedBy?: SyncPolicyKey;
+  kind: "will" | "nothing" | "blocked";
+  children: React.ReactNode;
 }) {
   return (
     <li className="flex items-start gap-2 text-sm">
-      {allowed ? (
+      {kind === "will" ? (
         <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+      ) : kind === "blocked" ? (
+        <Lock className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
       ) : (
-        <X className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+        <Minus className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
       )}
-      <span
-        className={cn(
-          "min-w-0",
-          !allowed && "text-muted-foreground",
-          suppressedBy && "line-through",
-        )}
-      >
-        {label}
+      <span className={cn("min-w-0", kind !== "will" && "text-muted-foreground")}>
+        {children}
       </span>
-      {suppressedBy && (
-        <span
-          className="text-xs text-destructive shrink-0"
-          title={SYNC_POLICY_LABELS[suppressedBy]}
-        >
-          (policy)
-        </span>
-      )}
     </li>
   );
 }
+
+/** The struck-through half of a policy-blocked sentence. */
+const Blocked = ({ children }: { children: React.ReactNode }) => (
+  <span className="line-through">{children}</span>
+);
+
 
 interface Props {
   row: ResolvedRow;
