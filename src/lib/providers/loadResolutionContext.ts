@@ -92,8 +92,19 @@ export async function loadReviewContext(
     stateRes.error ||
     mappingsRes.error ||
     packsRes.error ||
+    activeSubsRes.error ||
     baselineRes.error;
   if (firstError) throw firstError;
+
+  const providerServiceType = (providerRes.data as { service_type?: string } | null)?.service_type ?? "cable";
+  const subscribersWithActiveSubscription = [
+    ...new Set(
+      (activeSubsRes.data ?? [])
+        .filter((s) => s.service_type === providerServiceType)
+        .map((s) => s.subscriber_id),
+    ),
+  ];
+
 
   const subscriberByVcId: Record<string, string> = {};
   const subscriberBySerial: Record<string, string> = {};
