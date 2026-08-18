@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+
 import { Plus, Tv, Wifi, Archive, RotateCcw, Trash2, Edit2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui-ext/PageHeader';
 import { DataTable, DataTableColumn } from '@/components/ui-ext/DataTable';
@@ -68,6 +70,38 @@ export default function Catalog() {
 
   const [showPackDialog, setShowPackDialog] = useState(false);
   const [showProviderDialog, setShowProviderDialog] = useState(false);
+
+  /**
+   * Provider plan → pack mappings, so an operator can audit what a plan name
+   * on an import report resolves to without reopening import review.
+   */
+  const [mappings, setMappings] = useState<
+    { pack_id: string | null; provider_id: string; provider_plan_key: string }[]
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('provider_pack_mappings')
+      .select('pack_id, provider_id, provider_plan_key')
+      .then(({ data }) => {
+        if (!cancelled) setMappings(data ?? []);
+      });
+    return () => { cancelled = true; };
+  }, [packs.length]);
+
+  const mappingsByPack = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const row of mappings) {
+      if (!row.pack_id) continue;
+      const prov = providers.find(p => p.id === row.provider_id);
+      const label = `${row.provider_plan_key}${prov ? ` (${prov.name})` : ''}`;
+      const list = m.get(row.pack_id) ?? [];
+      if (!list.includes(label)) list.push(label);
+      m.set(row.pack_id, list);
+    }
+    return m;
+  }, [mappings, providers]);
+
 
   // ── Filters (packs) ────────────────────────────────────────────────
   const providerFilter = params.get('provider') || 'all';
@@ -177,8 +211,14 @@ export default function Catalog() {
           {p.service_type === 'cable' && p.channels && p.channels !== '-' && (
             <div className="text-xs text-muted-foreground truncate">{p.channels}</div>
           )}
+          {(mappingsByPack.get(p.id) ?? []).length > 0 && (
+            <div className="text-xs text-muted-foreground truncate mt-0.5">
+              Mapped from: {(mappingsByPack.get(p.id) ?? []).join(', ')}
+            </div>
+          )}
         </div>
       ),
+
     },
     {
       id: 'provider',

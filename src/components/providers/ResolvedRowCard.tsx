@@ -14,13 +14,15 @@
 import { memo, useState } from "react";
 import {
   Check,
-  X,
+  Minus,
+  Lock as LockIcon,
   AlertTriangle,
   Link2Off,
   GitBranch,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+
 
 /** Same normalisation the resolution layer uses for device keys. */
 const normalise = (v: string | null | undefined) => (v ?? "").trim().toUpperCase();
@@ -72,42 +74,43 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function WriteLine({
-  label,
-  allowed,
-  suppressedBy,
+/**
+ * One plain-language outcome sentence (redesign 2026-08-12).
+ *
+ * Three genuinely different situations, three consistent visual cues:
+ *   will    — a tick, stated as a fact with the concrete detail
+ *   nothing — a dash, "won't happen because there's nothing to do"
+ *   blocked — strikethrough + a spelled-out reason. Strikethrough ALWAYS
+ *             means "blocked by your sync settings", never "just off".
+ */
+function OutcomeLine({
+  kind,
+  children,
 }: {
-  label: string;
-  allowed: boolean;
-  suppressedBy?: SyncPolicyKey;
+  kind: "will" | "nothing" | "blocked";
+  children: React.ReactNode;
 }) {
   return (
     <li className="flex items-start gap-2 text-sm">
-      {allowed ? (
+      {kind === "will" ? (
         <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+      ) : kind === "blocked" ? (
+        <LockIcon className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
       ) : (
-        <X className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+        <Minus className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
       )}
-      <span
-        className={cn(
-          "min-w-0",
-          !allowed && "text-muted-foreground",
-          suppressedBy && "line-through",
-        )}
-      >
-        {label}
+      <span className={cn("min-w-0", kind !== "will" && "text-muted-foreground")}>
+        {children}
       </span>
-      {suppressedBy && (
-        <span
-          className="text-xs text-destructive shrink-0"
-          title={SYNC_POLICY_LABELS[suppressedBy]}
-        >
-          (policy)
-        </span>
-      )}
     </li>
   );
 }
+
+/** The struck-through half of a policy-blocked sentence. */
+const Blocked = ({ children }: { children: React.ReactNode }) => (
+  <span className="line-through">{children}</span>
+);
+
 
 interface Props {
   row: ResolvedRow;
@@ -172,6 +175,17 @@ function ResolvedRowCardImpl({
   const isConflict = match.status === "conflict";
   const isAnomaly = row.bucket === "anomaly";
   const resolvedByOperator = !!linkedLabel || !!prospectQueued;
+  const linked = match.status === "matched";
+
+  /** Plain-language reason a charge is NOT going to be posted. */
+  const noChargeReason = !linked
+    ? "No charge — this row isn't linked to a customer yet."
+    : isAnomaly
+      ? "No charge — the values on this row don't add up, so everything is on hold until you confirm it."
+      : pack.status === "unmapped"
+        ? "No charge — this provider plan isn't mapped to one of your packs yet."
+        : "No charge — nothing changed since the last import, and this customer already has this plan running.";
+
 
   // Rows that need a human stay open; everything else collapses to one line
   // so a 400-row report reads as a list, not a wall of cards.
@@ -236,12 +250,21 @@ function ResolvedRowCardImpl({
 
         <Section label="Event">
           {event.changed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {event.previous === null
-                ? "Not present in the last committed report"
-                : "Identical to the last committed report"}
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">
+                {event.previous === null
+                  ? "This connection wasn't in the last report we imported"
+                  : "Nothing changed in the report since the last import"}
+              </p>
+              {row.newly_identified && (
+                <p className="text-sm text-primary">
+                  …but you've just identified this customer for the first time and they
+                  have nothing running yet, so this is treated as a new activation.
+                </p>
+              )}
+            </div>
           ) : (
+
             <ul className="space-y-1">
               {event.changed.map((f) => (
                 <li key={f} className="text-sm">
@@ -385,47 +408,92 @@ function ResolvedRowCardImpl({
 
         {/* ── Proposed actions ────────────────────────────────── */}
         <Section label="Proposed actions">
-          <ul className="space-y-1">
-            <WriteLine
-              label="Post ledger charge"
-              allowed={writes.charge}
-              suppressedBy={suppressedFor("create_charges")}
-            />
-            <WriteLine
-              label="Update upstream plan & validity"
-              allowed={writes.plan_state}
-              suppressedBy={suppressedFor("update_plan_state")}
-            />
-            <WriteLine
-              label="Update upstream status"
-              allowed={writes.provider_status}
-              suppressedBy={suppressedFor("update_provider_status")}
-            />
+          <ul className="space-y-1.5">
+            {/* Charge */}
+            {writes.charge ? (
+              <OutcomeLine kind="will">
+                Will charge{" "}
+                <strong>
+                  ₹{Number.isFinite(chargeAmount as number) ? (chargeAmount as number).toFixed(2) : "—"}
+                </strong>{" "}
+                for {packLabel ?? "the mapped pack"}
+                {packValidityDays ? ` (${packValidityDays} days` : ""}
+                {packValidityDays && chargeDuration && chargeDuration > 1
+                  ? ` × ${chargeDuration})`
+                  : packValidityDays
+                    ? ")"
+                    : ""}
+              </OutcomeLine>
+            ) : suppressedFor("create_charges") ? (
+              <OutcomeLine kind="blocked">
+                <Blocked>Won't post a charge</Blocked> — your sync settings don't allow
+                provider imports to post charges (change this in Settings → Integrations).
+              </OutcomeLine>
+            ) : (
+              <OutcomeLine kind="nothing">{noChargeReason}</OutcomeLine>
+            )}
+
+            {/* Plan / validity from the provider */}
+            {writes.plan_state ? (
+              <OutcomeLine kind="will">
+                Will update this customer's plan details from the provider (plan name and
+                the dates it runs between)
+              </OutcomeLine>
+            ) : suppressedFor("update_plan_state") ? (
+              <OutcomeLine kind="blocked">
+                <Blocked>Won't update the plan details we store from the provider</Blocked>{" "}
+                — your sync settings don't allow it (change this in Settings → Integrations).
+              </OutcomeLine>
+            ) : (
+              <OutcomeLine kind="nothing">
+                {linked
+                  ? "Plan details stay as they are — the report shows the same plan and dates we already have."
+                  : "Plan details stay as they are — this row isn't linked to a customer yet."}
+              </OutcomeLine>
+            )}
+
+            {/* Provider status */}
+            {writes.provider_status ? (
+              <OutcomeLine kind="will">
+                Will record the provider's current status for this connection (
+                {event.current.service_status ?? "unknown"})
+              </OutcomeLine>
+            ) : suppressedFor("update_provider_status") ? (
+              <OutcomeLine kind="blocked">
+                <Blocked>Won't record the provider's status</Blocked> — your sync settings
+                don't allow it (change this in Settings → Integrations).
+              </OutcomeLine>
+            ) : (
+              <OutcomeLine kind="nothing">
+                {linked
+                  ? "Provider status stays as it is — it hasn't changed since the last import."
+                  : "Provider status stays as it is — this row isn't linked to a customer yet."}
+              </OutcomeLine>
+            )}
+
+            {/* Identity — always policy-blocked when listed */}
             {suppressed
               .filter((s) => s.policy_key.startsWith("update_identity"))
               .map((s) => (
-                <WriteLine
-                  key={s.policy_key}
-                  label={s.what}
-                  allowed={false}
-                  suppressedBy={s.policy_key}
-                />
+                <OutcomeLine key={s.policy_key} kind="blocked">
+                  <Blocked>
+                    Won't change this customer's{" "}
+                    {s.policy_key === "update_identity_name" ? "name" : "mobile number"} to
+                    what the provider has
+                  </Blocked>{" "}
+                  — your sync settings don't allow provider imports to change customer
+                  details (change this in Settings → Integrations).
+                </OutcomeLine>
               ))}
           </ul>
 
-          {writes.charge && Number.isFinite(chargeAmount as number) && (
-            <div className="mt-3 rounded-md border border-border bg-muted/40 p-2">
-              <p className="text-sm">
-                Charge <strong>₹{(chargeAmount as number).toFixed(2)}</strong>
-                {chargeDuration && chargeDuration > 1 ? ` · ${chargeDuration} periods` : ""}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {packLabel ?? "Mapped pack"}
-                {packValidityDays ? ` · ${packValidityDays}-day validity` : ""} — posted by
-                creating the subscription, not typed in.
-              </p>
-            </div>
+          {writes.charge && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              The charge is posted by creating the subscription — the amount comes from the
+              pack's own price, it is never typed in here.
+            </p>
           )}
+
 
           {renewalMismatch && (
             <p className="mt-2 text-xs text-destructive flex items-start gap-1.5">

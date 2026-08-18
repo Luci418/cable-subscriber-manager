@@ -44,9 +44,13 @@ export async function loadReviewContext(
   providerId: string,
   reportType: ProviderReportType,
 ): Promise<ReviewContext> {
-  const [providerRes, devicesRes, subsRes, stateRes, mappingsRes, packsRes, baselineRes] =
+  const [providerRes, devicesRes, subsRes, stateRes, mappingsRes, packsRes, activeSubsRes, baselineRes] =
     await Promise.all([
-      supabase.from("providers").select("id, name, sync_policy").eq("id", providerId).maybeSingle(),
+      supabase
+        .from("providers")
+        .select("id, name, service_type, sync_policy")
+        .eq("id", providerId)
+        .maybeSingle(),
       supabase.from("stb_inventory").select("vc_id, serial_number, subscriber_id"),
       supabase.from("subscribers").select("id, name, subscriber_id, mobile, hathway_customer_nbr"),
       // Tier-3 identity is NOT the legacy column alone: every link an operator
@@ -62,6 +66,13 @@ export async function loadReviewContext(
         .select("provider_plan_key, pack_id")
         .eq("provider_id", providerId),
       supabase.from("packs").select("id, name, price, validity_days"),
+      // Who already has an active subscription. A row the operator identifies
+      // for the first time only proposes writes when the customer has nothing
+      // running — that is what makes "newly identified" a real activation.
+      supabase
+        .from("subscriptions")
+        .select("subscriber_id, service_type")
+        .eq("status", "active"),
       supabase
         .from("provider_import_runs")
         .select("id, snapshot_data, imported_at, results")
@@ -73,6 +84,7 @@ export async function loadReviewContext(
         .maybeSingle(),
     ]);
 
+
   const firstError =
     providerRes.error ||
     devicesRes.error ||
@@ -80,8 +92,19 @@ export async function loadReviewContext(
     stateRes.error ||
     mappingsRes.error ||
     packsRes.error ||
+    activeSubsRes.error ||
     baselineRes.error;
   if (firstError) throw firstError;
+
+  const providerServiceType = (providerRes.data as { service_type?: string } | null)?.service_type ?? "cable";
+  const subscribersWithActiveSubscription = [
+    ...new Set(
+      (activeSubsRes.data ?? [])
+        .filter((s) => s.service_type === providerServiceType)
+        .map((s) => s.subscriber_id),
+    ),
+  ];
+
 
   const subscriberByVcId: Record<string, string> = {};
   const subscriberBySerial: Record<string, string> = {};
@@ -162,6 +185,8 @@ export async function loadReviewContext(
     subscriberByAccountNumber,
     packIdByProviderKey,
     forcedReviewKeys,
+    subscribersWithActiveSubscription,
+
     policy: getSyncPolicy(providerRes.data),
     packById,
     subscriberLabelById,

@@ -57,12 +57,19 @@ export function deriveReview(
   const subscriberBySerial = { ...base.subscriberBySerial };
   const subscriberByAccountNumber = { ...base.subscriberByAccountNumber };
   const subscriberLabelById = { ...base.subscriberLabelById };
+  /**
+   * Rows the operator identified in THIS session. Identity itself is a trigger
+   * for writes when the customer has nothing running — see `resolveEvent`.
+   */
+  const newlyIdentifiedKeys: string[] = [];
 
   for (const e of events) {
     const target =
       decisions.links[e.key] ??
       (decisions.prospects[e.key] ? `${PROSPECT_PREFIX}${e.key}` : null);
     if (!target) continue;
+
+    newlyIdentifiedKeys.push(e.key);
 
     if (isProspectPlaceholder(target)) {
       subscriberLabelById[target] = "New customer — created on approve";
@@ -82,11 +89,13 @@ export function deriveReview(
     subscriberBySerial,
     subscriberByAccountNumber,
     subscriberLabelById,
+    newlyIdentifiedKeys,
     packIdByProviderKey: {
       ...base.packIdByProviderKey,
       ...decisions.packOverrides,
     },
   };
+
 
   return { ...resolveEvents(events, ctx), ctx };
 }
