@@ -250,12 +250,21 @@ function ResolvedRowCardImpl({
 
         <Section label="Event">
           {event.changed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {event.previous === null
-                ? "Not present in the last committed report"
-                : "Identical to the last committed report"}
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">
+                {event.previous === null
+                  ? "This connection wasn't in the last report we imported"
+                  : "Nothing changed in the report since the last import"}
+              </p>
+              {row.newly_identified && (
+                <p className="text-sm text-primary">
+                  …but you've just identified this customer for the first time and they
+                  have nothing running yet, so this is treated as a new activation.
+                </p>
+              )}
+            </div>
           ) : (
+
             <ul className="space-y-1">
               {event.changed.map((f) => (
                 <li key={f} className="text-sm">
