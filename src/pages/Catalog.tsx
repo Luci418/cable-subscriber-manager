@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+
 import { Plus, Tv, Wifi, Archive, RotateCcw, Trash2, Edit2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui-ext/PageHeader';
 import { DataTable, DataTableColumn } from '@/components/ui-ext/DataTable';
