@@ -175,6 +175,17 @@ function ResolvedRowCardImpl({
   const isConflict = match.status === "conflict";
   const isAnomaly = row.bucket === "anomaly";
   const resolvedByOperator = !!linkedLabel || !!prospectQueued;
+  const linked = match.status === "matched";
+
+  /** Plain-language reason a charge is NOT going to be posted. */
+  const noChargeReason = !linked
+    ? "No charge — this row isn't linked to a customer yet."
+    : isAnomaly
+      ? "No charge — the values on this row don't add up, so everything is on hold until you confirm it."
+      : pack.status === "unmapped"
+        ? "No charge — this provider plan isn't mapped to one of your packs yet."
+        : "No charge — nothing changed since the last import, and this customer already has this plan running.";
+
 
   // Rows that need a human stay open; everything else collapses to one line
   // so a 400-row report reads as a list, not a wall of cards.
