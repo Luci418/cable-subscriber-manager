@@ -233,3 +233,62 @@ describe("failed rows never diff away (baseline-corruption guard)", () => {
     expect(r.bucket).toBe("no_change");
   });
 });
+
+describe("newly identified this session (identity is itself a trigger)", () => {
+  const rows = [row()];
+
+  it("proposes a real charge for a byte-identical row the operator just linked", () => {
+    const r = one(
+      rows,
+      rows,
+      ctx({ newlyIdentifiedKeys: ["VC001"], subscribersWithActiveSubscription: [] }),
+    );
+    expect(r.newly_identified).toBe(true);
+    expect(r.bucket).toBe("new_activation");
+    expect(r.writes.charge).toBe(true);
+    expect(r.writes.plan_state).toBe(true);
+    expect(r.writes.provider_status).toBe(true);
+  });
+
+  it("does NOT trigger when the customer already has an active subscription", () => {
+    const r = one(
+      rows,
+      rows,
+      ctx({ newlyIdentifiedKeys: ["VC001"], subscribersWithActiveSubscription: ["sub-1"] }),
+    );
+    expect(r.newly_identified).toBe(false);
+    expect(r.bucket).toBe("no_change");
+    expect(r.writes.charge).toBe(false);
+  });
+
+  it("does not loosen no_change for rows already matched before this session", () => {
+    const r = one(rows, rows, ctx({ subscribersWithActiveSubscription: [] }));
+    expect(r.newly_identified).toBe(false);
+    expect(r.bucket).toBe("no_change");
+    expect(r.writes.charge).toBe(false);
+  });
+
+  it("does not trigger for an inactive upstream row", () => {
+    const inactive = [row({ service_status: "DEACTIVE" })];
+    const r = one(
+      inactive,
+      inactive,
+      ctx({ newlyIdentifiedKeys: ["VC001"], subscribersWithActiveSubscription: [] }),
+    );
+    expect(r.writes.charge).toBe(false);
+  });
+
+  it("still refuses to charge when the plan has no local pack", () => {
+    const r = one(
+      rows,
+      rows,
+      ctx({
+        newlyIdentifiedKeys: ["VC001"],
+        subscribersWithActiveSubscription: [],
+        packIdByProviderKey: {},
+      }),
+    );
+    expect(r.bucket).toBe("unmapped_pack");
+    expect(r.writes.charge).toBe(false);
+  });
+});
