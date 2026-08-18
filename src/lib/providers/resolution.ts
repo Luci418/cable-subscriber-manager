@@ -97,6 +97,13 @@ export interface ResolvedRow {
   pack: PackResolution;
   bucket: ResolutionBucket;
   writes: ProposedWrites;
+  /**
+   * True when the operator identified this subscriber for the first time in
+   * THIS review session and that subscriber has no active subscription on
+   * file. Such a row proposes writes even when the report bytes are identical
+   * to the last committed snapshot (see `resolveEvent`).
+   */
+  newly_identified: boolean;
   /** Writes the data supports but policy forbids. Shown, never applied. */
   suppressed_by_policy: SuppressedWrite[];
 }
@@ -122,8 +129,17 @@ export interface ResolutionContext {
    * into `needs_review` until they commit cleanly once.
    */
   forcedReviewKeys?: string[];
+  /**
+   * Row keys the operator linked or queued as a new customer in this session.
+   * Learning who a row belongs to is itself a trigger for writes — see
+   * `resolveEvent`.
+   */
+  newlyIdentifiedKeys?: string[];
+  /** Subscriber ids that already have an active subscription for this service. */
+  subscribersWithActiveSubscription?: string[];
   policy: SyncPolicy;
 }
+
 
 /** Event types that represent money moving upstream. */
 const CHARGE_EVENTS = new Set(["new_activation", "renewal", "plan_change"]);
