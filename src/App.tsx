@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Home from "./pages/Home";
 import Customers from "./pages/Customers";
 import { SettingsProvider } from "./contexts/SettingsContext";
+import { AuthProvider } from "./hooks/useAuth";
 
 /**
  * Route-level code splitting. Home, Customers, Auth and the shell stay in the
