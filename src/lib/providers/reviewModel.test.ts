@@ -56,10 +56,14 @@ function row(overrides: Partial<ProviderReportRow> = {}): ProviderReportRow {
 }
 
 describe("deriveReview subscribersWithActiveSubscription wiring", () => {
-  it("proposes a charge for a newly linked row when the customer has no active subscription", () => {
+  it("proposes a charge for a newly linked, unchanged row when the customer has no active subscription", () => {
+    // Same row in both baseline and current report => event type is no_change,
+    // but because the operator just linked it in this session, it should be
+    // treated as a real activation.
     const parsed = [row()];
     const base = baseContext({
       subscribersWithActiveSubscription: [],
+      baseline: [row()],
     });
     const decisions: OperatorDecisions = {
       links: { VC001: "sub-1" },
@@ -70,15 +74,17 @@ describe("deriveReview subscribersWithActiveSubscription wiring", () => {
     const result = deriveReview(base, parsed, decisions);
     const resolved = result.rows[0];
 
+    expect(resolved.event.type).toBe("no_change");
     expect(resolved.newly_identified).toBe(true);
     expect(resolved.bucket).toBe("new_activation");
     expect(resolved.writes.charge).toBe(true);
   });
 
-  it("does NOT propose a charge when the linked customer already has an active subscription", () => {
+  it("does NOT propose a charge for a newly linked, unchanged row when the customer already has an active subscription", () => {
     const parsed = [row()];
     const base = baseContext({
       subscribersWithActiveSubscription: ["sub-1"],
+      baseline: [row()],
     });
     const decisions: OperatorDecisions = {
       links: { VC001: "sub-1" },
@@ -89,20 +95,21 @@ describe("deriveReview subscribersWithActiveSubscription wiring", () => {
     const result = deriveReview(base, parsed, decisions);
     const resolved = result.rows[0];
 
+    expect(resolved.event.type).toBe("no_change");
     expect(resolved.newly_identified).toBe(false);
     expect(resolved.bucket).toBe("no_change");
     expect(resolved.writes.charge).toBe(false);
   });
 
-  it("filters active subscriptions by the provider's service type", () => {
-    // The context loader only populates this set with active subscriptions for
-    // the provider's service type. A different-service subscription must not
-    // be in the set, so it cannot block a charge for this service.
-    const parsed = [row({ base_plan: "Marathi 1", service_status: "ACTIVE" })];
+  it("does not block a genuine new-activation report row even when the subscriber has other active subscriptions", () => {
+    // When the report itself has no baseline row (genuine new activation), the
+    // event type is new_activation. The subscribersWithActiveSubscription guard
+    // is only meant to stop the "newly identified + unchanged report" shortcut
+    // from duplicating a charge; it must not silence a real upstream activation.
+    const parsed = [row()];
     const base = baseContext({
-      // This would only happen if the loader incorrectly included an internet
-      // subscription for a cable provider import.
       subscribersWithActiveSubscription: ["sub-1"],
+      baseline: [],
     });
     const decisions: OperatorDecisions = {
       links: { VC001: "sub-1" },
@@ -113,11 +120,13 @@ describe("deriveReview subscribersWithActiveSubscription wiring", () => {
     const result = deriveReview(base, parsed, decisions);
     const resolved = result.rows[0];
 
-    // The test above already proves the guard works; this test documents the
-    // loader's responsibility to keep the set service-specific.
-    expect(resolved.writes.charge).toBe(false);
+    expect(resolved.event.type).toBe("new_activation");
+    expect(resolved.newly_identified).toBe(false);
+    expect(resolved.bucket).toBe("new_activation");
+    expect(resolved.writes.charge).toBe(true);
   });
 });
+
 
 describe("deriveReview charge plan", () => {
   it("exposes the computed charge via the returned context", () => {
