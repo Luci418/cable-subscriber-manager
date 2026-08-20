@@ -235,7 +235,7 @@ export const Billing = () => {
       cell: (l) => (
         <div className="min-w-0">
           <Link
-            to={`/customers/${l.subscriber.id}`}
+            to={`/customers/${(l.subscriber as any).subscriber_id ?? l.subscriber.id}`}
             className="font-medium hover:underline truncate block max-w-[220px]"
           >
             {l.subscriber.name}
@@ -379,7 +379,7 @@ export const Billing = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <Link
-                      to={`/customers/${l.subscriber.id}`}
+                      to={`/customers/${(l.subscriber as any).subscriber_id ?? l.subscriber.id}`}
                       className="font-medium truncate hover:underline"
                     >
                       {l.subscriber.name}
