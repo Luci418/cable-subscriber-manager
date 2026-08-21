@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
+
 
 /**
  * AppDataContext — shared subscribers/transactions state for the routed
