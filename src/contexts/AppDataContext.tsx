@@ -38,7 +38,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     demand,
   );
 
-  const { reloadSubscribers } = subs;
+  // The hooks recreate their reload closures every render; keep them in refs
+  // so `requestFullData` stays referentially stable for consumer effects.
+  const reloadRef = useRef({ subs: subs.reloadSubscribers, txns: reloadTransactions });
+  reloadRef.current = { subs: subs.reloadSubscribers, txns: reloadTransactions };
+  const loadingRef = useRef(subs.loading);
+  loadingRef.current = subs.loading;
+  const demandRef = useRef(demand);
+  demandRef.current = demand;
 
   // Stamp the snapshot time whenever a load finishes.
   useEffect(() => {
@@ -53,17 +60,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
    * "Customer not found" and stale balances/subscriptions.
    */
   const requestFullData = useCallback(() => {
-    if (!demand) {
+    if (!demandRef.current) {
       setDemand(true);
       return;
     }
-    if (subs.loading) return;
+    if (loadingRef.current) return;
     if (Date.now() - lastLoadedAt.current > STALE_AFTER_MS) {
       lastLoadedAt.current = Date.now();
-      reloadSubscribers();
-      reloadTransactions();
+      reloadRef.current.subs();
+      reloadRef.current.txns();
     }
-  }, [demand, subs.loading, reloadSubscribers, reloadTransactions]);
+  }, []);
+
 
 
   return (
