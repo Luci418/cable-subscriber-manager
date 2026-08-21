@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
+
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { SubscriberDetail } from '@/components/SubscriberDetail';
@@ -40,6 +42,22 @@ export default function CustomerDetail() {
 
   const activeTab = tab && VALID_TABS.has(tab) ? tab : 'overview';
 
+  // Route param `:id` carries the human-readable subscriber_id (e.g. NORTH-001)
+  // so URLs are shareable. Internal DB writes still use subscriber.id (UUID).
+  const subscriber = subscribers.find((s) => (s as any).subscriber_id === id);
+
+  // A customer created after the shared snapshot was taken (e.g. straight
+  // after a provider import) isn't in the cached list yet. Refetch once
+  // before declaring it missing.
+  const retriedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || subscriber || !id) return;
+    if (retriedFor.current === id) return;
+    retriedFor.current = id;
+    reloadSubscribers();
+    reloadTransactions();
+  }, [loading, subscriber, id, reloadSubscribers, reloadTransactions]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -48,10 +66,14 @@ export default function CustomerDetail() {
     );
   }
 
-  // Route param `:id` carries the human-readable subscriber_id (e.g. NORTH-001)
-  // so URLs are shareable. Internal DB writes still use subscriber.id (UUID).
-  const subscriber = subscribers.find((s) => (s as any).subscriber_id === id);
   if (!subscriber) {
+    if (retriedFor.current !== id) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
       <EmptyState
         title="Customer not found"
@@ -60,6 +82,7 @@ export default function CustomerDetail() {
       />
     );
   }
+
 
   const selectedTransactions = transactions.filter((t) => t.subscriber_id === subscriber.id);
 

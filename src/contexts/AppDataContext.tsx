@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscribers } from '@/hooks/useSubscribers';
 import { useTransactions } from '@/hooks/useTransactions';
+
 
 /**
  * AppDataContext — shared subscribers/transactions state for the routed
@@ -23,16 +24,55 @@ type Ctx = ReturnType<typeof useSubscribers> & {
 
 const AppDataCtx = createContext<Ctx | null>(null);
 
+/** How long a loaded snapshot is considered fresh (ms). */
+const STALE_AFTER_MS = 15_000;
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [demand, setDemand] = useState(false);
-  const requestFullData = useCallback(() => setDemand(true), []);
+  const lastLoadedAt = useRef(0);
   const subs = useSubscribers(user?.id, demand);
   const { transactions, addTransaction, reloadTransactions } = useTransactions(
     user?.id,
     undefined,
     demand,
   );
+
+  // The hooks recreate their reload closures every render; keep them in refs
+  // so `requestFullData` stays referentially stable for consumer effects.
+  const reloadRef = useRef({ subs: subs.reloadSubscribers, txns: reloadTransactions });
+  reloadRef.current = { subs: subs.reloadSubscribers, txns: reloadTransactions };
+  const loadingRef = useRef(subs.loading);
+  loadingRef.current = subs.loading;
+  const demandRef = useRef(demand);
+  demandRef.current = demand;
+
+  // Stamp the snapshot time whenever a load finishes.
+  useEffect(() => {
+    if (demand && !subs.loading) lastLoadedAt.current = Date.now();
+  }, [demand, subs.loading]);
+
+  /**
+   * Consumers call this on mount. The first call kicks off the load; later
+   * calls refetch when the snapshot has gone stale — without this, a page
+   * opened after an import (or after balances changed elsewhere) rendered
+   * the snapshot taken when the shell first mounted, which surfaced as
+   * "Customer not found" and stale balances/subscriptions.
+   */
+  const requestFullData = useCallback(() => {
+    if (!demandRef.current) {
+      setDemand(true);
+      return;
+    }
+    if (loadingRef.current) return;
+    if (Date.now() - lastLoadedAt.current > STALE_AFTER_MS) {
+      lastLoadedAt.current = Date.now();
+      reloadRef.current.subs();
+      reloadRef.current.txns();
+    }
+  }, []);
+
+
 
   return (
     <AppDataCtx.Provider
