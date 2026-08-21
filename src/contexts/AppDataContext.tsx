@@ -24,16 +24,46 @@ type Ctx = ReturnType<typeof useSubscribers> & {
 
 const AppDataCtx = createContext<Ctx | null>(null);
 
+/** How long a loaded snapshot is considered fresh (ms). */
+const STALE_AFTER_MS = 15_000;
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [demand, setDemand] = useState(false);
-  const requestFullData = useCallback(() => setDemand(true), []);
+  const lastLoadedAt = useRef(0);
   const subs = useSubscribers(user?.id, demand);
   const { transactions, addTransaction, reloadTransactions } = useTransactions(
     user?.id,
     undefined,
     demand,
   );
+
+  const { reloadSubscribers } = subs;
+
+  // Stamp the snapshot time whenever a load finishes.
+  useEffect(() => {
+    if (demand && !subs.loading) lastLoadedAt.current = Date.now();
+  }, [demand, subs.loading]);
+
+  /**
+   * Consumers call this on mount. The first call kicks off the load; later
+   * calls refetch when the snapshot has gone stale — without this, a page
+   * opened after an import (or after balances changed elsewhere) rendered
+   * the snapshot taken when the shell first mounted, which surfaced as
+   * "Customer not found" and stale balances/subscriptions.
+   */
+  const requestFullData = useCallback(() => {
+    if (!demand) {
+      setDemand(true);
+      return;
+    }
+    if (Date.now() - lastLoadedAt.current > STALE_AFTER_MS) {
+      lastLoadedAt.current = Date.now();
+      reloadSubscribers();
+      reloadTransactions();
+    }
+  }, [demand, reloadSubscribers, reloadTransactions]);
+
 
   return (
     <AppDataCtx.Provider
