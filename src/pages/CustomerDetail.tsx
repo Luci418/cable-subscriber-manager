@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
+
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { SubscriberDetail } from '@/components/SubscriberDetail';
