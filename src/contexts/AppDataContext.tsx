@@ -57,12 +57,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setDemand(true);
       return;
     }
+    if (subs.loading) return;
     if (Date.now() - lastLoadedAt.current > STALE_AFTER_MS) {
       lastLoadedAt.current = Date.now();
       reloadSubscribers();
       reloadTransactions();
     }
-  }, [demand, reloadSubscribers, reloadTransactions]);
+  }, [demand, subs.loading, reloadSubscribers, reloadTransactions]);
 
 
   return (
