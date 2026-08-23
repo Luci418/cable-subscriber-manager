@@ -45,6 +45,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/lib/permissions';
 import { useProviders } from '@/hooks/useProviders';
 import { usePacks } from '@/hooks/usePacks';
+import { useAppDataLazy } from '@/contexts/AppDataContext';
 import { parseCustomerMaster, CUSTOMER_MASTER_PARSER_VERSION } from '@/lib/providers/hathway/parseCustomerMaster';
 import { detectEvents } from '@/lib/providers/diffEngine';
 import { normKey, type ResolutionBucket, type ResolvedRow } from '@/lib/providers/resolution';
@@ -87,6 +88,7 @@ export default function ProviderImport() {
   const { canSyncProvider, loading: permsLoading } = usePermissions();
   const { providers } = useProviders(user?.id);
   const { packs } = usePacks(user?.id);
+  const { invalidateAppData } = useAppDataLazy();
 
   const cableProviders = useMemo(
     () => providers.filter((p) => p.service_type === 'cable' && p.is_active),
@@ -110,6 +112,23 @@ export default function ProviderImport() {
   const [linkPick, setLinkPick] = useState<SubscriberComboboxValue | null>(null);
   const [mapTarget, setMapTarget] = useState<{ key: string; label: string } | null>(null);
   const [mapPick, setMapPick] = useState<string>('');
+  /**
+   * Cross-provider mapping guard: a Hathway plan mapped to a pack owned by a
+   * different provider silently rewrites the customer's recorded provider.
+   * Warn — never block; some cross-provider mappings are legitimate.
+   */
+  const crossProviderPack = useMemo(() => {
+    if (!mapPick) return null;
+    const pack = packs.find((p) => p.id === mapPick);
+    const packProviderId = (pack as { provider_id?: string | null } | undefined)?.provider_id ?? null;
+    if (!pack || !packProviderId || !providerId || packProviderId === providerId) return null;
+    return {
+      pack: pack.name,
+      packProvider: providers.find((p) => p.id === packProviderId)?.name ?? 'another provider',
+      importProvider: providers.find((p) => p.id === providerId)?.name ?? 'this provider',
+    };
+  }, [mapPick, packs, providers, providerId]);
+
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -324,6 +343,11 @@ export default function ProviderImport() {
         ` · ${data?.states_updated ?? 0} upstream records, ${data?.prospects_created ?? 0} new customers` +
         (data?.errors ? ` · ${data.errors} rows failed and will return for review` : ''),
     );
+    // A commit creates customers, subscriptions and charges server-side, so
+    // the shared snapshot is stale the moment it succeeds. Invalidate rather
+    // than waiting for the 15s age-out (the operator clicks straight through
+    // to a newly created customer).
+    invalidateAppData();
     clearLocal();
   };
 
@@ -663,9 +687,22 @@ export default function ProviderImport() {
               ))}
             </SelectContent>
           </Select>
+          {crossProviderPack && (
+            <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+              <p className="font-medium">This pack belongs to a different provider</p>
+              <p className="text-muted-foreground mt-1">
+                “{crossProviderPack.pack}” is owned by {crossProviderPack.packProvider}, but this
+                import is for {crossProviderPack.importProvider}. Customers matched on this plan
+                will be recorded against {crossProviderPack.packProvider}. Continue only if that
+                is intended.
+              </p>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setMapTarget(null)}>Cancel</Button>
-            <Button onClick={mapPack} disabled={!mapPick}>Save mapping</Button>
+            <Button onClick={mapPack} disabled={!mapPick}>
+              {crossProviderPack ? 'Save anyway' : 'Save mapping'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
