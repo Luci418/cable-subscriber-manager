@@ -20,7 +20,16 @@ type Ctx = ReturnType<typeof useSubscribers> & {
   addTransaction: ReturnType<typeof useTransactions>['addTransaction'];
   reloadTransactions: ReturnType<typeof useTransactions>['reloadTransactions'];
   requestFullData: () => void;
+  /**
+   * Explicit invalidation for write actions that happen OUTSIDE the shared
+   * hooks (e.g. a provider import commit, which creates customers, charges
+   * and subscriptions server-side). Without this the profile of a
+   * just-imported customer would only be guaranteed fresh after the 15s
+   * age-out — a real window for "Customer not found" / stale balances.
+   */
+  invalidateAppData: () => void;
 };
+
 
 const AppDataCtx = createContext<Ctx | null>(null);
 
