@@ -20,7 +20,16 @@ type Ctx = ReturnType<typeof useSubscribers> & {
   addTransaction: ReturnType<typeof useTransactions>['addTransaction'];
   reloadTransactions: ReturnType<typeof useTransactions>['reloadTransactions'];
   requestFullData: () => void;
+  /**
+   * Explicit invalidation for write actions that happen OUTSIDE the shared
+   * hooks (e.g. a provider import commit, which creates customers, charges
+   * and subscriptions server-side). Without this the profile of a
+   * just-imported customer would only be guaranteed fresh after the 15s
+   * age-out — a real window for "Customer not found" / stale balances.
+   */
+  invalidateAppData: () => void;
 };
+
 
 const AppDataCtx = createContext<Ctx | null>(null);
 
@@ -73,6 +82,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
 
+  /** Mark the snapshot stale and refetch immediately if anyone is consuming it. */
+  const invalidateAppData = useCallback(() => {
+    lastLoadedAt.current = 0;
+    if (!demandRef.current || loadingRef.current) return;
+    lastLoadedAt.current = Date.now();
+    reloadRef.current.subs();
+    reloadRef.current.txns();
+  }, []);
 
   return (
     <AppDataCtx.Provider
@@ -82,8 +99,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addTransaction,
         reloadTransactions,
         requestFullData,
+        invalidateAppData,
       }}
     >
+
       {children}
     </AppDataCtx.Provider>
   );

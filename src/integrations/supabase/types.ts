@@ -1508,6 +1508,7 @@ export type Database = {
           p_duration: number
           p_pack_id: string
           p_service_type: string
+          p_source?: Database["public"]["Enums"]["transaction_source"]
           p_subscriber_id: string
         }
         Returns: Json
@@ -1546,6 +1547,7 @@ export type Database = {
           p_pack_id: string
           p_periods?: number
           p_service_type: string
+          p_source?: Database["public"]["Enums"]["transaction_source"]
           p_subscriber_id: string
         }
         Returns: Json

@@ -98,6 +98,30 @@ export const PackManagementDialog = ({ open, onOpenChange }: PackManagementDialo
       // mapping it by hand during review (INV-51 freezes it at commit time).
       const key = formData.provider_plan_key.trim();
       if (key) {
+        // Cross-provider guard: if this plan name is already mapped under a
+        // DIFFERENT provider, mapping it here silently changes which provider
+        // synced customers are recorded against. Warn, never block.
+        const { data: clash } = await supabase
+          .from('provider_pack_mappings')
+          .select('provider_id')
+          .eq('provider_plan_key', key)
+          .neq('provider_id', formData.provider_id)
+          .limit(1)
+          .maybeSingle();
+        if (clash?.provider_id) {
+          const other = providers.find((p) => p.id === clash.provider_id)?.name ?? 'another provider';
+          const { confirm } = await import('@/lib/confirm');
+          const ok = await confirm({
+            title: 'Plan name already used by another provider',
+            description: `“${key}” is already mapped under ${other}. Mapping it to this pack means customers on this plan will be recorded against this pack's provider instead. Continue only if that is intended.`,
+            confirmText: 'Map anyway',
+          });
+          if (!ok) {
+            toast.success(editingId ? 'Pack updated (plan name not mapped)' : 'Pack added (plan name not mapped)');
+            resetForm();
+            return;
+          }
+        }
         const { error } = await supabase
           .from('provider_pack_mappings')
           .upsert(
