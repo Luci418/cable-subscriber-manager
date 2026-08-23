@@ -82,6 +82,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
 
+  /** Mark the snapshot stale and refetch immediately if anyone is consuming it. */
+  const invalidateAppData = useCallback(() => {
+    lastLoadedAt.current = 0;
+    if (!demandRef.current || loadingRef.current) return;
+    lastLoadedAt.current = Date.now();
+    reloadRef.current.subs();
+    reloadRef.current.txns();
+  }, []);
 
   return (
     <AppDataCtx.Provider
@@ -91,8 +99,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addTransaction,
         reloadTransactions,
         requestFullData,
+        invalidateAppData,
       }}
     >
+
       {children}
     </AppDataCtx.Provider>
   );
