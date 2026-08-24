@@ -348,8 +348,13 @@ export default function ProviderImport() {
     // than waiting for the 15s age-out (the operator clicks straight through
     // to a newly created customer).
     invalidateAppData();
+    const runId = review.runId;
     clearLocal();
+    // Land on the run report: the operator's next question is always "what
+    // exactly did that change?", and the toast can't answer it per customer.
+    navigate(`/integrations/hathway/runs/${runId}`);
   };
+
 
   const mapPack = async () => {
     if (!review || !mapTarget || !mapPick) return;
