@@ -26,6 +26,8 @@ const importEquipment = () => import("./pages/Equipment");
 const importEquipmentDetail = () => import("./pages/EquipmentDetail");
 const importCatalog = () => import("./pages/Catalog");
 const importProviderImport = () => import("./pages/ProviderImport");
+const importImportRuns = () => import("./pages/ImportRuns");
+const importImportRunDetail = () => import("./pages/ImportRunDetail");
 const importBilling = () => import("./pages/Billing");
 const importAnalytics = () => import("./pages/Analytics");
 const importComplaints = () => import("./pages/Complaints");
@@ -38,6 +40,8 @@ const Equipment = lazy(importEquipment);
 const EquipmentDetail = lazy(importEquipmentDetail);
 const Catalog = lazy(importCatalog);
 const ProviderImport = lazy(importProviderImport);
+const ImportRuns = lazy(importImportRuns);
+const ImportRunDetail = lazy(importImportRunDetail);
 const Billing = lazy(() => importBilling().then((m) => ({ default: m.Billing })));
 const Analytics = lazy(() => importAnalytics().then((m) => ({ default: m.Analytics })));
 const Complaints = lazy(() => importComplaints().then((m) => ({ default: m.Complaints })));
@@ -63,6 +67,7 @@ function usePrefetchRoutes() {
         importCustomerNew,
         importEquipmentDetail,
         importProviderImport,
+        importImportRuns,
       ].forEach((load) => {
         void load().catch(() => {});
       });
@@ -140,6 +145,8 @@ const AppRoutes = () => {
           <Route path="analytics" element={<AnalyticsRoute />} />
           <Route path="complaints" element={<ComplaintsRoute />} />
           <Route path="integrations/hathway" element={<ProviderImport />} />
+          <Route path="integrations/hathway/runs" element={<ImportRuns />} />
+          <Route path="integrations/hathway/runs/:runId" element={<ImportRunDetail />} />
           <Route path="settings" element={<Navigate to="/settings/company" replace />} />
           <Route path="settings/:section" element={<Settings />} />
         </Route>
