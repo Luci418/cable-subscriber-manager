@@ -440,7 +440,12 @@ const IntegrationsSection = () => {
           </p>
 
           <div>
-            <p className="text-sm font-medium mb-2">Recent imports</p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium">Recent imports</p>
+              <Link to="/integrations/hathway/runs" className="text-xs text-muted-foreground hover:underline">
+                View all
+              </Link>
+            </div>
             {loadingRuns ? (
               <p className="text-xs text-muted-foreground rounded-md border border-dashed p-3">Loading…</p>
             ) : runs.length === 0 ? (
@@ -449,10 +454,14 @@ const IntegrationsSection = () => {
               </p>
             ) : (
               <div className="rounded-md border divide-y text-sm">
-                {runs.map((r) => {
+                {runs.slice(0, 5).map((r) => {
                   const res = (r.results ?? {}) as Record<string, number>;
                   return (
-                    <div key={r.id} className="p-3">
+                    <Link
+                      key={r.id}
+                      to={`/integrations/hathway/runs/${r.id}`}
+                      className="block p-3 hover:bg-accent/40 transition-colors"
+                    >
                       <div className="font-medium truncate">{r.file_name ?? 'Customer Master'}</div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(r.committed_at ?? r.imported_at).toLocaleString()} · {r.row_count} rows
@@ -462,12 +471,13 @@ const IntegrationsSection = () => {
                           <span className="text-destructive"> · {res.errors} errors</span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
             )}
           </div>
+
         </div>
       </SectionCard>
     </div>
