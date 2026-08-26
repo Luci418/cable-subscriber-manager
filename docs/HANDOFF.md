@@ -93,7 +93,7 @@ src/
 supabase/migrations/  — SQL migrations (append-only, timestamped)
 test/db/         — pgTAP tests (11 files, 44 assertions)
 docs/            — all long-form documentation (see docs/README.md)
-.lovable/plan.md — current active build plan
+.lovable/plan.md — superseded-plan note; points at the canonical doc
 ```
 
 ## 5. Provider integration — how it got here
