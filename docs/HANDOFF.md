@@ -40,11 +40,12 @@ credentials, legacy column retirement (JSONB blobs, `current_pack*`,
 dialogs, catalog page, pack margin analytics, Testing Sprint 1 & 2
 (pgTAP + Vitest: 46 Vitest tests, 11 pgTAP files / 44 assertions).
 
-**Currently in planning, not built:** provider integration (Hathway
-snapshot import + write-through to provider portal). See `.lovable/plan.md`
-for the current direction — it changed on 2026-07-28 from a
-diff-and-apply engine to a write-through-first model where our app leads
-and the provider portal follows.
+**Provider integration is built and tested end-to-end** (2026-08): Hathway
+report import with an upload → review → approve pipeline. The operator
+exports from the Hathway portal, we diff against the last committed run,
+the operator approves, and only then is anything written. Canonical doc:
+`docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md`; decisions ADR-013 … ADR-024;
+rules INV-46 … INV-52.
 
 **Blockers:** none. **Known regressions:** none.
 
@@ -90,14 +91,14 @@ src/
                      activeSubs, subscriberIdGenerator, timeSync, confirm)
   integrations/supabase/ — auto-generated client + types (do not edit)
 supabase/migrations/  — SQL migrations (append-only, timestamped)
-test/db/         — pgTAP tests (11 files, 44 assertions)
+test/db/         — pgTAP tests (13 files)
 docs/            — all long-form documentation (see docs/README.md)
-.lovable/plan.md — current active build plan
+.lovable/plan.md — superseded-plan note; points at the canonical doc
 ```
 
-## 5. Provider integration — the current live discussion
+## 5. Provider integration — how it got here
 
-Two design iterations happened. A new thread should understand both:
+Three design iterations happened. A new thread should understand all three:
 
 - **v1 (rejected):** classic importer — parse Hathway TSV, upsert into local
   tables. Rejected because reports are event-evidence, not the truth.
@@ -105,18 +106,22 @@ Two design iterations happened. A new thread should understand both:
   diff, review dashboard, auto-create charges from detected renewals.
   Documented in the older `.lovable/plan.md` (git history) and
   `docs/PROVIDER_INTEGRATION_ARCHITECTURE.md`.
-- **v3 (current, 2026-07-28):** write-through-first — operator acts in
+- **v3 (superseded, 2026-07-28):** write-through-first — operator acts in
   our app, we generate a `provider_action_intent` row, then assist the
-  operator to reproduce the action on the Hathway portal (checklist →
-  deep-link → optional browser automation). Reactive snapshot diffing
-  survives, but only as a reconciliation safety net. See
-  `.lovable/plan.md` for the full plan.
+  operator to reproduce the action on the Hathway portal. Reversed on
+  2026-07-31: Hathway offers no API and the operator provisions on the
+  portal first, so a model where our app leads described a workflow that
+  does not exist. No `provider_action_intent` table was ever built.
+- **v4 (current, shipped 2026-08):** reactive snapshot sync as the
+  **primary** mechanism — export → upload → diff against the last
+  committed run → operator review → approve → commit. See
+  `docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md` (canonical) and ADR-013.
 
 ## 6. Testing
 
 - `bun run test` — Vitest unit tests (46 tests). Covers financialPosition,
   ledgerRendering, activeSubs, subscriberIdGenerator.
-- `bun run test:db` — pgTAP against a throwaway Postgres (11 files, 44 assertions).
+- `bun run test:db` — pgTAP against a throwaway Postgres (13 files).
   Covers immutability triggers, role gates, RPC behaviour, RLS isolation,
   FIFO allocation.
 - No E2E/browser tests yet. Regression is manual per `docs/QA_TEST_PLAN.md`.

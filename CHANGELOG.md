@@ -10,6 +10,78 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Docs — Provider sync documentation pass (2026-08-26)
+- `ARCHITECTURE_DECISIONS.md`: added **ADR-013 … ADR-024** covering the provider sync workstream — direction reversal to reactive snapshot sync, ledger authority (INV-46), insert-only sync (INV-47), operator-approved commit, committed-baseline idempotency (INV-48), SMS-owned identity (INV-49), `getSyncPolicy` merge-with-defaults (INV-50), `subscriber_provider_state` shape, verbatim provider status, manual account number as identity key (INV-52), frozen commit interpretation (INV-51), and renewal vs. plan change vs. activation.
+- `.lovable/plan.md`: rewritten as a **superseded-plan note** pointing at `docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md` as canonical. The write-through-first / `provider_action_intent` model is documented as a possible future direction only, not current architecture.
+- `PROJECT_STATUS.md`: provider integration moved out of "Active work" into Completed milestones (PS-1 … PS-10). Next milestone is "none currently active".
+- `SYSTEM_INVARIANTS.md`: Provider Synchronization section re-marked against real test files — several rows moved 🔴 → 🟢.
+- `HANDOFF.md`: provider integration section rewritten; v3 write-through described as superseded by v4 reactive sync.
+
+### Backfill — Provider Synchronization Engine (2026-07-30 → 2026-08-24)
+
+> Milestone-level entries, reconstructed on 2026-08-26 per ADR-010
+> (append-only history; entries written after the fact are labelled as
+> such). Dates are milestone dates, not commit dates.
+
+- **Direction reversal (2026-07-31).** Confirmed the operator provisions
+  directly on the Hathway portal with no API access. Reactive snapshot sync
+  became the primary integration mechanism; the write-through-first model
+  from 2026-07-28 was superseded. See ADR-013.
+- **Invariants (2026-07-31 → 2026-08-24).** INV-46 … INV-50 added to
+  `BUSINESS_MODEL.md`; INV-51 (frozen commit interpretation) and INV-52
+  (manual provider identifiers) followed. Canonical range is now
+  INV-01 … INV-52.
+- **PS-1 — schema foundation.** `provider_import_runs`,
+  `provider_pack_mappings`, `subscriber_provider_state`,
+  `providers.sync_policy` (jsonb, defaults deny identity writes),
+  `stb_inventory.vc_id` + unique index, `transaction_source` gained
+  `provider_sync`, `can_sync_provider()` role gate, committed-run
+  immutability trigger.
+- **PS-2 — parsers.** Hathway Customer Master and Dashboard Status parsers
+  with row-shape validation; `parser_version` frozen onto the run at parse.
+- **PS-3 — diff engine.** Pure, side-effect-free diffing against the last
+  *committed* run for `(provider_id, report_type)`; activation, renewal,
+  plan-change and status-change detection; absence never treated as
+  termination.
+- **PS-4 — resolution layer.** Match order VC Id → serial → account number
+  (mobile never matches); vc/serial disagreement surfaces as a conflict;
+  `getSyncPolicy()` merge-with-defaults as the only policy read path;
+  `update_identity_address` flag removed as inert.
+- **PS-5 — review screen.** Per-row proposed actions in plain language,
+  unmapped-plan drill-down, `create_prospects` UI gate, performance work
+  for large reports.
+- **PS-6 — commit.** `commit_provider_import` and `cancel_provider_import`
+  RPCs; server-side policy enforcement; charges always priced from the local
+  catalog, never `dpo_total_price`; pack fields frozen into `results`
+  (INV-51); commit writes a `transaction_notes` row rather than touching an
+  immutable transaction.
+- **PS-7 — renewal correctness.** `extend_subscription()` extends in place
+  and targets a specific device when a subscriber has several active
+  subscriptions; unresolved device raises and the row lands in
+  `failed_keys`. Failed rows are carried forward so they can never be
+  diffed away as `no_change` (baseline-corruption guard).
+- **PS-8 — manual identity.** Provider Accounts card on the customer
+  profile, `save_provider_account` RPC refusing colliding numbers, unique
+  index behind it, bulk VC Id import.
+- **PS-9 — import run reports (2026-08-24).** `/integrations/hathway/runs`
+  history list and per-run detail page grouping every affected customer by
+  what actually happened (new customers, renewals, plan changes,
+  activations, state-only, skipped, failed), with charge totals read from
+  the frozen snapshot.
+- **PS-10 — agent integrations.** Read-only MCP tools: search subscribers,
+  get subscriber, list devices, list packs, list transactions, list
+  expiring subscriptions, business summary.
+- **Performance & correctness fixes shipped alongside.** `AuthProvider`
+  singleton + route prefetching; `AppDataContext` staleness window,
+  `requestFullData` and explicit `invalidateAppData` after a commit; Billing
+  customer links use the human-readable `subscriber_id`; cross-provider pack
+  mapping warnings in Catalog and import.
+- **Tests.** `test/db/12_provider_sync_schema.sql` (17 assertions) and
+  `test/db/13_extend_subscription_device.sql` (5 assertions); Vitest suites
+  for the diff engine, resolution layer, review model, sync policy and run
+  report.
+
+
 ### Docs — Fresh-thread handoff + provider integration re-scope (2026-07-28)
 - Added `docs/HANDOFF.md`: one-page onboarding for a new Claude / Gemini / ChatGPT thread, including the minimum-viable file-attachment list.
 - Rewrote `.lovable/plan.md`: provider integration pivots from a diff-and-apply sync engine to a **write-through-first** model. Operator acts in the SMS; the app records a `provider_action_intent`; operator is assisted to reproduce the action on the portal (checklist → deep-link → optional out-of-process browser automation). Reactive snapshot reconciliation is retained as a safety net only. No code shipped in this batch.

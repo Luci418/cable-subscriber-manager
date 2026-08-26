@@ -4,30 +4,28 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-29 (documentation consistency pass)
+Last updated: 2026-08-26 (provider sync workstream closed)
 
 ---
 
 ## Current milestone
 
-**Phase 6.5 — Consolidation Sprint & UX Foundation: COMPLETE.**
-All planned batches shipped: correctness fixes, legacy column
-retirement (JSONB blobs, `current_pack*`, `stb_number`), roles +
-permissions, encrypted credentials, reconciliation RPCs, standardized
-confirmation dialogs, catalog page, pack margin analytics, and
-Testing Sprints 1 & 2 (46 Vitest tests + 11 pgTAP files / 44 assertions).
+**Provider Sync (Hathway) — COMPLETE and tested end-to-end.**
+The operator exports a report from the Hathway portal, uploads it, reviews
+every proposed change, and approves. Only then is anything written.
+Shipped: Customer Master + Dashboard Status parsers, diff engine,
+resolution layer, review screen, `commit_provider_import` /
+`cancel_provider_import`, `extend_subscription` with device targeting,
+Provider Accounts card, import-run history and per-run detail report,
+and read-only MCP tools.
+
+Canonical design doc: `docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md`.
+Decisions: ADR-013 … ADR-024. Rules: INV-46 … INV-52.
 
 ## Active work
 
-**Provider integration — planning only, nothing shipped yet.**
-Design pivoted on 2026-07-28 from a diff-and-apply sync engine to a
-**write-through-first** model: operator acts in our app, the app records
-a `provider_action_intent`, and the operator is guided to reproduce the
-action on the Hathway/BSNL portal (checklist → deep-link → optional
-out-of-process browser automation). Reactive snapshot reconciliation
-survives as a safety net. See `.lovable/plan.md` for the full plan;
-`docs/PROVIDER_INTEGRATION_ARCHITECTURE.md` documents the earlier v2
-design (kept for context).
+None. No batch is in progress.
+
 
 ## Completed milestones
 
@@ -56,13 +54,27 @@ design (kept for context).
 | 6.5-K | Multi-STB and NULL-provider fixes; "no active connection" filter | ✅ |
 | 6.5-L | `packs.provider_cost` + Analytics Margin section | ✅ |
 | 6.5-M | Catalog page (`/catalog`), Hathway integration stub in Settings, `hathway_customer_nbr` column | ✅ |
+| PS-1 | Provider sync schema: `provider_import_runs`, `provider_pack_mappings`, `subscriber_provider_state`, `providers.sync_policy`, `stb_inventory.vc_id`, `transaction_source = 'provider_sync'` | ✅ |
+| PS-2 | Hathway parsers (Customer Master + Dashboard Status) with row-shape validation and frozen `parser_version` | ✅ |
+| PS-3 | Pure diff engine — activation / renewal / plan-change / status-change detection against the last committed run | ✅ |
+| PS-4 | Resolution layer: VC Id → serial → account-number matching, conflict detection, `getSyncPolicy` merge-with-defaults | ✅ |
+| PS-5 | Review screen: per-row proposed actions in plain language, unmapped-plan drill-down, prospect creation gate | ✅ |
+| PS-6 | `commit_provider_import` / `cancel_provider_import` RPCs; server-side policy enforcement; frozen pack snapshot (INV-51) | ✅ |
+| PS-7 | `extend_subscription` with device targeting for multi-STB households; failed rows carried forward, never diffed away | ✅ |
+| PS-8 | Provider Accounts card + `save_provider_account` RPC with collision refusal (INV-52); bulk VC Id import | ✅ |
+| PS-9 | Import-run history (`/integrations/hathway/runs`) and per-run detail report grouped by what actually changed | ✅ |
+| PS-10 | Read-only MCP tools (subscribers, devices, packs, transactions, expiring subscriptions, business summary) | ✅ |
 
 
-## Next milestone — Provider Integration Phase A′
+## Next milestone
 
-Write-through-first provider integration for Hathway (Cable) and BSNL
-(Internet). Full plan in `.lovable/plan.md`. Reactive snapshot
-reconciliation retained as safety net.
+**None currently active.** Nothing is queued. The most likely candidates,
+in no committed order, are Testing Sprint 3 (component / routing / E2E
+coverage — see `TESTING_ARCHITECTURE.md`), retiring the legacy
+`hathway_customer_nbr` column in favour of
+`subscriber_provider_state.provider_customer_number`, and BSNL (internet)
+as a second provider on the same sync pipeline.
+
 
 ## Deferred work
 
