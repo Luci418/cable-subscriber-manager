@@ -91,7 +91,7 @@ src/
                      activeSubs, subscriberIdGenerator, timeSync, confirm)
   integrations/supabase/ — auto-generated client + types (do not edit)
 supabase/migrations/  — SQL migrations (append-only, timestamped)
-test/db/         — pgTAP tests (11 files, 44 assertions)
+test/db/         — pgTAP tests (13 files)
 docs/            — all long-form documentation (see docs/README.md)
 .lovable/plan.md — superseded-plan note; points at the canonical doc
 ```
