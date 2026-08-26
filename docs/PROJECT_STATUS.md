@@ -54,13 +54,27 @@ None. No batch is in progress.
 | 6.5-K | Multi-STB and NULL-provider fixes; "no active connection" filter | ✅ |
 | 6.5-L | `packs.provider_cost` + Analytics Margin section | ✅ |
 | 6.5-M | Catalog page (`/catalog`), Hathway integration stub in Settings, `hathway_customer_nbr` column | ✅ |
+| PS-1 | Provider sync schema: `provider_import_runs`, `provider_pack_mappings`, `subscriber_provider_state`, `providers.sync_policy`, `stb_inventory.vc_id`, `transaction_source = 'provider_sync'` | ✅ |
+| PS-2 | Hathway parsers (Customer Master + Dashboard Status) with row-shape validation and frozen `parser_version` | ✅ |
+| PS-3 | Pure diff engine — activation / renewal / plan-change / status-change detection against the last committed run | ✅ |
+| PS-4 | Resolution layer: VC Id → serial → account-number matching, conflict detection, `getSyncPolicy` merge-with-defaults | ✅ |
+| PS-5 | Review screen: per-row proposed actions in plain language, unmapped-plan drill-down, prospect creation gate | ✅ |
+| PS-6 | `commit_provider_import` / `cancel_provider_import` RPCs; server-side policy enforcement; frozen pack snapshot (INV-51) | ✅ |
+| PS-7 | `extend_subscription` with device targeting for multi-STB households; failed rows carried forward, never diffed away | ✅ |
+| PS-8 | Provider Accounts card + `save_provider_account` RPC with collision refusal (INV-52); bulk VC Id import | ✅ |
+| PS-9 | Import-run history (`/integrations/hathway/runs`) and per-run detail report grouped by what actually changed | ✅ |
+| PS-10 | Read-only MCP tools (subscribers, devices, packs, transactions, expiring subscriptions, business summary) | ✅ |
 
 
-## Next milestone — Provider Integration Phase A′
+## Next milestone
 
-Write-through-first provider integration for Hathway (Cable) and BSNL
-(Internet). Full plan in `.lovable/plan.md`. Reactive snapshot
-reconciliation retained as safety net.
+**None currently active.** Nothing is queued. The most likely candidates,
+in no committed order, are Testing Sprint 3 (component / routing / E2E
+coverage — see `TESTING_ARCHITECTURE.md`), retiring the legacy
+`hathway_customer_nbr` column in favour of
+`subscriber_provider_state.provider_customer_number`, and BSNL (internet)
+as a second provider on the same sync pipeline.
+
 
 ## Deferred work
 
