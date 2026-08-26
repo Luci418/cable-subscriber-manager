@@ -4,30 +4,28 @@
 Update at the end of every major milestone. If it disagrees with any other
 doc, this file wins for status; the domain docs win for rules.
 
-Last updated: 2026-07-29 (documentation consistency pass)
+Last updated: 2026-08-26 (provider sync workstream closed)
 
 ---
 
 ## Current milestone
 
-**Phase 6.5 — Consolidation Sprint & UX Foundation: COMPLETE.**
-All planned batches shipped: correctness fixes, legacy column
-retirement (JSONB blobs, `current_pack*`, `stb_number`), roles +
-permissions, encrypted credentials, reconciliation RPCs, standardized
-confirmation dialogs, catalog page, pack margin analytics, and
-Testing Sprints 1 & 2 (46 Vitest tests + 11 pgTAP files / 44 assertions).
+**Provider Sync (Hathway) — COMPLETE and tested end-to-end.**
+The operator exports a report from the Hathway portal, uploads it, reviews
+every proposed change, and approves. Only then is anything written.
+Shipped: Customer Master + Dashboard Status parsers, diff engine,
+resolution layer, review screen, `commit_provider_import` /
+`cancel_provider_import`, `extend_subscription` with device targeting,
+Provider Accounts card, import-run history and per-run detail report,
+and read-only MCP tools.
+
+Canonical design doc: `docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md`.
+Decisions: ADR-013 … ADR-024. Rules: INV-46 … INV-52.
 
 ## Active work
 
-**Provider integration — planning only, nothing shipped yet.**
-Design pivoted on 2026-07-28 from a diff-and-apply sync engine to a
-**write-through-first** model: operator acts in our app, the app records
-a `provider_action_intent`, and the operator is guided to reproduce the
-action on the Hathway/BSNL portal (checklist → deep-link → optional
-out-of-process browser automation). Reactive snapshot reconciliation
-survives as a safety net. See `.lovable/plan.md` for the full plan;
-`docs/PROVIDER_INTEGRATION_ARCHITECTURE.md` documents the earlier v2
-design (kept for context).
+None. No batch is in progress.
+
 
 ## Completed milestones
 
