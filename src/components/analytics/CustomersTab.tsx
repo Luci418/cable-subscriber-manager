@@ -20,22 +20,25 @@ export const CustomersTab = ({
 
   return (
     <div className="space-y-4">
-      <AnalyticsCard
+      <ChartFrame
         title="Acquisition vs churn"
         description="New subscribers vs expired subscriptions per day"
       >
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={growthSeries}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="newC" fill="hsl(142 71% 45%)" name="New" />
-            <Bar dataKey="churnC" fill="hsl(0 84% 60%)" name="Churned" />
-          </BarChart>
-        </ResponsiveContainer>
-      </AnalyticsCard>
+        <div className="h-[240px] sm:h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={growthSeries} margin={{ left: 4, right: 8, top: 8 }}>
+              <CartesianGrid {...chartTheme.grid} />
+              <XAxis dataKey="date" {...chartTheme.axis} minTickGap={24} />
+              <YAxis {...chartTheme.axis} width={36} allowDecimals={false} />
+              <Tooltip contentStyle={chartTheme.tooltip} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.5 }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="newC" fill="hsl(var(--chart-1))" name="New" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="churnC" fill="hsl(var(--chart-4))" name="Churned" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartFrame>
+
 
       <div className="grid gap-4 xl:grid-cols-2">
         <AnalyticsCard
