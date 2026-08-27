@@ -688,23 +688,6 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         onCompareToggle={() => setCompare(c => !c)}
       />
 
-      <KpiStrip
-        compare={compare}
-        v={{
-          activeSubs,
-          totalSubs: subsScoped.length,
-          revenue,
-          revenuePrev,
-          charges,
-          collectionEff,
-          collectionEffPrev,
-          expiring7d,
-          outstanding,
-          arpu,
-          arpuPrev,
-        }}
-      />
-
       {/* Four working surfaces — only the active one renders, so charts and
           tables outside the current tab cost nothing. */}
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -716,8 +699,37 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         </TabsList>
 
         <TabsContent value="overview" className="mt-0">
-          <OverviewTab timeseries={timeseries} aging={aging} compare={compare} />
+          <OverviewTab
+            timeseries={heroSeries}
+            aging={aging}
+            compare={compare}
+            prevLabel="previous period"
+            kpi={{
+              activeSubs,
+              totalSubs: subsScoped.length,
+              revenue,
+              revenuePrev,
+              charges,
+              chargesPrev,
+              net,
+              netPrev,
+              newSubs,
+              newSubsPrev,
+              collectionEff,
+              collectionEffPrev,
+              expiring7d,
+              outstanding,
+              arpu,
+              arpuPrev,
+              netMargin: marginTotals.net,
+              marginKnown: marginTotals.cost > 0,
+            }}
+            topSubscribers={topSubscribers as any}
+            topDefaulters={topDefaulters as any}
+            onGoTo={setTab}
+          />
         </TabsContent>
+
 
         <TabsContent value="revenue" className="mt-0">
           <RevenueTab
