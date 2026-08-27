@@ -10,7 +10,7 @@ import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
 import { usePacks } from '@/hooks/usePacks';
 import { AnalyticsFilterBar } from '@/components/analytics/AnalyticsFilterBar';
-import { KpiStrip } from '@/components/analytics/KpiStrip';
+import { KpiValues } from '@/components/analytics/KpiRow';
 import { OverviewTab } from '@/components/analytics/OverviewTab';
 import { RevenueTab } from '@/components/analytics/RevenueTab';
 import { CustomersTab } from '@/components/analytics/CustomersTab';
