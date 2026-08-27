@@ -195,7 +195,7 @@ export function OverviewTab({
                       key: a.subscriptionId,
                       primary: `${a.packName} (no device)`,
                       statusText: outstanding > 0 ? `₹${outstanding.toFixed(0)} due` : 'Settled',
-                      statusClass: outstanding > 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
+                      tone: outstanding > 0 ? 'danger' as const : 'muted' as const,
                     });
                   });
                 const svcNet = svc.balance;
