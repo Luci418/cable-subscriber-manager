@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useRegions } from '@/hooks/useRegions';
 import { useSubscribersPaged, type ServiceFilter, type StatusFilter, type BalanceFilter, type ConnectionFilter } from '@/hooks/useSubscribersPaged';
-import { computeNextActionChip, chipToneClasses } from '@/lib/financialPosition';
+import { computeNextActionChip, chipDotClasses } from '@/lib/financialPosition';
 import { CollectPaymentDialog } from '@/components/CollectPaymentDialog';
 import type { Subscriber } from '@/hooks/useSubscribers';
 
@@ -154,12 +154,16 @@ export const SubscriberList = ({
         hideBelow: 'md',
         cell: (s) => {
           const chip = computeNextActionChip(s);
+          if (chip.tone === 'success') {
+            return <span className="text-xs text-muted-foreground">—</span>;
+          }
           return (
             <span
-              className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${chipToneClasses(chip.tone)}`}
+              className="inline-flex items-center gap-1.5 text-xs text-foreground max-w-[220px]"
+              title={chip.label}
             >
-              <span aria-hidden>{chip.icon}</span>
-              {chip.label}
+              <span aria-hidden className={`h-1.5 w-1.5 rounded-full shrink-0 ${chipDotClasses(chip.tone)}`} />
+              <span className="truncate">{chip.label}</span>
             </span>
           );
         },
