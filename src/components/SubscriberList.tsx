@@ -180,7 +180,7 @@ export const SubscriberList = ({
           return (
             <Money
               value={total}
-              className={total > 0 ? 'text-destructive font-semibold' : 'text-success font-medium'}
+              className={total > 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}
             />
           );
         },
