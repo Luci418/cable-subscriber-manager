@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import type { Subscriber } from '@/lib/storage';
 import { daysUntil } from '@/lib/activeSubs';
 import {
-  chipToneClasses,
+  chipDotClasses,
   computeNextActionChip,
   computeOverallPosition,
   positionToneClasses,
@@ -140,12 +140,17 @@ export function OverviewTab({
                   </p>
                 )}
               </div>
-              <span
-                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
-              >
-                <span aria-hidden>{chip.icon}</span>
-                {chip.label}
-              </span>
+              {chip.tone === 'success' ? (
+                <span className="text-xs text-muted-foreground">No action required</span>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground max-w-full sm:max-w-[280px]"
+                  title={chip.label}
+                >
+                  <span aria-hidden className={`h-1.5 w-1.5 rounded-full shrink-0 ${chipDotClasses(chip.tone)}`} />
+                  <span className="truncate">{chip.label}</span>
+                </span>
+              )}
             </div>
 
             <div className="space-y-2 text-sm">
@@ -160,16 +165,16 @@ export function OverviewTab({
                     : 0;
                   const daysLeft = sub ? daysUntil(sub.endDate) : null;
                   let statusText: string;
-                  let statusClass = 'text-muted-foreground';
+                  let tone: 'warning' | 'danger' | 'muted' = 'muted';
                   if (!sub) {
                     statusText = 'No active subscription';
-                    statusClass = 'text-yellow-700 dark:text-yellow-400';
+                    tone = 'warning';
                   } else if (daysLeft !== null && daysLeft < 0) {
                     statusText = `Expired ${Math.abs(daysLeft)}d ago${outstanding > 0 ? ` · ₹${outstanding.toFixed(0)} due` : ''}`;
-                    statusClass = 'text-red-700 dark:text-red-400';
+                    tone = 'danger';
                   } else if (outstanding > 0) {
                     statusText = `₹${outstanding.toFixed(0)} due`;
-                    statusClass = 'text-red-700 dark:text-red-400';
+                    tone = 'danger';
                   } else {
                     statusText = 'Settled';
                   }
@@ -177,7 +182,7 @@ export function OverviewTab({
                     key: dev.id,
                     primary: `${dev.serial_number}${sub?.packName ? ` (${sub.packName})` : ''}`,
                     statusText,
-                    statusClass,
+                    tone,
                   };
                 });
                 svc.actives
@@ -190,7 +195,7 @@ export function OverviewTab({
                       key: a.subscriptionId,
                       primary: `${a.packName} (no device)`,
                       statusText: outstanding > 0 ? `₹${outstanding.toFixed(0)} due` : 'Settled',
-                      statusClass: outstanding > 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
+                      tone: outstanding > 0 ? 'danger' as const : 'muted' as const,
                     });
                   });
                 const svcNet = svc.balance;
@@ -204,7 +209,10 @@ export function OverviewTab({
                       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                         <ServiceIcon className="h-3.5 w-3.5" /> {svcLabel}
                       </div>
-                      <span className={`text-xs font-medium ${positionToneClasses(svcNet > 0 ? 'outstanding' : svcNet < 0 ? 'available_credit' : 'settled')}`}>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${svcNet === 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {svcNet !== 0 && (
+                          <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${chipDotClasses(svcNet > 0 ? 'danger' : 'info')}`} />
+                        )}
                         {svcSummary}
                       </span>
                     </div>
@@ -215,7 +223,12 @@ export function OverviewTab({
                         {rows.map((r) => (
                           <li key={r.key} className="flex items-center justify-between gap-2 text-xs">
                             <span className="font-mono truncate">{r.primary}</span>
-                            <span className={`shrink-0 ${r.statusClass}`}>{r.statusText}</span>
+                            <span className={`shrink-0 inline-flex items-center gap-1.5 ${r.tone === 'muted' ? 'text-muted-foreground' : 'text-foreground'}`}>
+                              {r.tone !== 'muted' && (
+                                <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${chipDotClasses(r.tone)}`} />
+                              )}
+                              {r.statusText}
+                            </span>
                           </li>
                         ))}
                       </ul>

@@ -200,6 +200,17 @@ export const computeNextActionChip = (subscriber: any): NextActionChip => {
   return { label: 'No action required', tone: 'success', icon: '✅' };
 };
 
+/** Quiet dot-only color for calm status rendering (no pill, no emoji). */
+export const chipDotClasses = (tone: ChipTone): string => {
+  switch (tone) {
+    case 'success': return 'bg-green-500';
+    case 'warning': return 'bg-yellow-500';
+    case 'danger':  return 'bg-red-500';
+    case 'info':    return 'bg-blue-500';
+    case 'muted':   return 'bg-muted-foreground/40';
+  }
+};
+
 export const chipToneClasses = (tone: ChipTone): string => {
   switch (tone) {
     case 'success': return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30';
