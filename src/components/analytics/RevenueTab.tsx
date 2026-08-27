@@ -4,7 +4,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tv, Wifi } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AnalyticsCard, DistroPie, inr, tooltipStyle, useRowLimit } from './AnalyticsPrimitives';
+import { AnalyticsCard, ChartFrame, DistroPie, chartTheme, inr, useRowLimit } from './AnalyticsPrimitives';
 
 const kFmt = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`);
 
@@ -42,20 +42,27 @@ export const RevenueTab = ({
   return (
     <div className="space-y-4">
       {bothEnabled && (
-        <AnalyticsCard title="Cable vs Internet revenue" description="Daily payment split across services">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={serviceSplit}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={kFmt} />
-              <Tooltip formatter={(v: any) => inr(Number(v))} contentStyle={tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="cable" stackId="s" fill="hsl(217 91% 60%)" name="Cable" />
-              <Bar dataKey="internet" stackId="s" fill="hsl(142 71% 45%)" name="Internet" />
-            </BarChart>
-          </ResponsiveContainer>
-        </AnalyticsCard>
+        <ChartFrame title="Cable vs Internet revenue" description="Daily payment split across services">
+          <div className="h-[240px] sm:h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={serviceSplit} margin={{ left: 4, right: 8, top: 8 }}>
+                <CartesianGrid {...chartTheme.grid} />
+                <XAxis dataKey="date" {...chartTheme.axis} minTickGap={24} />
+                <YAxis {...chartTheme.axis} width={48} tickFormatter={kFmt} />
+                <Tooltip
+                  formatter={(v: any) => inr(Number(v))}
+                  contentStyle={chartTheme.tooltip}
+                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.5 }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="cable" stackId="s" fill="hsl(var(--chart-1))" name="Cable" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="internet" stackId="s" fill="hsl(var(--chart-2))" name="Internet" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartFrame>
       )}
+
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DistroPie title="Pack distribution" data={packDist} onBack={onBack}

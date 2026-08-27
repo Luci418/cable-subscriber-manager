@@ -1,67 +1,106 @@
-import {
-  AreaChart, Area, BarChart, Bar, Line, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
-import { AnalyticsCard, inr, tooltipStyle } from './AnalyticsPrimitives';
+import { useState } from 'react';
+import { HeroChart, HeroMetric } from './HeroChart';
+import { KpiRow, KpiValues } from './KpiRow';
+import { RankedList } from './RankedList';
+import { compactInr, inr } from './AnalyticsPrimitives';
 
-const kFmt = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`);
-
-/** Overview — how money came in over the period, and how old the dues are. */
+/**
+ * The landing surface: one full-width chart, the numbers underneath, and three
+ * short lists that answer "who paid", "who owes", "how old is the money".
+ */
 export const OverviewTab = ({
   timeseries,
   aging,
   compare,
+  prevLabel,
+  kpi,
+  topSubscribers,
+  topDefaulters,
+  onGoTo,
 }: {
   timeseries: any[];
   aging: { name: string; value: number }[];
   compare: boolean;
-}) => (
-  <div className="grid gap-4 xl:grid-cols-2">
-    <AnalyticsCard
-      title="Revenue over time"
-      description={`Payments collected${compare ? ', dashed line shows the previous period' : ''}`}
-    >
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={timeseries}>
-          <defs>
-            <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={kFmt} />
-          <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => inr(Number(v))} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Area type="monotone" dataKey="payments" stroke="hsl(var(--primary))" fill="url(#rev)" name="Payments" strokeWidth={2} />
-          <Line type="monotone" dataKey="charges" stroke="hsl(var(--destructive))" name="Charges" strokeWidth={1.5} dot={false} />
-          {compare && <Line type="monotone" dataKey="prev" stroke="hsl(var(--muted-foreground))" name="Previous period" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />}
-        </AreaChart>
-      </ResponsiveContainer>
-    </AnalyticsCard>
+  prevLabel: string;
+  kpi: KpiValues & {
+    chargesPrev: number;
+    net: number;
+    netPrev: number;
+    newSubs: number;
+    newSubsPrev: number;
+  };
+  topSubscribers: { sub: any; revenue: number; txns: number }[];
+  topDefaulters: { sub: any; balance: number }[];
+  onGoTo: (tab: string) => void;
+}) => {
+  const [metricKey, setMetricKey] = useState('payments');
 
-    <AnalyticsCard
-      title="Outstanding by age"
-      description="How long dues have been pending, based on the last payment"
-    >
-      {aging.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No outstanding dues</p>
-      ) : (
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={aging} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis type="number" tickFormatter={kFmt} tick={{ fontSize: 11 }} />
-            <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v: any) => inr(Number(v))} contentStyle={tooltipStyle} />
-            <Bar dataKey="value" name="Outstanding" radius={[0, 4, 4, 0]}>
-              {aging.map((_, i) => (
-                <Cell key={i} fill={['hsl(142 71% 45%)', 'hsl(38 92% 50%)', 'hsl(20 90% 55%)', 'hsl(0 84% 60%)', 'hsl(280 70% 55%)'][i]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </AnalyticsCard>
-  </div>
-);
+  const metrics: HeroMetric[] = [
+    { key: 'payments', label: 'Collected', total: kpi.revenue, prevTotal: kpi.revenuePrev, format: inr, axisFormat: compactInr },
+    { key: 'charges', label: 'Charged', total: kpi.charges, prevTotal: kpi.chargesPrev, format: inr, axisFormat: compactInr },
+    { key: 'net', label: 'Net', total: kpi.net, prevTotal: kpi.netPrev, format: inr, axisFormat: compactInr },
+    { key: 'newC', label: 'New subscribers', total: kpi.newSubs, prevTotal: kpi.newSubsPrev, format: (n) => `${Math.round(n)}`, shape: 'bar' },
+  ];
+
+  const agingTotal = aging.reduce((s, a) => s + a.value, 0);
+
+  return (
+    <div className="space-y-5">
+      <HeroChart
+        title={metrics.find((m) => m.key === metricKey)?.label ?? 'Collected'}
+        series={timeseries}
+        metrics={metrics}
+        activeKey={metricKey}
+        onSelect={setMetricKey}
+        compare={compare}
+        prevLabel={prevLabel}
+      />
+
+      <KpiRow v={kpi} compare={compare} revenueSpark={timeseries.map((d) => d.payments)} />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <RankedList
+          title="Top by revenue"
+          description="Who paid the most this period"
+          items={topSubscribers.map((r) => ({
+            id: r.sub.id,
+            label: r.sub.name,
+            sub: r.sub.subscriber_id,
+            value: inr(r.revenue),
+            raw: r.revenue,
+            to: `/customers/${r.sub.subscriber_id}`,
+          }))}
+          empty="No payments in this period"
+          onSeeAll={() => onGoTo('customers')}
+        />
+        <RankedList
+          title="Needs attention"
+          description="Largest outstanding balances"
+          items={topDefaulters.map((r) => ({
+            id: r.sub.id,
+            label: r.sub.name,
+            sub: r.sub.region || undefined,
+            value: inr(r.balance),
+            raw: r.balance,
+            tone: 'danger' as const,
+            to: `/customers/${r.sub.subscriber_id}`,
+          }))}
+          empty="No outstanding dues"
+          onSeeAll={() => onGoTo('customers')}
+        />
+        <RankedList
+          title="Where money sits"
+          description={`${inr(agingTotal)} outstanding by age`}
+          items={aging.map((a) => ({
+            id: a.name,
+            label: a.name,
+            value: inr(a.value),
+            raw: a.value,
+          }))}
+          empty="No outstanding dues"
+          limit={5}
+        />
+      </div>
+    </div>
+  );
+};

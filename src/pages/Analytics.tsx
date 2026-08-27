@@ -10,7 +10,7 @@ import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
 import { usePacks } from '@/hooks/usePacks';
 import { AnalyticsFilterBar } from '@/components/analytics/AnalyticsFilterBar';
-import { KpiStrip } from '@/components/analytics/KpiStrip';
+import { KpiValues } from '@/components/analytics/KpiRow';
 import { OverviewTab } from '@/components/analytics/OverviewTab';
 import { RevenueTab } from '@/components/analytics/RevenueTab';
 import { CustomersTab } from '@/components/analytics/CustomersTab';
@@ -275,6 +275,13 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
 
     return days.map(d => ({ date: format(d, 'd MMM'), ...map.get(isoDay(d))! }));
   }, [range, subsScoped]);
+
+  // Hero chart reads one merged series so the metric switcher can flip between
+  // money and subscriber counts without swapping datasets.
+  const heroSeries = useMemo(
+    () => timeseries.map((d, i) => ({ ...d, newC: growthSeries[i]?.newC ?? 0 })),
+    [timeseries, growthSeries],
+  );
 
 
 
@@ -688,23 +695,6 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         onCompareToggle={() => setCompare(c => !c)}
       />
 
-      <KpiStrip
-        compare={compare}
-        v={{
-          activeSubs,
-          totalSubs: subsScoped.length,
-          revenue,
-          revenuePrev,
-          charges,
-          collectionEff,
-          collectionEffPrev,
-          expiring7d,
-          outstanding,
-          arpu,
-          arpuPrev,
-        }}
-      />
-
       {/* Four working surfaces — only the active one renders, so charts and
           tables outside the current tab cost nothing. */}
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -716,8 +706,37 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
         </TabsList>
 
         <TabsContent value="overview" className="mt-0">
-          <OverviewTab timeseries={timeseries} aging={aging} compare={compare} />
+          <OverviewTab
+            timeseries={heroSeries}
+            aging={aging}
+            compare={compare}
+            prevLabel="previous period"
+            kpi={{
+              activeSubs,
+              totalSubs: subsScoped.length,
+              revenue,
+              revenuePrev,
+              charges,
+              chargesPrev,
+              net,
+              netPrev,
+              newSubs,
+              newSubsPrev,
+              collectionEff,
+              collectionEffPrev,
+              expiring7d,
+              outstanding,
+              arpu,
+              arpuPrev,
+              netMargin: marginTotals.net,
+              marginKnown: marginTotals.cost > 0,
+            }}
+            topSubscribers={topSubscribers as any}
+            topDefaulters={topDefaulters as any}
+            onGoTo={setTab}
+          />
         </TabsContent>
+
 
         <TabsContent value="revenue" className="mt-0">
           <RevenueTab
