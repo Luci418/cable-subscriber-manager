@@ -1,24 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Calendar, CreditCard, Search, Tv, Wallet, Wifi } from 'lucide-react';
-import {
-  PageHeader,
-  SectionCard,
-  StatCard,
-  DataTable,
-  EmptyState,
-  Toolbar,
-  Money,
-  Pagination,
-  type DataTableColumn,
-} from '@/components/ui-ext';
-import { Badge } from '@/components/ui/badge';
-import { chipDotClasses } from '@/lib/financialPosition';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useSearchParams } from 'react-router-dom';
+import { PageHeader } from '@/components/ui-ext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppData } from '@/contexts/AppDataContext';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
@@ -27,37 +10,27 @@ import { toast } from 'sonner';
 import { friendlyDbError } from '@/lib/dbErrors';
 import { RecentVoidsCard } from '@/components/RecentVoidsCard';
 import { TodaysCollectionsCard } from '@/components/TodaysCollectionsCard';
-import type { Subscriber } from '@/hooks/useSubscribers';
+import { BillingStatsStrip } from '@/components/billing/BillingStatsStrip';
+import { NeedsAttentionSection } from '@/components/billing/NeedsAttentionSection';
+import { ServiceLinesTable } from '@/components/billing/ServiceLinesTable';
+import { RecordPaymentDialog } from '@/components/billing/RecordPaymentDialog';
+import type { ServiceFilter, ServiceLine, StatusFilter } from '@/components/billing/types';
 
 /**
  * Billing — cross-subscriber worklist.
  *
- * Batch 3 rebuild:
- *  - "Needs attention today" section at the top: overdue balances +
- *    subscriptions expiring in ≤7 days. This is the operator's morning view.
- *  - Full billing table below with URL-bound search/filters. Built on the
- *    shared DataTable primitive so future columns and empty states inherit
- *    the same behaviour.
- *  - Removed the tabbed layout, subscription plan cards, and back button —
- *    the sidebar + breadcrumb handle navigation now.
- *  - Reads through useAppData so payments recorded here refresh Home,
- *    Customers, and the profile without a manual reload.
+ * Layout (2026-08 redesign): one compact stat strip, then three tabs so the
+ * page is a single working surface instead of a long scroll.
+ *  - Worklist    → "Needs attention today" + the full service-line table
+ *  - Collections → today's collections, full width
+ *  - Activity    → recent voids / corrections
+ *
+ * All filters (service, status, search) and the active tab live in the URL, so
+ * links and refreshes land in the same place. Data derivation and payment
+ * handlers stay here; presentation lives in src/components/billing/.
  */
-type ServiceFilter = 'all' | 'cable' | 'internet';
-type StatusFilter = 'all' | 'overdue' | 'expiring' | 'active' | 'inactive';
-
-type ServiceLine = {
-  subscriber: Subscriber;
-  service: 'cable' | 'internet';
-  sub: any | null;
-  pack: string | null;
-  balance: number;
-  daysUntil: number | null;
-  isActive: boolean;
-  isOverdue: boolean;
-  isExpiring: boolean;
-  key: string;
-};
+type TabKey = 'worklist' | 'collections' | 'activity';
+const TABS: TabKey[] = ['worklist', 'collections', 'activity'];
 
 export const Billing = () => {
   const { user } = useAuth();
@@ -68,6 +41,8 @@ export const Billing = () => {
   const service = (params.get('service') ?? (bothEnabled ? 'all' : cableEnabled ? 'cable' : 'internet')) as ServiceFilter;
   const status = (params.get('status') ?? 'all') as StatusFilter;
   const q = params.get('q') ?? '';
+  const tabParam = params.get('tab') as TabKey | null;
+  const tab: TabKey = tabParam && TABS.includes(tabParam) ? tabParam : 'worklist';
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
@@ -81,9 +56,7 @@ export const Billing = () => {
   const [paySaving, setPaySaving] = useState(false);
   /** Local service filter for the "Needs attention today" section only. */
   const [needsServiceFilter, setNeedsServiceFilter] = useState<ServiceFilter>('all');
-  /** Client-side pagination for the full worklist. */
   const [worklistPage, setWorklistPage] = useState(1);
-  const WORKLIST_PAGE_SIZE = 25;
 
   const openRecordPayment = (line: ServiceLine) => {
     setPayLine(line);
@@ -177,7 +150,6 @@ export const Billing = () => {
         .filter((l) => l.isOverdue || l.isExpiring)
         .filter((l) => needsServiceFilter === 'all' || l.service === needsServiceFilter)
         .sort((a, b) => {
-          // Overdue first, then soonest-expiring, then largest balance
           if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
           if (a.isExpiring && b.isExpiring) return (a.daysUntil ?? 999) - (b.daysUntil ?? 999);
           return b.balance - a.balance;
@@ -207,100 +179,11 @@ export const Billing = () => {
   const expiringCount = bySvc.filter((l) => l.isExpiring).length;
   const activeCount = bySvc.filter((l) => l.isActive).length;
 
-  // Calm status language — dot + neutral text (matches Customers list).
-  const nextActionChip = (l: ServiceLine) => {
-    const dot = (tone: 'danger' | 'warning' | 'success' | 'muted', label: string) => (
-      <span className="inline-flex items-center gap-1.5 text-sm">
-        <span aria-hidden className={`h-1.5 w-1.5 rounded-full shrink-0 ${chipDotClasses(tone)}`} />
-        <span className={tone === 'muted' ? 'text-muted-foreground' : tone === 'danger' ? 'text-destructive' : ''}>{label}</span>
-      </span>
-    );
-    if (l.isOverdue && l.daysUntil !== null && l.daysUntil < 0) {
-      return dot('danger', `Overdue · expired ${Math.abs(l.daysUntil)}d ago`);
-    }
-    if (l.isOverdue) return dot('danger', 'Collect payment');
-    if (l.isExpiring) {
-      return dot('warning', l.daysUntil === 0 ? 'Expires today' : `Renew in ${l.daysUntil}d`);
-    }
-    if (!l.isActive) return dot('muted', 'No active subscription');
-    return dot('success', 'Current');
-  };
-
   if (loading) {
     return (
       <div className="py-12 text-center text-sm text-muted-foreground">Loading billing data…</div>
     );
   }
-
-  const columns: DataTableColumn<ServiceLine>[] = [
-    {
-      id: 'subscriber',
-      header: 'Subscriber',
-      cell: (l) => (
-        <div className="min-w-0">
-          <Link
-            to={`/customers/${(l.subscriber as any).subscriber_id ?? l.subscriber.id}`}
-            className="font-medium hover:underline truncate block max-w-[220px]"
-          >
-            {l.subscriber.name}
-          </Link>
-          <div className="text-xs text-muted-foreground font-mono">
-            {(l.subscriber as any).subscriber_id ?? l.subscriber.mobile}
-          </div>
-        </div>
-      ),
-    },
-    ...(bothEnabled
-      ? [
-          {
-            id: 'service',
-            header: 'Service',
-            cell: (l: ServiceLine) => (
-              <Badge variant="outline" className="gap-1">
-                {l.service === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-                {l.service === 'internet' ? 'Internet' : 'Cable'}
-              </Badge>
-            ),
-            hideBelow: 'sm' as const,
-          },
-        ]
-      : []),
-    {
-      id: 'pack',
-      header: 'Pack',
-      cell: (l) => <span className="text-sm">{l.pack ?? '—'}</span>,
-      hideBelow: 'md',
-    },
-    {
-      id: 'endDate',
-      header: 'Ends',
-      cell: (l) =>
-        l.sub?.endDate ? (
-          <span className="text-xs tabular-nums">
-            {new Date(l.sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        ),
-      hideBelow: 'md',
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      cell: (l) => nextActionChip(l),
-    },
-    {
-      id: 'balance',
-      header: 'Balance',
-      cell: (l) => (
-        <Money
-          value={l.balance}
-          className={l.balance > 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}
-        />
-      ),
-      align: 'right',
-    },
-  ];
 
   return (
     <>
@@ -309,226 +192,69 @@ export const Billing = () => {
         description="Your daily collection worklist. Overdue and expiring first, everything else below."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <StatCard
-          label="Needs attention"
-          value={overdueCount + expiringCount}
-          hint={`${overdueCount} overdue · ${expiringCount} expiring`}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          onClick={() => setParam('status', overdueCount > 0 ? 'overdue' : 'expiring')}
-        />
-        <StatCard
-          label="Total outstanding"
-          value={<Money value={totalOutstanding} compact />}
-          hint="across service lines"
-          icon={<CreditCard className="h-4 w-4" />}
-          onClick={() => setParam('status', 'overdue')}
-        />
-        <StatCard
-          label="Active"
-          value={activeCount}
-          hint={`of ${bySvc.length} lines`}
-          icon={<Calendar className="h-4 w-4" />}
-          onClick={() => setParam('status', 'active')}
-        />
-        <StatCard
-          label="Inactive"
-          value={bySvc.length - activeCount}
-          hint="no active subscription"
-          icon={<Wallet className="h-4 w-4" />}
-          onClick={() => setParam('status', 'inactive')}
+      <div className="mb-4">
+        <BillingStatsStrip
+          needsAttention={overdueCount + expiringCount}
+          overdueCount={overdueCount}
+          expiringCount={expiringCount}
+          totalOutstanding={totalOutstanding}
+          activeCount={activeCount}
+          totalLines={bySvc.length}
+          onSelectStatus={(s) => {
+            setParam('tab', 'worklist');
+            setParam('status', s);
+            setWorklistPage(1);
+          }}
         />
       </div>
 
-      {/* Priority worklist — overdue & expiring inside 7 days. */}
-      <TodaysCollectionsCard />
+      <Tabs value={tab} onValueChange={(v) => setParam('tab', v === 'worklist' ? null : v)}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="worklist">Worklist</TabsTrigger>
+          <TabsTrigger value="collections">Collections</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+        </TabsList>
 
-      <SectionCard
-        title="Needs attention today"
-        description="Overdue balances and subscriptions expiring in the next 7 days. Act top-down."
-        className="mb-6"
-        padded={false}
-        actions={
-          bothEnabled ? (
-            <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
-              {(['all', 'cable', 'internet'] as ServiceFilter[]).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setNeedsServiceFilter(v)}
-                  className={
-                    'px-3 py-1.5 transition-colors ' +
-                    (needsServiceFilter === v
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-transparent hover:bg-accent/40 text-muted-foreground')
-                  }
-                >
-                  {v === 'all' ? 'Both' : v === 'cable' ? 'Cable' : 'Internet'}
-                </button>
-              ))}
-            </div>
-          ) : undefined
-        }
-      >
-        {needsAttention.length === 0 ? (
-          <EmptyState
-            icon={<AlertTriangle className="h-5 w-5" />}
-            title="All caught up"
-            description="No overdue balances or subscriptions expiring in the next 7 days."
+        <TabsContent value="worklist" className="space-y-6 mt-0">
+          <NeedsAttentionSection
+            lines={needsAttention}
+            bothEnabled={bothEnabled}
+            serviceFilter={needsServiceFilter}
+            onServiceFilterChange={setNeedsServiceFilter}
+            onCollect={openRecordPayment}
           />
-        ) : (
-          <ul className="divide-y">
-            {needsAttention.slice(0, 12).map((l) => (
-              <li key={l.key} className="flex items-center justify-between gap-3 p-3 sm:px-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Link
-                      to={`/customers/${(l.subscriber as any).subscriber_id ?? l.subscriber.id}`}
-                      className="font-medium truncate hover:underline"
-                    >
-                      {l.subscriber.name}
-                    </Link>
-                    {bothEnabled && (
-                      <Badge variant="outline" className="gap-1 shrink-0">
-                        {l.service === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-                      </Badge>
-                    )}
-                    {nextActionChip(l)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {(l.subscriber as any).subscriber_id ?? l.subscriber.mobile}
-                    {l.pack ? ` · ${l.pack}` : ''}
-                    {l.sub?.endDate && ` · ends ${new Date(l.sub.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <Money
-                    value={l.balance}
-                    className={l.balance > 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}
-                  />
-                  {l.balance > 0 && (
-                    <div className="mt-1">
-                      <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
-                        <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <SectionCard title="All service lines" padded={false}>
-        <Toolbar
-          searchValue={q}
-          onSearchChange={(v) => { setParam('q', v); setWorklistPage(1); }}
-          searchPlaceholder="Search name, mobile, ID, pack…"
-          filters={
-            <>
-              {bothEnabled && (
-                <Select value={service} onValueChange={(v) => { setParam('service', v); setWorklistPage(1); }}>
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All services</SelectItem>
-                    <SelectItem value="cable">Cable</SelectItem>
-                    <SelectItem value="internet">Internet</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={status} onValueChange={(v) => { setParam('status', v); setWorklistPage(1); }}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="expiring">Expiring ≤7d</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </>
-          }
-        />
-
-        {worklist.length === 0 ? (
-          <EmptyState
-            icon={<Search className="h-5 w-5" />}
-            title="No matching service lines"
-            description="Adjust the filters or search to see other lines."
+          <ServiceLinesTable
+            rows={worklist}
+            bothEnabled={bothEnabled}
+            service={service}
+            status={status}
+            query={q}
+            page={worklistPage}
+            onPageChange={setWorklistPage}
+            onServiceChange={(v) => { setParam('service', v); setWorklistPage(1); }}
+            onStatusChange={(v) => { setParam('status', v); setWorklistPage(1); }}
+            onQueryChange={(v) => { setParam('q', v); setWorklistPage(1); }}
+            onCollect={openRecordPayment}
           />
-        ) : (
-          <>
-            <DataTable
-              rows={worklist.slice(
-                (worklistPage - 1) * WORKLIST_PAGE_SIZE,
-                worklistPage * WORKLIST_PAGE_SIZE,
-              )}
-              rowKey={(l) => l.key}
-              columns={columns}
-              rowActions={(l) =>
-                l.balance > 0 ? (
-                  <Button size="sm" variant="outline" onClick={() => openRecordPayment(l)}>
-                    <Wallet className="h-3.5 w-3.5 mr-1" /> Collect
-                  </Button>
-                ) : null
-              }
-            />
-            <Pagination
-              page={worklistPage}
-              pageSize={WORKLIST_PAGE_SIZE}
-              total={worklist.length}
-              label="service lines"
-              onPageChange={setWorklistPage}
-            />
-          </>
-        )}
-      </SectionCard>
+        </TabsContent>
 
-      <div className="mt-6">
-        <RecentVoidsCard />
-      </div>
+        <TabsContent value="collections" className="mt-0">
+          <TodaysCollectionsCard />
+        </TabsContent>
 
-      <Dialog open={!!payLine} onOpenChange={(o) => { if (!o) setPayLine(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              {payLine && (
-                <>
-                  {payLine.subscriber.name} · {payLine.service === 'cable' ? 'Cable' : 'Internet'} ·{' '}
-                  Outstanding: <span className="font-medium text-destructive">₹{payLine.balance.toFixed(2)}</span>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="pay-amt">Amount received (₹)</Label>
-            <Input
-              id="pay-amt"
-              type="number"
-              min="0"
-              step="0.01"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              autoFocus
-            />
-            <p className="text-xs text-muted-foreground">
-              Posts a payment to the immutable ledger. Use Void from the subscriber page if entered incorrectly.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPayLine(null)} disabled={paySaving}>Cancel</Button>
-            <Button onClick={submitRecordPayment} disabled={paySaving}>
-              {paySaving ? 'Saving…' : 'Mark as Paid'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="activity" className="mt-0">
+          <RecentVoidsCard />
+        </TabsContent>
+      </Tabs>
+
+      <RecordPaymentDialog
+        line={payLine}
+        amount={payAmount}
+        saving={paySaving}
+        onAmountChange={setPayAmount}
+        onClose={() => setPayLine(null)}
+        onSubmit={submitRecordPayment}
+      />
     </>
   );
 };
