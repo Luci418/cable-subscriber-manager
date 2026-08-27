@@ -1,20 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  ArrowLeft, TrendingUp, TrendingDown, Users, IndianRupee, Wallet, UserPlus,
-  UserMinus, Percent, Download, CalendarIcon, Tv, Wifi, Minus, Clock, ArrowRight,
-} from 'lucide-react';
-import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
+import { ArrowLeft, Download } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, differenceInDays, eachDayOfInterval } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +9,12 @@ import { useAppData } from '@/contexts/AppDataContext';
 import { useEnabledServices } from '@/hooks/useEnabledServices';
 import { useProviders } from '@/hooks/useProviders';
 import { usePacks } from '@/hooks/usePacks';
-import { cn } from '@/lib/utils';
+import { AnalyticsFilterBar } from '@/components/analytics/AnalyticsFilterBar';
+import { KpiStrip } from '@/components/analytics/KpiStrip';
+import { OverviewTab } from '@/components/analytics/OverviewTab';
+import { RevenueTab } from '@/components/analytics/RevenueTab';
+import { CustomersTab } from '@/components/analytics/CustomersTab';
+import { CatalogTab } from '@/components/analytics/CatalogTab';
 
 type ServiceFilter = 'all' | 'cable' | 'internet';
 type PresetKey = '7d' | '30d' | '90d' | 'ytd' | 'all' | 'custom';
