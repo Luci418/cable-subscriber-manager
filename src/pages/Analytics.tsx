@@ -62,6 +62,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   const [preset, setPreset] = useState<PresetKey>('30d');
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [compare, setCompare] = useState(true);
+  const [tab, setTab] = useState('overview');
 
   const loading = subsLoading || txnLoading;
 
