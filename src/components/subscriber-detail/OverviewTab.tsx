@@ -209,7 +209,10 @@ export function OverviewTab({
                       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                         <ServiceIcon className="h-3.5 w-3.5" /> {svcLabel}
                       </div>
-                      <span className={`text-xs font-medium ${positionToneClasses(svcNet > 0 ? 'outstanding' : svcNet < 0 ? 'available_credit' : 'settled')}`}>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${svcNet === 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {svcNet !== 0 && (
+                          <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${chipDotClasses(svcNet > 0 ? 'danger' : 'info')}`} />
+                        )}
                         {svcSummary}
                       </span>
                     </div>
