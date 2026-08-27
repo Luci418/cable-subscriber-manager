@@ -1,56 +1,53 @@
-# Provider integration — direction note (superseded plan)
+# UI Polish: Calmer tables, less red, tidy badges
 
-> **This file is not the current architecture.**
-> The canonical document for provider integration is
-> **`docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md`**. Read that first.
-> Status of the workstream lives in `docs/PROJECT_STATUS.md`.
+Your instinct is right — three spots are over-decorated. Every row in Customers gets a colored pill, the Overview tab paints amounts red, and Catalog gives each provider a random rainbow badge. This plan tones all three down to a quiet, consistent visual language.
 
-## What changed
+## 1. Customers list — tame the "Next action" column
 
-An earlier version of this file (2026-07-28) described a
-**write-through-first** design: the operator would act inside the SMS, the
-app would record a `provider_action_intent` row, and the operator would then
-be guided to reproduce the same action on the Hathway portal (checklist →
-deep link → optional browser automation). Reactive snapshot import was
-framed as a safety net behind it.
+**Problem:** every row renders a colored, bordered bubble with an emoji. With many customers owing money, the column is a wall of red pills.
 
-**That direction was reversed on 2026-07-31.** Hathway gives the operator no
-API and no write access of any kind, and in practice the operator provisions
-directly on the Hathway portal — the portal always acts first. A model where
-our app leads and the portal follows describes a workflow that does not
-exist.
+**Fix — replace bubbles with a quiet status line:**
+- Drop the pill/border/background entirely. Render as: small colored **dot** (6px) + plain text, e.g. `● Collect ₹250 and renew Cable`.
+- Drop emojis; the dot carries the tone. Keep tone semantics but soften: red only for *expired + debt* (true urgency), amber for expiring-soon and plain collect, neutral gray for "No action required" (or show `—`).
+- Long labels truncate with ellipsis at a fixed max-width so rows stay even.
 
-## What is actually built
+Files: `src/components/SubscriberList.tsx` (action column cell), `src/lib/financialPosition.ts` (`chipToneClasses` → new `chipDotClasses` returning just a dot color; labels/icons unchanged so all 120 existing tests keep passing).
 
-**Reactive snapshot synchronization is the primary integration mechanism**,
-not a fallback:
+## 2. Customer Overview — stop painting everything red
 
-1. The operator exports a report from the Hathway portal
-   (Customer Master or Dashboard Status).
-2. The report is uploaded and parsed into rows.
-3. The rows are diffed against the last **committed** import run.
-4. The operator reviews every proposed change and approves the run.
-5. `commit_provider_import` writes the approved changes — and only then.
+**Problem:** balance amounts and per-service lines all use red/green colored text; a customer with dues looks alarming everywhere.
 
-Nothing is written before approval, and nothing runs on a schedule.
-See ADR-013 … ADR-024 in `docs/ARCHITECTURE_DECISIONS.md` for the decisions
-behind each part, and `docs/SYSTEM_INVARIANTS.md` for the rules the code
-enforces.
+**Fix — color the headline only:**
+- "Overall position" card: keep the colored headline (`Outstanding ₹250` in red), but render the amount in neutral `text-foreground` when Settled.
+- Per-service breakdown rows: amounts in plain `text-foreground` with a small colored dot before the status word — same dot language as the customers list. No full red text lines.
+- Keep `positionToneClasses` for the headline; add a muted variant for secondary spots.
 
-## The write-through-assist idea (possible future direction)
+Files: `src/components/subscriber-detail/OverviewTab.tsx`, `src/lib/financialPosition.ts`.
 
-The A0/A1/A2 tiering is kept here as an idea, **not** as current
-architecture:
+## 3. Catalog — provider badges that behave
 
-- **A0 — checklist.** After an in-app action, show the operator the exact
-  steps to repeat on the portal.
-- **A1 — deep link.** Open the relevant portal screen pre-filled where the
-  portal URL scheme allows it.
-- **A2 — assisted automation.** An out-of-process browser agent replays the
-  action on the portal under operator supervision.
+**Problem:** `hueFor()` assigns each provider a random rainbow outline color; badges wrap on mobile and long names overflow.
 
-This would only become worth building if the operator starts to act in the
-SMS *before* the portal often enough that the double entry becomes the main
-pain point. Even then it sits **on top of** reactive sync, which stays the
-system of record for what the provider actually did. There is no
-`provider_action_intent` table, and none is planned.
+**Fix:**
+- One consistent style for all providers: neutral `outline` badge with a colored **initial avatar dot** (letter + deterministic hue) — hue becomes a small accent, not the whole chip.
+- `whitespace-nowrap`, `max-w-[140px] truncate`, title tooltip for long names, so nothing wraps in mobile view.
+- Same treatment in both places it's used (pack rows line 230, provider tab line 308).
+
+File: `src/pages/Catalog.tsx`.
+
+## 4. Other quick wins (included, small)
+
+- Customers list: reduce row vertical padding slightly (`py-3` → `py-2.5`) and let the Services badges sit inline — less crowded feel.
+- Balance column: keep red only for positive dues; credit in plain foreground with a `-` sign and muted style (currently green bold, adds noise).
+- Empty "—" states already good; no change.
+
+## Out of scope (say the word if you want these)
+
+- Full redesign of the customers table (card layout, avatars).
+- Analytics/Complaints visual pass.
+- Dark-mode specific tuning beyond what the tokens already handle.
+
+## Verification
+
+- `bunx vitest run` — financialPosition tests must stay green (labels/decision table untouched).
+- Visual check via Playwright on Customers, one customer Overview with dues, and Catalog (mobile viewport for the wrap fix).
