@@ -640,635 +640,99 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
-            <Button variant="ghost" onClick={onBack} className="mb-2 -ml-3">
-              <ArrowLeft className="mr-2 h-4 w-4" />Back
-            </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Analytics</h1>
-            <p className="text-sm text-muted-foreground">{label}{compare && ' · vs previous period'}</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={exportCsv}>
-            <Download className="mr-2 h-4 w-4" />Export CSV
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div>
+          <Button variant="ghost" onClick={onBack} className="mb-1 -ml-3">
+            <ArrowLeft className="mr-2 h-4 w-4" />Back
           </Button>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground">{label}{compare && ' · vs previous period'}</p>
         </div>
-
-        {/* Filter bar */}
-        <Card className="border-dashed">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {bothEnabled && (
-                <Tabs value={service} onValueChange={(v) => setService(v as ServiceFilter)}>
-                  <TabsList className="h-9">
-                    <TabsTrigger value="all" className="text-xs">All Services</TabsTrigger>
-                    {cableEnabled && <TabsTrigger value="cable" className="text-xs"><Tv className="h-3 w-3 mr-1" />Cable</TabsTrigger>}
-                    {internetEnabled && <TabsTrigger value="internet" className="text-xs"><Wifi className="h-3 w-3 mr-1" />Internet</TabsTrigger>}
-                  </TabsList>
-                </Tabs>
-              )}
-
-              <div className="flex flex-wrap gap-1 ml-auto">
-                {PRESETS.map(p => (
-                  <Button key={p.key} size="sm" variant={preset === p.key ? 'default' : 'outline'}
-                    onClick={() => { setPreset(p.key); setCustomRange(undefined); }}>
-                    {p.label}
-                  </Button>
-                ))}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button size="sm" variant={preset === 'custom' ? 'default' : 'outline'}>
-                      <CalendarIcon className="h-4 w-4 mr-1" />
-                      {preset === 'custom' && customRange?.from
-                        ? `${format(customRange.from, 'd MMM')}${customRange.to ? ` – ${format(customRange.to, 'd MMM')}` : ''}`
-                        : 'Custom'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar mode="range" selected={customRange}
-                      onSelect={(r) => { setCustomRange(r); if (r?.from) setPreset('custom'); }}
-                      numberOfMonths={2} />
-                  </PopoverContent>
-                </Popover>
-                <Button size="sm" variant={compare ? 'default' : 'outline'} onClick={() => setCompare(c => !c)}>
-                  Compare
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Button variant="outline" size="sm" onClick={exportCsv}>
+          <Download className="mr-2 h-4 w-4" />Export CSV
+        </Button>
       </div>
 
-      {/* Operational KPI scorecards — 6 metrics operators act on daily. Clickable → filtered destinations. */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3">
-        <KpiCard label="Active Subscribers" value={activeSubs.toLocaleString('en-IN')} delta={0}
-          icon={<Users className="h-4 w-4" />} compare={false} sub={`${subsScoped.length} total`}
-          to="/customers?status=active" />
-        <KpiCard label="Collected vs Charged" value={`${inr(revenue)} / ${inr(charges)}`} delta={pct(revenue, revenuePrev)}
-          icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(revenuePrev)}
-          to="/billing" />
-        <KpiCard label="Collection Rate" value={`${collectionEff.toFixed(0)}%`}
-          delta={pct(collectionEff, collectionEffPrev)} icon={<Percent className="h-4 w-4" />}
-          compare={compare} prevLabel={`${collectionEffPrev.toFixed(0)}%`}
-          to="/billing" />
-        <KpiCard label="Expiring in 7 days" value={expiring7d.toLocaleString('en-IN')} delta={0}
-          icon={<Clock className="h-4 w-4" />} compare={false}
-          sub="Renewals to nudge"
-          tone={expiring7d > 0 ? 'danger' : undefined}
-          to="/billing?status=expiring" />
-        <KpiCard label="Outstanding Balance" value={inr(outstanding)} delta={0}
-          icon={<Wallet className="h-4 w-4" />} compare={false}
-          sub={outstanding > 0 ? 'Due from subscribers' : 'Credit with subscribers'}
-          tone={outstanding > 0 ? 'danger' : 'success'}
-          to="/customers?balance=dues" />
-        <KpiCard label="ARPU" value={inr(arpu)} delta={pct(arpu, arpuPrev)}
-          icon={<IndianRupee className="h-4 w-4" />} compare={compare} prevLabel={inr(arpuPrev)}
-          sub="Avg revenue per active sub" />
-      </div>
+      <AnalyticsFilterBar
+        service={service}
+        onServiceChange={setService}
+        bothEnabled={bothEnabled}
+        cableEnabled={cableEnabled}
+        internetEnabled={internetEnabled}
+        preset={preset}
+        onPresetChange={setPreset}
+        customRange={customRange}
+        onCustomRangeChange={setCustomRange}
+        compare={compare}
+        onCompareToggle={() => setCompare(c => !c)}
+      />
 
-      {/* Main charts */}
-      <Tabs defaultValue="revenue" className="space-y-4">
+      <KpiStrip
+        compare={compare}
+        v={{
+          activeSubs,
+          totalSubs: subsScoped.length,
+          revenue,
+          revenuePrev,
+          charges,
+          collectionEff,
+          collectionEffPrev,
+          expiring7d,
+          outstanding,
+          arpu,
+          arpuPrev,
+        }}
+      />
+
+      {/* Four working surfaces — only the active one renders, so charts and
+          tables outside the current tab cost nothing. */}
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap h-auto">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="services">Services Split</TabsTrigger>
-          <TabsTrigger value="growth">Subscribers</TabsTrigger>
-          <TabsTrigger value="aging">Outstanding Aging</TabsTrigger>
-          <TabsTrigger value="distribution">Distribution</TabsTrigger>
+          <TabsTrigger value="customers">Customers</TabsTrigger>
+          <TabsTrigger value="catalog">Catalog</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="revenue">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue Over Time</CardTitle>
-              <CardDescription>
-                Payments collected{compare && ', dashed line shows previous period for comparison'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={360}>
-                <AreaChart data={timeseries}>
-                  <defs>
-                    <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
-                    formatter={(v: any) => inr(Number(v))} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Area type="monotone" dataKey="payments" stroke="hsl(var(--primary))" fill="url(#rev)" name="Payments" strokeWidth={2} />
-                  <Line type="monotone" dataKey="charges" stroke="hsl(var(--destructive))" name="Charges" strokeWidth={1.5} dot={false} />
-                  {compare && <Line type="monotone" dataKey="prev" stroke="hsl(var(--muted-foreground))" name="Previous period" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />}
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <TabsContent value="overview" className="mt-0">
+          <OverviewTab timeseries={timeseries} aging={aging} compare={compare} />
         </TabsContent>
 
-        <TabsContent value="services">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cable vs Internet Revenue</CardTitle>
-              <CardDescription>Daily payment split across services</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={360}>
-                <BarChart data={serviceSplit}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                  <Tooltip formatter={(v: any) => inr(Number(v))}
-                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="cable" stackId="s" fill="hsl(217 91% 60%)" name="Cable" />
-                  <Bar dataKey="internet" stackId="s" fill="hsl(142 71% 45%)" name="Internet" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <TabsContent value="revenue" className="mt-0">
+          <RevenueTab
+            serviceSplit={serviceSplit}
+            bothEnabled={bothEnabled}
+            packDist={packDist}
+            regionDist={regionDist}
+            balanceDist={balanceDist}
+            marginTotals={marginTotals}
+            marginPerProvider={marginPerProvider}
+            marginPerPack={marginPerPack}
+            onFilterPack={onFilterPack}
+            onFilterRegion={onFilterRegion}
+            onFilterBalance={onFilterBalance}
+            onBack={onBack}
+          />
         </TabsContent>
 
-        <TabsContent value="growth">
-          <Card>
-            <CardHeader>
-              <CardTitle>Acquisition vs Churn</CardTitle>
-              <CardDescription>New subscribers vs expired subscriptions per day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={360}>
-                <BarChart data={(() => {
-                  const days = eachDayOfInterval({ start: range.from, end: range.to });
-                  const map = new Map<string, { newC: number; churnC: number }>();
-                  days.forEach(d => map.set(isoDay(d), { newC: 0, churnC: 0 }));
-                  subsScoped.forEach(s => {
-                    const k = isoDay(new Date(s.created_at));
-                    if (map.has(k)) map.get(k)!.newC += 1;
-                  });
-                  subsScoped.forEach(s => {
-                    const hs: any[] = [];
-                    if (service !== 'internet') hs.push(...((s as any)._timelineCable || []));
-                    if (service !== 'cable') hs.push(...((s as any)._timelineInternet || []));
-                    hs.forEach(h => {
-                      if (h?.status === 'expired' && h?.endDate) {
-                        const k = isoDay(new Date(h.endDate));
-                        if (map.has(k)) map.get(k)!.churnC += 1;
-                      }
-                    });
-                  });
-                  return days.map(d => ({ date: format(d, 'd MMM'), ...map.get(isoDay(d))! }));
-                })()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="newC" fill="hsl(142 71% 45%)" name="New" />
-                  <Bar dataKey="churnC" fill="hsl(0 84% 60%)" name="Churned" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <TabsContent value="customers" className="mt-0">
+          <CustomersTab
+            growthSeries={growthSeries}
+            topSubscribers={topSubscribers as any}
+            topDefaulters={topDefaulters as any}
+          />
         </TabsContent>
 
-        <TabsContent value="aging">
-          <Card>
-            <CardHeader>
-              <CardTitle>Outstanding by Age</CardTitle>
-              <CardDescription>How long dues have been pending (based on last payment)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {aging.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center">No outstanding dues 🎉</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={aging} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} tick={{ fontSize: 11 }} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: any) => inr(Number(v))}
-                      contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                    <Bar dataKey="value" name="Outstanding" radius={[0, 4, 4, 0]}>
-                      {aging.map((_, i) => (
-                        <Cell key={i} fill={['hsl(142 71% 45%)','hsl(38 92% 50%)','hsl(20 90% 55%)','hsl(0 84% 60%)','hsl(280 70% 55%)'][i]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="distribution">
-          <div className="grid gap-4 md:grid-cols-2">
-            <DistroPie title="Pack Distribution" data={packDist} onClick={(n) => onFilterPack?.(n.split(' · ')[0])} onBack={onBack} />
-            <DistroPie title="Region Distribution" data={regionDist} onClick={(n) => n !== 'Unassigned' && onFilterRegion?.(n)} onBack={onBack} />
-            <DistroPie title="Balance Status" data={balanceDist} onClick={(n) => {
-              const map: Record<string, string> = { 'Debt (Due)': 'positive', 'Credit (Advance)': 'negative', 'Zero Balance': 'zero' };
-              if (map[n]) onFilterBalance?.(map[n]);
-            }} onBack={onBack} labelValue />
-          </div>
+        <TabsContent value="catalog" className="mt-0">
+          <CatalogTab
+            packPerf={packPerf}
+            regionPerf={regionPerf}
+            providerPerf={providerPerf as any}
+          />
         </TabsContent>
       </Tabs>
-
-      {/* Top tables */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Subscribers by Revenue</CardTitle>
-            <CardDescription>Highest paying customers in this period</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subscriber</TableHead>
-                  <TableHead className="text-right">Txns</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topSubscribers.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">No payments in this period</TableCell></TableRow>
-                )}
-                {topSubscribers.map((r, i) => (
-                  <TableRow key={r.sub!.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="w-6 justify-center text-xs">{i + 1}</Badge>
-                        <div>
-                          <div className="font-medium text-sm">{r.sub!.name}</div>
-                          <div className="text-xs text-muted-foreground">{r.sub!.subscriber_id}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right text-sm">{r.txns}</TableCell>
-                    <TableCell className="text-right font-medium">{inr(r.revenue)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Defaulters</CardTitle>
-            <CardDescription>Largest outstanding balances right now</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subscriber</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topDefaulters.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">No outstanding dues</TableCell></TableRow>
-                )}
-                {topDefaulters.map((r, i) => (
-                  <TableRow key={r.sub.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="w-6 justify-center text-xs">{i + 1}</Badge>
-                        <div>
-                          <div className="font-medium text-sm">{r.sub.name}</div>
-                          <div className="text-xs text-muted-foreground">{r.sub.subscriber_id}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{r.sub.region || '—'}</TableCell>
-                    <TableCell className="text-right font-medium text-destructive">{inr(r.balance)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Pack Performance</CardTitle>
-            <CardDescription>Subscribers, revenue and ARPU per pack</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pack</TableHead>
-                  <TableHead className="text-right">Subscribers</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">ARPU</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {packPerf.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No packs assigned</TableCell></TableRow>
-                )}
-                {packPerf.map(p => (
-                  <TableRow key={p.name}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="text-right">{p.subs}</TableCell>
-                    <TableCell className="text-right">{inr(p.revenue)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{inr(p.arpu)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Region Performance</CardTitle>
-            <CardDescription>Revenue and outstanding by region</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Region</TableHead>
-                  <TableHead className="text-right">Subscribers</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {regionPerf.map(r => (
-                  <TableRow key={r.name}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right">{r.subs}</TableCell>
-                    <TableCell className="text-right">{inr(r.revenue)}</TableCell>
-                    <TableCell className={cn('text-right', r.outstanding > 0 && 'text-destructive')}>{inr(r.outstanding)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Provider Performance</CardTitle>
-            <CardDescription>Revenue, active subscribers and outstanding by upstream provider</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead className="text-right">Subscribers</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {providerPerf.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No provider data yet</TableCell></TableRow>
-                )}
-                {providerPerf.map(p => (
-                  <TableRow key={`${p.name}-${p.service}`}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="capitalize">
-                      <span className="inline-flex items-center gap-1">
-                        {p.service === 'internet' ? <Wifi className="h-3.5 w-3.5" /> : <Tv className="h-3.5 w-3.5" />}
-                        {p.service}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">{p.subs}</TableCell>
-                    <TableCell className="text-right">{inr(p.revenue)}</TableCell>
-                    <TableCell className={cn('text-right', p.outstanding > 0 && 'text-destructive')}>{inr(p.outstanding)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Margin analysis — gross revenue vs upstream provider cost */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Margin</CardTitle>
-            <CardDescription>
-              Gross revenue minus upstream provider cost (from each pack's <em>Provider cost</em> field × active subscribers).
-              {marginTotals.packsMissingCost > 0 && (
-                <> {marginTotals.packsMissingCost} pack{marginTotals.packsMissingCost === 1 ? '' : 's'} with active subs have no cost set — excluded from totals.</>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">Gross revenue</div>
-                <div className="text-xl font-bold mt-1">{inr(marginTotals.gross)}</div>
-              </div>
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">Provider cost</div>
-                <div className="text-xl font-bold mt-1 text-destructive">{inr(marginTotals.cost)}</div>
-              </div>
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">Net margin</div>
-                <div className={cn('text-xl font-bold mt-1', marginTotals.net >= 0 ? 'text-success' : 'text-destructive')}>
-                  {inr(marginTotals.net)}
-                  {marginTotals.gross > 0 && (
-                    <span className="text-xs font-normal text-muted-foreground ml-2">
-                      ({((marginTotals.net / marginTotals.gross) * 100).toFixed(1)}%)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Margin per provider</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Provider</TableHead>
-                    <TableHead className="text-right">Subscribers</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead className="text-right">Margin %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {marginPerProvider.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No data</TableCell></TableRow>
-                  )}
-                  {marginPerProvider.map((p, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{p.providerName}</TableCell>
-                      <TableCell className="text-right">{p.subs}</TableCell>
-                      <TableCell className="text-right">{inr(p.gross)}</TableCell>
-                      <TableCell className="text-right">
-                        {p.hasCost ? inr(p.cost) : <span className="text-xs text-muted-foreground italic">cost not set</span>}
-                      </TableCell>
-                      <TableCell className={cn('text-right', p.net != null && (p.net >= 0 ? 'text-success' : 'text-destructive'))}>
-                        {p.net != null ? inr(p.net) : '—'}
-                      </TableCell>
-                      <TableCell className={cn('text-right', p.marginPct != null && (p.marginPct >= 0 ? 'text-success' : 'text-destructive'))}>
-                        {p.marginPct != null ? `${p.marginPct.toFixed(1)}%` : '—'}
-                        {!p.hasCost && p.missingCostPacks > 0 && (
-                          <div className="text-[10px] text-muted-foreground">{p.missingCostPacks} pack{p.missingCostPacks === 1 ? '' : 's'} missing cost</div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Margin per pack</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Pack</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead className="text-right">Subs</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead className="text-right">Margin %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {marginPerPack.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No active packs</TableCell></TableRow>
-                  )}
-                  {marginPerPack.map(r => (
-                    <TableRow key={r.key}>
-                      <TableCell className="font-medium">
-                        {r.packName}
-                        <span className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground capitalize">
-                          {r.service === 'internet' ? <Wifi className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-                          {r.service}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{r.providerName}</TableCell>
-                      <TableCell className="text-right">{r.subs}</TableCell>
-                      <TableCell className="text-right">{inr(r.gross)}</TableCell>
-                      <TableCell className="text-right">
-                        {r.cost != null ? inr(r.cost) : <span className="text-xs text-muted-foreground italic">cost not set</span>}
-                      </TableCell>
-                      <TableCell className={cn('text-right', r.net != null && (r.net >= 0 ? 'text-success' : 'text-destructive'))}>
-                        {r.net != null ? inr(r.net) : '—'}
-                      </TableCell>
-                      <TableCell className={cn('text-right', r.marginPct != null && (r.marginPct >= 0 ? 'text-success' : 'text-destructive'))}>
-                        {r.marginPct != null ? `${r.marginPct.toFixed(1)}%` : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-
     </div>
   );
 };
-
-// ============ subcomponents ============
-
-interface KpiCardProps {
-  label: string;
-  value: string;
-  delta: number;
-  icon: React.ReactNode;
-  compare: boolean;
-  prevLabel?: string;
-  sub?: string;
-  tone?: 'success' | 'danger';
-  negativeAware?: boolean;
-  value_?: number;
-  /** When provided, the card becomes a clickable link to a filtered view. */
-  to?: string;
-}
-const KpiCard = ({ label, value, delta, icon, compare, prevLabel, sub, tone, negativeAware, value_, to }: KpiCardProps) => {
-  const up = delta > 0.5;
-  const down = delta < -0.5;
-  const flat = !up && !down;
-  const valColor = tone === 'danger' ? 'text-destructive'
-    : tone === 'success' ? 'text-success'
-    : negativeAware && (value_ ?? 0) < 0 ? 'text-destructive'
-    : 'text-foreground';
-  const inner = (
-    <Card className={cn(to && 'transition-shadow hover:shadow-md cursor-pointer h-full')}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <div className="text-muted-foreground flex items-center gap-1">
-          {icon}
-          {to && <ArrowRight className="h-3 w-3 opacity-40" />}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className={cn('text-xl sm:text-2xl font-bold', valColor)}>{value}</div>
-        {compare ? (
-          <div className="flex items-center gap-1.5 mt-1 text-xs">
-            <span className={cn('inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded font-medium',
-              up && 'bg-success/10 text-success',
-              down && 'bg-destructive/10 text-destructive',
-              flat && 'bg-muted text-muted-foreground'
-            )}>
-              {up && <TrendingUp className="h-3 w-3" />}
-              {down && <TrendingDown className="h-3 w-3" />}
-              {flat && <Minus className="h-3 w-3" />}
-              {Math.abs(delta).toFixed(1)}%
-            </span>
-            {prevLabel && <span className="text-muted-foreground">vs {prevLabel}</span>}
-          </div>
-        ) : sub ? (
-          <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-  return to ? <Link to={to} className="block">{inner}</Link> : inner;
-};
-
-interface DistroPieProps {
-  title: string;
-  data: { name: string; value: number }[];
-  onClick: (name: string) => void;
-  onBack: () => void;
-  labelValue?: boolean;
-}
-const DistroPie = ({ title, data, onClick, onBack, labelValue }: DistroPieProps) => (
-  <Card>
-    <CardHeader>
-      <CardTitle>{title}</CardTitle>
-    </CardHeader>
-    <CardContent>
-      {data.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No data</p>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie data={data} cx="50%" cy="50%" outerRadius={80} dataKey="value"
-              label={({ name, value, percent }) => labelValue ? `${name}: ${value}` : `${name}: ${(percent * 100).toFixed(0)}%`}
-              labelLine={false}
-              onClick={(d: any) => { onClick(d.name); onBack(); }}
-              cursor="pointer">
-              {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-            </Pie>
-            <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-          </PieChart>
-        </ResponsiveContainer>
-      )}
-    </CardContent>
-  </Card>
-);
