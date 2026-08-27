@@ -276,6 +276,13 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     return days.map(d => ({ date: format(d, 'd MMM'), ...map.get(isoDay(d))! }));
   }, [range, subsScoped]);
 
+  // Hero chart reads one merged series so the metric switcher can flip between
+  // money and subscriber counts without swapping datasets.
+  const heroSeries = useMemo(
+    () => timeseries.map((d, i) => ({ ...d, newC: growthSeries[i]?.newC ?? 0 })),
+    [timeseries, growthSeries],
+  );
+
 
 
   // ---------- service split timeseries (only when service==='all') ----------
