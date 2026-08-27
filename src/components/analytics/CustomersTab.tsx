@@ -3,7 +3,7 @@ import {
 } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AnalyticsCard, inr, tooltipStyle, useRowLimit } from './AnalyticsPrimitives';
+import { AnalyticsCard, ChartFrame, chartTheme, inr, useRowLimit } from './AnalyticsPrimitives';
 
 /** Customers — growth, best payers, biggest defaulters. */
 export const CustomersTab = ({
