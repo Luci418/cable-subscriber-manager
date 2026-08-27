@@ -239,9 +239,7 @@ export default function Catalog() {
         const prov = providers.find(x => x.id === p.provider_id);
         if (!prov) return <span className="text-xs text-muted-foreground">—</span>;
         return (
-          <Badge variant="outline" className={cn('font-normal border', hueFor(prov.name))}>
-            {prov.name}
-          </Badge>
+          <ProviderBadge name={prov.name} />
         );
       },
     },
@@ -317,7 +315,7 @@ export default function Catalog() {
       header: 'Provider',
       cell: (p) => (
         <div className="flex items-center gap-2 min-w-0">
-          <Badge variant="outline" className={cn('font-normal border', hueFor(p.name))}>{p.name}</Badge>
+          <ProviderBadge name={p.name} />
         </div>
       ),
     },
