@@ -140,12 +140,17 @@ export function OverviewTab({
                   </p>
                 )}
               </div>
-              <span
-                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${chipToneClasses(chip.tone)}`}
-              >
-                <span aria-hidden>{chip.icon}</span>
-                {chip.label}
-              </span>
+              {chip.tone === 'success' ? (
+                <span className="text-xs text-muted-foreground">No action required</span>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground max-w-full sm:max-w-[280px]"
+                  title={chip.label}
+                >
+                  <span aria-hidden className={`h-1.5 w-1.5 rounded-full shrink-0 ${chipDotClasses(chip.tone)}`} />
+                  <span className="truncate">{chip.label}</span>
+                </span>
+              )}
             </div>
 
             <div className="space-y-2 text-sm">
