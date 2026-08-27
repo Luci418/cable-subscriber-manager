@@ -39,20 +39,32 @@ type PackRow = ReturnType<typeof usePacks>['packs'][number] & {
   provider_cost?: number | null;
 };
 
-// Deterministic colour per provider name (small palette, semantic tokens).
-const PROVIDER_HUE_CLASSES = [
-  'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
-  'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
-  'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-  'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
-  'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30',
-  'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
+// Deterministic dot colour per provider name — hue is a small accent, not the whole chip.
+const PROVIDER_DOT_CLASSES = [
+  'bg-blue-500', 'bg-emerald-500', 'bg-amber-500',
+  'bg-purple-500', 'bg-rose-500', 'bg-cyan-500',
 ];
 
-function hueFor(name: string) {
+function hueDotFor(name: string) {
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  return PROVIDER_HUE_CLASSES[Math.abs(hash) % PROVIDER_HUE_CLASSES.length];
+  return PROVIDER_DOT_CLASSES[Math.abs(hash) % PROVIDER_DOT_CLASSES.length];
+}
+
+/** Quiet provider chip: initial dot + truncated name, never wraps. */
+function ProviderBadge({ name }: { name: string }) {
+  return (
+    <Badge
+      variant="outline"
+      title={name}
+      className="font-normal gap-1.5 whitespace-nowrap max-w-[140px] overflow-hidden"
+    >
+      <span aria-hidden className={cn('h-4 w-4 rounded-full shrink-0 inline-flex items-center justify-center text-[9px] font-semibold text-white', hueDotFor(name))}>
+        {name.charAt(0).toUpperCase()}
+      </span>
+      <span className="truncate">{name}</span>
+    </Badge>
+  );
 }
 
 export default function Catalog() {
