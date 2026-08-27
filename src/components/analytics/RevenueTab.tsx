@@ -4,7 +4,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tv, Wifi } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AnalyticsCard, DistroPie, inr, tooltipStyle, useRowLimit } from './AnalyticsPrimitives';
+import { AnalyticsCard, ChartFrame, DistroPie, chartTheme, inr, useRowLimit } from './AnalyticsPrimitives';
 
 const kFmt = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`);
 
