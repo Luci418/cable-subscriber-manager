@@ -165,16 +165,16 @@ export function OverviewTab({
                     : 0;
                   const daysLeft = sub ? daysUntil(sub.endDate) : null;
                   let statusText: string;
-                  let statusClass = 'text-muted-foreground';
+                  let tone: 'warning' | 'danger' | 'muted' = 'muted';
                   if (!sub) {
                     statusText = 'No active subscription';
-                    statusClass = 'text-yellow-700 dark:text-yellow-400';
+                    tone = 'warning';
                   } else if (daysLeft !== null && daysLeft < 0) {
                     statusText = `Expired ${Math.abs(daysLeft)}d ago${outstanding > 0 ? ` · ₹${outstanding.toFixed(0)} due` : ''}`;
-                    statusClass = 'text-red-700 dark:text-red-400';
+                    tone = 'danger';
                   } else if (outstanding > 0) {
                     statusText = `₹${outstanding.toFixed(0)} due`;
-                    statusClass = 'text-red-700 dark:text-red-400';
+                    tone = 'danger';
                   } else {
                     statusText = 'Settled';
                   }
@@ -182,7 +182,7 @@ export function OverviewTab({
                     key: dev.id,
                     primary: `${dev.serial_number}${sub?.packName ? ` (${sub.packName})` : ''}`,
                     statusText,
-                    statusClass,
+                    tone,
                   };
                 });
                 svc.actives
