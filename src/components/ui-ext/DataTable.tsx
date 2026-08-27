@@ -98,7 +98,7 @@ export function DataTable<T>({
                     <td
                       key={col.id}
                       className={cn(
-                        'px-4 py-3 align-middle',
+                        'px-4 py-2.5 align-middle',
                         alignClass[col.align ?? 'left'],
                         col.hideBelow && hideClass[col.hideBelow],
                         col.className,
