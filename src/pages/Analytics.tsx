@@ -259,6 +259,32 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     });
   }, [range, txnsInRange, txnsPrev, prevRange, compare]);
 
+  // ---------- acquisition vs churn per day ----------
+  // "New" = subscriber created that day. "Churned" = a subscription ended that
+  // day and was not renewed (the subscriber is no longer active).
+  const growthSeries = useMemo(() => {
+    const days = eachDayOfInterval({ start: range.from, end: range.to });
+    const map = new Map<string, { newC: number; churnC: number }>();
+    days.forEach(d => map.set(isoDay(d), { newC: 0, churnC: 0 }));
+
+    subsScoped.forEach(s => {
+      const created = map.get(isoDay(new Date((s as any).created_at)));
+      if (created) created.newC += 1;
+      const end = (s as any).subscription_end;
+      if (end) {
+        const endDate = new Date(end);
+        if (+endDate <= Date.now()) {
+          const e = map.get(isoDay(endDate));
+          if (e) e.churnC += 1;
+        }
+      }
+    });
+
+    return days.map(d => ({ date: format(d, 'd MMM'), ...map.get(isoDay(d))! }));
+  }, [range, subsScoped]);
+
+
+
   // ---------- service split timeseries (only when service==='all') ----------
   const serviceSplit = useMemo(() => {
     const days = eachDayOfInterval({ start: range.from, end: range.to });
