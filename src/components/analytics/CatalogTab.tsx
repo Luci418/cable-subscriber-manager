@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tv, Wifi } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AnalyticsCard, inr, useRowLimit } from './AnalyticsPrimitives';
+import { AnalyticsCard, ShareBar, inr, useRowLimit } from './AnalyticsPrimitives';
 
 /** Catalog — how packs, regions and upstream providers are performing. */
 export const CatalogTab = ({
@@ -16,6 +16,12 @@ export const CatalogTab = ({
   const packs = useRowLimit(packPerf);
   const regions = useRowLimit(regionPerf);
   const providers = useRowLimit(providerPerf);
+
+  // Share bars read off the largest revenue in each table, so a row's width
+  // says "how much of the total this is" at a glance.
+  const maxPack = Math.max(1, ...packPerf.map((p) => p.revenue));
+  const maxRegion = Math.max(1, ...regionPerf.map((r) => r.revenue));
+  const maxProvider = Math.max(1, ...providerPerf.map((p) => p.revenue));
 
   return (
     <div className="space-y-4">
@@ -35,7 +41,10 @@ export const CatalogTab = ({
             )}
             {packs.visible.map((p) => (
               <TableRow key={p.name}>
-                <TableCell className="font-medium">{p.name}</TableCell>
+                <TableCell className="font-medium">
+                  {p.name}
+                  <div className="mt-1.5 max-w-[220px]"><ShareBar value={p.revenue} max={maxPack} /></div>
+                </TableCell>
                 <TableCell className="text-right">{p.subs}</TableCell>
                 <TableCell className="text-right">{inr(p.revenue)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{inr(p.arpu)}</TableCell>
@@ -62,7 +71,10 @@ export const CatalogTab = ({
             )}
             {regions.visible.map((r) => (
               <TableRow key={r.name}>
-                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="font-medium">
+                  {r.name}
+                  <div className="mt-1.5 max-w-[220px]"><ShareBar value={r.revenue} max={maxRegion} /></div>
+                </TableCell>
                 <TableCell className="text-right">{r.subs}</TableCell>
                 <TableCell className="text-right">{inr(r.revenue)}</TableCell>
                 <TableCell className={cn('text-right', r.outstanding > 0 && 'text-destructive')}>{inr(r.outstanding)}</TableCell>
@@ -94,7 +106,10 @@ export const CatalogTab = ({
             )}
             {providers.visible.map((p) => (
               <TableRow key={`${p.name}-${p.service}`}>
-                <TableCell className="font-medium">{p.name}</TableCell>
+                <TableCell className="font-medium">
+                  {p.name}
+                  <div className="mt-1.5 max-w-[220px]"><ShareBar value={p.revenue} max={maxProvider} /></div>
+                </TableCell>
                 <TableCell className="capitalize">
                   <span className="inline-flex items-center gap-1">
                     {p.service === 'internet' ? <Wifi className="h-3.5 w-3.5" /> : <Tv className="h-3.5 w-3.5" />}
