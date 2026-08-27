@@ -10,6 +10,12 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### UI polish — calmer status language (2026-08-27)
+- Customers list: "Next action" column no longer renders colored emoji pills; a small colored dot + plain text carries urgency. Settled rows show `—`. Credit balances render muted instead of green-bold.
+- Customer Overview: red text limited to the "Overall position" headline; per-service and per-device statuses now use the same dot + neutral-text language.
+- Catalog: rainbow per-provider badges replaced with a single neutral outline badge + colored initial dot; `nowrap` + truncation fixes mobile wrapping for long provider names.
+- Shared `DataTable` row padding tightened (`py-3` → `py-2.5`).
+
 ### Docs — Provider sync documentation pass (2026-08-26)
 - `ARCHITECTURE_DECISIONS.md`: added **ADR-013 … ADR-024** covering the provider sync workstream — direction reversal to reactive snapshot sync, ledger authority (INV-46), insert-only sync (INV-47), operator-approved commit, committed-baseline idempotency (INV-48), SMS-owned identity (INV-49), `getSyncPolicy` merge-with-defaults (INV-50), `subscriber_provider_state` shape, verbatim provider status, manual account number as identity key (INV-52), frozen commit interpretation (INV-51), and renewal vs. plan change vs. activation.
 - `.lovable/plan.md`: rewritten as a **superseded-plan note** pointing at `docs/PROVIDER_SYNC_IMPLEMENTATION_PLAN.md` as canonical. The write-through-first / `provider_action_intent` model is documented as a possible future direction only, not current architecture.
