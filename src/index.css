@@ -56,6 +56,16 @@
     --info-foreground: 0 0% 100%;
     --info-muted: 210 85% 96%;
 
+    /* Charts — a 4-step ramp off the primary hue, used in this order.
+       Category colours only; deltas keep using success/destructive. */
+    --chart-1: 224 71% 42%;
+    --chart-2: 200 70% 45%;
+    --chart-3: 262 52% 55%;
+    --chart-4: 32 80% 50%;
+    --chart-grid: 30 12% 89%;
+
+
+
     /* Structure */
     --border: 30 12% 89%;
     --input: 30 12% 89%;
