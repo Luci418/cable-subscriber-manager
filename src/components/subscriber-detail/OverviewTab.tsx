@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import type { Subscriber } from '@/lib/storage';
 import { daysUntil } from '@/lib/activeSubs';
 import {
-  chipToneClasses,
+  chipDotClasses,
   computeNextActionChip,
   computeOverallPosition,
   positionToneClasses,
