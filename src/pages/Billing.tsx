@@ -13,6 +13,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui-ext';
 import { Badge } from '@/components/ui/badge';
+import { chipDotClasses } from '@/lib/financialPosition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -206,20 +207,23 @@ export const Billing = () => {
   const expiringCount = bySvc.filter((l) => l.isExpiring).length;
   const activeCount = bySvc.filter((l) => l.isActive).length;
 
+  // Calm status language — dot + neutral text (matches Customers list).
   const nextActionChip = (l: ServiceLine) => {
+    const dot = (tone: 'danger' | 'warning' | 'success' | 'muted', label: string) => (
+      <span className="inline-flex items-center gap-1.5 text-sm">
+        <span aria-hidden className={`h-1.5 w-1.5 rounded-full shrink-0 ${chipDotClasses(tone)}`} />
+        <span className={tone === 'muted' ? 'text-muted-foreground' : tone === 'danger' ? 'text-destructive' : ''}>{label}</span>
+      </span>
+    );
     if (l.isOverdue && l.daysUntil !== null && l.daysUntil < 0) {
-      return <Badge variant="destructive">Overdue · expired {Math.abs(l.daysUntil)}d ago</Badge>;
+      return dot('danger', `Overdue · expired ${Math.abs(l.daysUntil)}d ago`);
     }
-    if (l.isOverdue) return <Badge variant="destructive">Collect payment</Badge>;
+    if (l.isOverdue) return dot('danger', 'Collect payment');
     if (l.isExpiring) {
-      return (
-        <Badge className="bg-warning/15 text-warning border-warning/30" variant="outline">
-          {l.daysUntil === 0 ? 'Expires today' : `Renew in ${l.daysUntil}d`}
-        </Badge>
-      );
+      return dot('warning', l.daysUntil === 0 ? 'Expires today' : `Renew in ${l.daysUntil}d`);
     }
-    if (!l.isActive) return <Badge variant="outline">No active subscription</Badge>;
-    return <Badge variant="outline" className="bg-success/15 text-success border-success/30">Current</Badge>;
+    if (!l.isActive) return dot('muted', 'No active subscription');
+    return dot('success', 'Current');
   };
 
   if (loading) {

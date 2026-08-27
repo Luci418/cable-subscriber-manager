@@ -13,6 +13,7 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 ### UI polish — calmer status language (2026-08-27)
 - Customers list: "Next action" column no longer renders colored emoji pills; a small colored dot + plain text carries urgency. Settled rows show `—`. Credit balances render muted instead of green-bold.
 - Customer Overview: red text limited to the "Overall position" headline; per-service and per-device statuses now use the same dot + neutral-text language.
+- Billing: worklist Status column and "Needs attention" rows now use the same dot + neutral-text pattern instead of colored badge pills; red remains only on balances actually owed.
 - Catalog: rainbow per-provider badges replaced with a single neutral outline badge + colored initial dot; `nowrap` + truncation fixes mobile wrapping for long provider names.
 - Shared `DataTable` row padding tightened (`py-3` → `py-2.5`).
 
