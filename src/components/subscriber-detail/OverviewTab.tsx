@@ -220,7 +220,12 @@ export function OverviewTab({
                         {rows.map((r) => (
                           <li key={r.key} className="flex items-center justify-between gap-2 text-xs">
                             <span className="font-mono truncate">{r.primary}</span>
-                            <span className={`shrink-0 ${r.statusClass}`}>{r.statusText}</span>
+                            <span className={`shrink-0 inline-flex items-center gap-1.5 ${r.tone === 'muted' ? 'text-muted-foreground' : 'text-foreground'}`}>
+                              {r.tone !== 'muted' && (
+                                <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${chipDotClasses(r.tone)}`} />
+                              )}
+                              {r.statusText}
+                            </span>
                           </li>
                         ))}
                       </ul>
