@@ -263,12 +263,18 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     subsScoped.forEach(s => {
       const created = map.get(isoDay(new Date((s as any).created_at)));
       if (created) created.newC += 1;
-      const end = (s as any).subscription_end;
-      if (end) {
-        const endDate = new Date(end);
-        if (+endDate <= Date.now()) {
-          const e = map.get(isoDay(endDate));
-          if (e) e.churnC += 1;
+      // Churn = a subscription expired that day (from the per-service timeline
+      // blobs populated by v_subscriber_subscription_timeline).
+      const timelines: any[][] = [
+        (s as any)._timelineCable || [],
+        (s as any)._timelineInternet || [],
+      ];
+      for (const timeline of timelines) {
+        for (const h of timeline) {
+          if (h?.status === 'expired' && h?.endDate) {
+            const e = map.get(isoDay(new Date(h.endDate)));
+            if (e) e.churnC += 1;
+          }
         }
       }
     });

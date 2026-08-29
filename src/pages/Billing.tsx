@@ -201,8 +201,14 @@ export const Billing = () => {
           activeCount={activeCount}
           totalLines={bySvc.length}
           onSelectStatus={(s) => {
-            setParam('tab', 'worklist');
-            setParam('status', s);
+            // Batch both params into one setParams call — sequential setParam
+            // calls read the same render-time snapshot, so the second would
+            // discard the first.
+            const next = new URLSearchParams(params);
+            next.set('tab', 'worklist');
+            if (s === 'all') next.delete('status');
+            else next.set('status', s);
+            setParams(next, { replace: true });
             setWorklistPage(1);
           }}
         />
