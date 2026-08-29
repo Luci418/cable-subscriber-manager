@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense, useEffect } from "react";
+import { lazyWithRetry, clearChunkReloadGuards } from "@/lib/lazyWithRetry";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,19 +34,19 @@ const importAnalytics = () => import("./pages/Analytics");
 const importComplaints = () => import("./pages/Complaints");
 const importSettings = () => import("./pages/Settings");
 
-const OAuthConsent = lazy(importOAuthConsent);
-const CustomerNew = lazy(importCustomerNew);
-const CustomerDetail = lazy(importCustomerDetail);
-const Equipment = lazy(importEquipment);
-const EquipmentDetail = lazy(importEquipmentDetail);
-const Catalog = lazy(importCatalog);
-const ProviderImport = lazy(importProviderImport);
-const ImportRuns = lazy(importImportRuns);
-const ImportRunDetail = lazy(importImportRunDetail);
-const Billing = lazy(() => importBilling().then((m) => ({ default: m.Billing })));
-const Analytics = lazy(() => importAnalytics().then((m) => ({ default: m.Analytics })));
-const Complaints = lazy(() => importComplaints().then((m) => ({ default: m.Complaints })));
-const Settings = lazy(() => importSettings().then((m) => ({ default: m.Settings })));
+const OAuthConsent = lazyWithRetry(importOAuthConsent, "oauth-consent");
+const CustomerNew = lazyWithRetry(importCustomerNew, "customer-new");
+const CustomerDetail = lazyWithRetry(importCustomerDetail, "customer-detail");
+const Equipment = lazyWithRetry(importEquipment, "equipment");
+const EquipmentDetail = lazyWithRetry(importEquipmentDetail, "equipment-detail");
+const Catalog = lazyWithRetry(importCatalog, "catalog");
+const ProviderImport = lazyWithRetry(importProviderImport, "provider-import");
+const ImportRuns = lazyWithRetry(importImportRuns, "import-runs");
+const ImportRunDetail = lazyWithRetry(importImportRunDetail, "import-run-detail");
+const Billing = lazyWithRetry(() => importBilling().then((m) => ({ default: m.Billing })), "billing");
+const Analytics = lazyWithRetry(() => importAnalytics().then((m) => ({ default: m.Analytics })), "analytics");
+const Complaints = lazyWithRetry(() => importComplaints().then((m) => ({ default: m.Complaints })), "complaints");
+const Settings = lazyWithRetry(() => importSettings().then((m) => ({ default: m.Settings })), "settings");
 
 /**
  * Warm the route chunks once the first screen is idle. Code splitting keeps
@@ -55,6 +56,8 @@ const Settings = lazy(() => importSettings().then((m) => ({ default: m.Settings 
  */
 function usePrefetchRoutes() {
   useEffect(() => {
+    // The app booted fine, so any earlier stale-chunk reload guard is spent.
+    clearChunkReloadGuards();
     const warm = () => {
       [
         importCustomerDetail,
