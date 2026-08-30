@@ -16,26 +16,42 @@ export function retryImport<T>(
   factory: () => Promise<T>,
   key: string,
 ): Promise<T> {
-  return factory().catch(async (err) => {
+  const flag = RELOAD_KEY + key;
+  const clear = () => {
     try {
-      return await factory();
+      sessionStorage?.removeItem(flag);
     } catch {
-      const flag = RELOAD_KEY + key;
-      const alreadyReloaded =
-        typeof sessionStorage !== "undefined" && sessionStorage.getItem(flag);
-      if (!alreadyReloaded && typeof window !== "undefined") {
-        try {
-          sessionStorage.setItem(flag, "1");
-        } catch {
-          /* storage may be unavailable */
-        }
-        window.location.reload();
-        // Never resolves; the page is going away.
-        return new Promise<T>(() => {});
-      }
-      throw err;
+      /* ignore */
     }
-  });
+  };
+  return factory().then(
+    (mod) => {
+      // This chunk loaded fine, so its one-shot reload budget is restored.
+      clear();
+      return mod;
+    },
+    async (err) => {
+      try {
+        const mod = await factory();
+        clear();
+        return mod;
+      } catch {
+        const alreadyReloaded =
+          typeof sessionStorage !== "undefined" && sessionStorage.getItem(flag);
+        if (!alreadyReloaded && typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(flag, "1");
+          } catch {
+            /* storage may be unavailable */
+          }
+          window.location.reload();
+          // Never resolves; the page is going away.
+          return new Promise<T>(() => {});
+        }
+        throw err;
+      }
+    },
+  );
 }
 
 export function lazyWithRetry<T extends ComponentType<any>>(
@@ -45,14 +61,11 @@ export function lazyWithRetry<T extends ComponentType<any>>(
   return lazy(() => retryImport(factory, key));
 }
 
-/** Clear the reload guards once the app has successfully booted a route. */
+/**
+ * Deprecated: guards are now cleared per-chunk on a successful import. Clearing
+ * everything at boot defeated the one-shot protection, because the boot caused
+ * by the reload wiped the flag before the failing chunk was retried.
+ */
 export function clearChunkReloadGuards() {
-  try {
-    if (typeof sessionStorage === "undefined") return;
-    Object.keys(sessionStorage)
-      .filter((k) => k.startsWith(RELOAD_KEY))
-      .forEach((k) => sessionStorage.removeItem(k));
-  } catch {
-    /* ignore */
-  }
+  /* no-op */
 }

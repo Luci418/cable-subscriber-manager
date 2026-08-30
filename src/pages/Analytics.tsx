@@ -265,10 +265,9 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
       if (created) created.newC += 1;
       // Churn = a subscription expired that day (from the per-service timeline
       // blobs populated by v_subscriber_subscription_timeline).
-      const timelines: any[][] = [
-        (s as any)._timelineCable || [],
-        (s as any)._timelineInternet || [],
-      ];
+      const timelines: any[][] = [];
+      if (service !== 'internet') timelines.push((s as any)._timelineCable || []);
+      if (service !== 'cable') timelines.push((s as any)._timelineInternet || []);
       for (const timeline of timelines) {
         for (const h of timeline) {
           if (h?.status === 'expired' && h?.endDate) {
@@ -280,7 +279,7 @@ export const Analytics = ({ onBack, onFilterPack, onFilterRegion, onFilterBalanc
     });
 
     return days.map(d => ({ date: format(d, 'd MMM'), ...map.get(isoDay(d))! }));
-  }, [range, subsScoped]);
+  }, [range, subsScoped, service]);
 
   // Hero chart reads one merged series so the metric switcher can flip between
   // money and subscriber counts without swapping datasets.
