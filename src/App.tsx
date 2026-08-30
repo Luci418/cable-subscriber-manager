@@ -56,8 +56,6 @@ const Settings = lazyWithRetry(() => importSettings().then((m) => ({ default: m.
  */
 function usePrefetchRoutes() {
   useEffect(() => {
-    // The app booted fine, so any earlier stale-chunk reload guard is spent.
-    clearChunkReloadGuards();
     const warm = () => {
       [
         importCustomerDetail,
