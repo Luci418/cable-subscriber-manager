@@ -16,26 +16,42 @@ export function retryImport<T>(
   factory: () => Promise<T>,
   key: string,
 ): Promise<T> {
-  return factory().catch(async (err) => {
+  const flag = RELOAD_KEY + key;
+  const clear = () => {
     try {
-      return await factory();
+      sessionStorage?.removeItem(flag);
     } catch {
-      const flag = RELOAD_KEY + key;
-      const alreadyReloaded =
-        typeof sessionStorage !== "undefined" && sessionStorage.getItem(flag);
-      if (!alreadyReloaded && typeof window !== "undefined") {
-        try {
-          sessionStorage.setItem(flag, "1");
-        } catch {
-          /* storage may be unavailable */
-        }
-        window.location.reload();
-        // Never resolves; the page is going away.
-        return new Promise<T>(() => {});
-      }
-      throw err;
+      /* ignore */
     }
-  });
+  };
+  return factory().then(
+    (mod) => {
+      // This chunk loaded fine, so its one-shot reload budget is restored.
+      clear();
+      return mod;
+    },
+    async (err) => {
+      try {
+        const mod = await factory();
+        clear();
+        return mod;
+      } catch {
+        const alreadyReloaded =
+          typeof sessionStorage !== "undefined" && sessionStorage.getItem(flag);
+        if (!alreadyReloaded && typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(flag, "1");
+          } catch {
+            /* storage may be unavailable */
+          }
+          window.location.reload();
+          // Never resolves; the page is going away.
+          return new Promise<T>(() => {});
+        }
+        throw err;
+      }
+    },
+  );
 }
 
 export function lazyWithRetry<T extends ComponentType<any>>(
