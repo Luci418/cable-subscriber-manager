@@ -61,14 +61,11 @@ export function lazyWithRetry<T extends ComponentType<any>>(
   return lazy(() => retryImport(factory, key));
 }
 
-/** Clear the reload guards once the app has successfully booted a route. */
+/**
+ * Deprecated: guards are now cleared per-chunk on a successful import. Clearing
+ * everything at boot defeated the one-shot protection, because the boot caused
+ * by the reload wiped the flag before the failing chunk was retried.
+ */
 export function clearChunkReloadGuards() {
-  try {
-    if (typeof sessionStorage === "undefined") return;
-    Object.keys(sessionStorage)
-      .filter((k) => k.startsWith(RELOAD_KEY))
-      .forEach((k) => sessionStorage.removeItem(k));
-  } catch {
-    /* ignore */
-  }
+  /* no-op */
 }
