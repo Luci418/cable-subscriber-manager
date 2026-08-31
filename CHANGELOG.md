@@ -10,6 +10,17 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Production deployment workflow — self-hosted stack (2026-08-31)
+- Target stack fixed: **Vercel** (static frontend, free Hobby tier) + **your own Supabase project** (Mumbai region, free tier). Nothing hosted on Lovable.
+- Added `vercel.json`: Vite build config, SPA fallback rewrite, immutable caching for `/assets/*`, `no-store` on `index.html` (prevents the stale-chunk failures that motivated `lazyWithRetry`), and security headers (HSTS, nosniff, frame-deny, referrer policy).
+- Added `.github/workflows/ci.yml`: typecheck, lint, unit tests, production build, plus a database job that runs `supabase db reset` from scratch and the pgTAP suite. Intended to be wired as a required check before Vercel promotes to production.
+- Added `.github/workflows/deploy-db.yml`: applies migrations to production via `supabase db push` after CI passes on `main`, gated behind a `production` GitHub environment for optional manual approval.
+- Added `.env.example` documenting the three public `VITE_*` variables and stating explicitly that `service_role` / DB password never belong in the frontend.
+- Added `npm run typecheck` (`tsc -b`).
+- Rewrote `docs/DEPLOYMENT.md`: host comparison (Vercel vs Cloudflare Pages vs Netlify), free-tier limits and upgrade triggers, the one-time schema+data migration runbook (`db push`, data-only `pg_dump --disable-triggers`, `user_id` remap, first-Owner seed, auth hardening, `pg_cron` re-schedule), cutover checklist, change-promotion flow, own-your-backups policy, and the post-deploy smoke test.
+
+
+
 ### UI polish — calmer status language (2026-08-27)
 - Customers list: "Next action" column no longer renders colored emoji pills; a small colored dot + plain text carries urgency. Settled rows show `—`. Credit balances render muted instead of green-bold.
 - Customer Overview: red text limited to the "Overall position" headline; per-service and per-device statuses now use the same dot + neutral-text language.
