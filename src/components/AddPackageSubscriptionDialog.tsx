@@ -97,7 +97,7 @@ export const AddPackageSubscriptionDialog = ({
     let pinnedProvider: string | null = null;
 
     if (deviceId) {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('subscriptions')
         .select('id, provider_id')
         .eq('device_id', deviceId)
@@ -106,18 +106,18 @@ export const AddPackageSubscriptionDialog = ({
       pinnedProvider = activeCount > 0 ? (data![0]?.provider_id ?? null) : null;
     } else {
       const [viewRes, subRes] = await Promise.all([
-        (supabase as any)
+        supabase
           .from('v_subscriber_active_subscription')
           .select('subscription_id')
           .eq('subscriber_id', subscriberId)
           .eq('service_type', serviceType),
-        (supabase as any)
+        supabase
           .from('subscribers')
           .select('cable_provider_id, internet_provider_id')
           .eq('id', subscriberId)
           .maybeSingle(),
       ]);
-      activeCount = (viewRes?.data as any[] | null)?.length || 0;
+      activeCount = viewRes?.data?.length || 0;
       pinnedProvider = activeCount > 0
         ? (serviceType === 'internet'
             ? subRes?.data?.internet_provider_id
