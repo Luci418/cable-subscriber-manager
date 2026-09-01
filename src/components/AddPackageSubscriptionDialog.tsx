@@ -61,12 +61,12 @@ export const AddPackageSubscriptionDialog = ({
   //   labelled by provider so the operator knows what they're picking.
   const providerNameById = new Map(providers.map((p) => [p.id, p.name] as const));
   const allServicePacks = getActivePacks().filter(
-    (p: any) => (p.service_type || 'cable') === serviceType,
+    (p) => (p.service_type || 'cable') === serviceType,
   );
   const activePacks = activeProviderId
-    ? allServicePacks.filter((p: any) => p.provider_id === activeProviderId)
+    ? allServicePacks.filter((p) => p.provider_id === activeProviderId)
     : allServicePacks;
-  const selectedPackData: any = activePacks.find((p) => p.name === selectedPack);
+  const selectedPackData = activePacks.find((p) => p.name === selectedPack);
   const isPrepaid = selectedPackData?.billing_type === 'prepaid';
   const validityDays = Number(selectedPackData?.validity_days) || 30;
 
@@ -172,7 +172,7 @@ export const AddPackageSubscriptionDialog = ({
     // subscription/history/pack/provider in one transaction. The balance
     // trigger then recomputes cable_balance / internet_balance from the
     // ledger — we never write balance from the client.
-    const { error } = await (supabase as any).rpc('create_subscription', {
+    const { error } = await supabase.rpc('create_subscription', {
       p_subscriber_id: subscriberId,
       p_service_type: serviceType,
       p_pack_id: selectedPackData.id,
@@ -222,7 +222,7 @@ export const AddPackageSubscriptionDialog = ({
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   {activePacks.length > 0 ? (
-                    activePacks.map((pack: any) => {
+                    activePacks.map((pack) => {
                       const providerName = pack.provider_id
                         ? providerNameById.get(pack.provider_id) ?? 'Unknown provider'
                         : 'No provider';
