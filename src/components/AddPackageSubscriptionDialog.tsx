@@ -46,7 +46,7 @@ export const AddPackageSubscriptionDialog = ({
   const { providers } = useProviders(user?.id);
   const [selectedPack, setSelectedPack] = useState<string>('');
   const [duration, setDuration] = useState<number>(1);
-  const [currentSubscriber, setCurrentSubscriber] = useState<any>(null);
+  const [currentSubscriber, setCurrentSubscriber] = useState<{ activeCount: number } | null>(null);
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [subscriberLoading, setSubscriberLoading] = useState(false);
@@ -61,12 +61,12 @@ export const AddPackageSubscriptionDialog = ({
   //   labelled by provider so the operator knows what they're picking.
   const providerNameById = new Map(providers.map((p) => [p.id, p.name] as const));
   const allServicePacks = getActivePacks().filter(
-    (p: any) => (p.service_type || 'cable') === serviceType,
+    (p) => (p.service_type || 'cable') === serviceType,
   );
   const activePacks = activeProviderId
-    ? allServicePacks.filter((p: any) => p.provider_id === activeProviderId)
+    ? allServicePacks.filter((p) => p.provider_id === activeProviderId)
     : allServicePacks;
-  const selectedPackData: any = activePacks.find((p) => p.name === selectedPack);
+  const selectedPackData = activePacks.find((p) => p.name === selectedPack);
   const isPrepaid = selectedPackData?.billing_type === 'prepaid';
   const validityDays = Number(selectedPackData?.validity_days) || 30;
 
@@ -97,7 +97,7 @@ export const AddPackageSubscriptionDialog = ({
     let pinnedProvider: string | null = null;
 
     if (deviceId) {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('subscriptions')
         .select('id, provider_id')
         .eq('device_id', deviceId)
@@ -106,18 +106,18 @@ export const AddPackageSubscriptionDialog = ({
       pinnedProvider = activeCount > 0 ? (data![0]?.provider_id ?? null) : null;
     } else {
       const [viewRes, subRes] = await Promise.all([
-        (supabase as any)
+        supabase
           .from('v_subscriber_active_subscription')
           .select('subscription_id')
           .eq('subscriber_id', subscriberId)
           .eq('service_type', serviceType),
-        (supabase as any)
+        supabase
           .from('subscribers')
           .select('cable_provider_id, internet_provider_id')
           .eq('id', subscriberId)
           .maybeSingle(),
       ]);
-      activeCount = (viewRes?.data as any[] | null)?.length || 0;
+      activeCount = viewRes?.data?.length || 0;
       pinnedProvider = activeCount > 0
         ? (serviceType === 'internet'
             ? subRes?.data?.internet_provider_id
@@ -172,7 +172,7 @@ export const AddPackageSubscriptionDialog = ({
     // subscription/history/pack/provider in one transaction. The balance
     // trigger then recomputes cable_balance / internet_balance from the
     // ledger — we never write balance from the client.
-    const { error } = await (supabase as any).rpc('create_subscription', {
+    const { error } = await supabase.rpc('create_subscription', {
       p_subscriber_id: subscriberId,
       p_service_type: serviceType,
       p_pack_id: selectedPackData.id,
@@ -222,7 +222,7 @@ export const AddPackageSubscriptionDialog = ({
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   {activePacks.length > 0 ? (
-                    activePacks.map((pack: any) => {
+                    activePacks.map((pack) => {
                       const providerName = pack.provider_id
                         ? providerNameById.get(pack.provider_id) ?? 'Unknown provider'
                         : 'No provider';
