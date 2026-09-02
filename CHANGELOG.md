@@ -10,6 +10,11 @@ See [`docs/releases/`](./docs/releases/) for detailed per-version notes.
 
 ## [Unreleased]
 
+### Launch walkthrough — complete ground-up runbook (2026-09-02)
+- Added `docs/LAUNCH_WALKTHROUGH.md`: an exhaustive, click-by-click deployment runbook that assumes zero existing accounts and no installed tooling. Covers tool installation per OS (macOS/Windows/Linux) with verification commands; GitHub account, 2FA, private repo, PAT, and clone; Supabase account, org, Mumbai project, and every value to collect; applying all 75 migrations with drift and RLS verification SQL; the data decision (start clean vs migrate) including the Lovable Cloud `pg_dump` constraint, ordered hard-delete of test fixtures, and pack cost backfill; auth hardening, URL configuration, manual first-Owner grant, ownership remapping, closing signups, and re-scheduling the `pg_cron` expiry job; Vercel account, import, build settings, the three env vars and their exact names, custom domain DNS records, and CI gating; GitHub Actions secrets and the `production` approval environment; a real backup + restore-to-scratch-project drill and an automated nightly dump workflow; UptimeRobot monitors; the week-two staging split; a launch-day checklist and smoke test; the ongoing release process; cost table with upgrade triggers; and a symptom/cause/fix troubleshooting table.
+
+
+
 ### Production deployment workflow — self-hosted stack (2026-08-31)
 - Target stack fixed: **Vercel** (static frontend, free Hobby tier) + **your own Supabase project** (Mumbai region, free tier). Nothing hosted on Lovable.
 - Added `vercel.json`: Vite build config, SPA fallback rewrite, immutable caching for `/assets/*`, `no-store` on `index.html` (prevents the stale-chunk failures that motivated `lazyWithRetry`), and security headers (HSTS, nosniff, frame-deny, referrer policy).
